@@ -5492,14 +5492,14 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             $('btnBgm').addEventListener('pointerleave', () => { if (bgmPressTimer) { clearTimeout(bgmPressTimer); bgmPressTimer = null; } });
             $('btnIdle').addEventListener('click', toggleIdle);
             $('btnAchievements') && $('btnAchievements').addEventListener('click', () => {
-                renderAchievementsPanel();
+                const f = window.renderAchievementsPanel; if (f) f();
                 $('achievementsModal').style.display = 'flex';
             });
             $('modalCloseAchievements') && $('modalCloseAchievements').addEventListener('click', () => {
                 $('achievementsModal').style.display = 'none';
             });
             $('btnEvents') && $('btnEvents').addEventListener('click', () => {
-                renderEventsPanel();
+                const f = window.renderEventsPanel; if (f) f();
                 $('eventsModal').style.display = 'flex';
             });
             $('modalCloseEvents') && $('modalCloseEvents').addEventListener('click', () => {
@@ -5996,7 +5996,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 // 生成可读的角色设定文本
                 const lines = [];
                 lines.push('══════════════════════════════════');
-                lines.push('  末日生存 — 角色设定卡');
+                lines.push('  代号：ZDay — 角色设定卡');
                 lines.push('══════════════════════════════════');
                 lines.push('');
                 lines.push('【世界背景】');
@@ -7695,23 +7695,23 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 list.appendChild(el);
             });
         }
-        // 事件记录存储
-        let eventLog = [];
+        // 事件记录存储（用于事件面板显示）
+        let eventDisplayLog = [];
         function logEvent(type, text) {
             const clk = gclk();
-            eventLog.unshift({ type, text, time: fmtTime(clk.elapsedSec) + ' D' + (clk.day || 1) });
-            if (eventLog.length > 50) eventLog.pop();
+            eventDisplayLog.unshift({ type, text, time: fmtTime(clk.elapsedSec) + ' D' + (clk.day || 1) });
+            if (eventDisplayLog.length > 50) eventDisplayLog.pop();
         }
         // 渲染事件面板
         function renderEventsPanel() {
             const list = $('eventsList');
             if (!list) return;
-            if (eventLog.length === 0) {
+            if (eventDisplayLog.length === 0) {
                 list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">暂无突发事件记录</div>';
                 return;
             }
             list.innerHTML = '';
-            eventLog.forEach(e => {
+            eventDisplayLog.forEach(e => {
                 const el = document.createElement('div');
                 el.className = 'event-item';
                 el.innerHTML = '<div class="ev-time">' + esc(e.time) + '</div>' + esc(e.text);
@@ -7784,7 +7784,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = '末日求生存档_' + new Date().toISOString().slice(0,10) + '.json';
+            a.download = 'ZDay存档_' + new Date().toISOString().slice(0,10) + '.json';
             a.click();
             URL.revokeObjectURL(url);
             tst('存档已导出');
@@ -8208,6 +8208,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
         window._applyStatusEffect = applyStatusEffect;
         window._tickStatusEffects = tickStatusEffects;
         window._checkAchievements = checkAchievements;
+        window.renderAchievementsPanel = renderAchievementsPanel;
+        window.renderEventsPanel = renderEventsPanel;
 
         // Add buttons to settings panel
         setTimeout(() => {
