@@ -20,7 +20,7 @@
     'hin','abold','migrateSta','migrateChr','migrateCfg','mergeSbx','ssbx','gsbx','ldh','ssv',
     'gsv','gsp','spBar','mentalityLabel','itemEmoji','fmtTime','dayPhase','seasonFromDay',
     'randWeather','randTemp','aiInitStats','fillCharModal','_getHist','_setHist','_getSbx','_setSbx',
-    'hasHover'
+    'hasHover','initAutoBGM','bgmAutoSwitch','launchTutorial','toggleSfx'
   ];
   fnDefaults.forEach(k => {
     if (typeof window[k] !== 'function') {
@@ -61,6 +61,8 @@
         // Helpers needed by playSfx override and status effect system
         const playSfx = window.playSfx, playTone = window.playTone, snotify = window.snotify, tst = window.tst;
         const esc = window.esc, escAttr = window.escAttr;
+        const initAutoBGM = window.initAutoBGM, bgmAutoSwitch = window.bgmAutoSwitch;
+        const launchTutorial = window.launchTutorial, toggleSfx = window.toggleSfx;
         const ABILITIES = window.ABILITIES, NORMAL_SKILLS = window.NORMAL_SKILLS;
         const STATUS_EFFECTS = window.STATUS_EFFECTS, WEAPON_DATA = window.WEAPON_DATA;
         const CRAFT_RECIPES = window.CRAFT_RECIPES, RANDOM_EVENTS = window.RANDOM_EVENTS;
@@ -106,7 +108,8 @@
 
         function tickStatusEffects() {
             const s = gst();
-            if (!s.statusEffects) return;
+            if (!s) return;
+            if (!s.statusEffects) s.statusEffects = {};
             const toRemove = [];
             Object.entries(s.statusEffects).forEach(([key, data]) => {
                 const eff = STATUS_EFFECTS[data.name];
@@ -127,7 +130,9 @@
         // Status effect ticker - runs every game minute
         setInterval(() => {
             const s = gst();
-            if (!s.statusEffects || Object.keys(s.statusEffects).length === 0) return;
+            if (!s) return;
+            if (!s.statusEffects) s.statusEffects = {};
+            if (Object.keys(s.statusEffects).length === 0) return;
             tickStatusEffects();
             sst(s);
         }, 5000);
