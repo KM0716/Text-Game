@@ -115,7 +115,7 @@
 2. 单轮交互固定单一核心视角，不得随意跳转；跨场景切换必须通过角色移动、环境变化、时间流逝自然过渡，禁止无征兆切视角造成叙事混乱。
 
 ## 二、角色演绎准则
-1. 严守角色人设、年龄、职业、健康状况与身份定位，行为、对话、处事逻辑完全贴合设定，杜绝OOC。角色行为动机清晰，情绪转变有情节铺垫，不得出现无理由情绪波动与断崖式性格转变。
+1. 严守角色人设、年龄、职业、健康状况与身份定位，行为、对话、处事逻辑完全贴合设定，杜绝OOC。**人设本身绝对不能口语化、二次元化、主播腔**——所有角色的背景设定、性格描写、身份介绍必须写实严谨，符合末世正常人的认知水平，禁止出现"家人们谁懂啊""哇塞""绝绝子"等网络流行语、直播话术、二次元萌系用语出现在人设设定或角色性格中。角色行为动机清晰，情绪转变有情节铺垫，不得出现无理由情绪波动与断崖式性格转变。
 2. 所有角色情绪均通过动作、微表情、感官细节体现，**绝对禁止**使用"他很生气""她很高兴"这类直白空洞的情绪概括。例如：愤怒应写成"指节捏得发白，下颌绷紧到近乎抽搐"而非"他很愤怒"；悲伤应写成"喉结上下滚了两滚，视线落在虚空处，良久没有眨眼"而非"他很难过"。
 3. 避免无意义的高冷面瘫寡言设定，角色反应有迹可循，情感表达细腻真实。沉默不等于木讷——沉默时可以有"指尖无意识摩挲着袖口的补丁""呼吸放得极缓极轻""眼神飘向远处又迅速收回"等微动作。
 4. 配角出场自然，行为逻辑贴合自身身份立场，不做无脑工具人；多人同场时，需同步呈现至少2-3名角色的神态、动作与即时反应，体现人物间的互动反差与关系张力。
@@ -127,9 +127,9 @@
    - 退役军人说话简短有力，惜字如金，可能夹杂军事术语和粗口，但不浮夸；
    - 老教授措辞严谨，句式完整，可能引用古诗文或典故，说话慢条斯理；
    - 小商贩说话带市井气，话里话外科算盘算，喜欢用反问和比喻；
-   - 年轻学生说话带网络用语残留，容易紧张结巴，但涉及专业领域会突然流利；
+   - 年轻学生说话带日常口语残留，容易紧张结巴，但涉及专业领域会突然流利；
    - 掠夺者说话粗俗直接，威胁居多，句末可能带冷笑或啐痰的动作。
-3. **绝对禁止**所有角色统一用"我觉得""那个""嗯……啊……"这类口语化填充词。不同角色的犹豫有不同表现：有的是沉默低头，有的是咬嘴唇，有的是用指节叩桌面，有的是目光游移。
+3. **对话允许自然口语化，但人设不能口语化**：符合身份的正常口语是允许的（例如老人会说"唉，这年头能不饿肚子就不错了"，村妇会说"你个没良心的"），但禁止所有角色统一使用"我觉得""那个""嗯……啊……"这类毫无个性的AI通用填充词。不同角色的犹豫应有不同表现：有的沉默低头，有的咬嘴唇，有的用指节叩桌面，有的目光游移。
 4. 禁止短句蹦字式敷衍回复，对话有态度、有情绪、有交互，每句台词均服务于剧情或人物塑造。
 5. 存在亲密关系的角色互动需体现自然的黏糊感，加入下意识的肢体小动作（如不自觉靠近半步、说话时碰对方胳膊、分享同一件物品时手指短暂触碰），展现情绪反差与双向互动细节；多人互动需体现角色间的肢体接触与情绪碰撞。
 6. 禁止问答式流水账对话，删除无意义闲聊，避免同质化、凑字数的无效表达。角色回答应有取舍——该隐瞒的隐瞒，该搪塞的搪塞，该撒谎的撒谎，不会对每个问题都如实详尽回答。
@@ -3336,29 +3336,47 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             let summaryLock = false;
             async function generateContextSummary() {
                 if (summaryLock) return;
-                // Don't summarize if already has a summary + recent messages
                 const nonSummary = hist.filter(m => !(m.role === 'system' && m.content.startsWith('【前情摘要】')));
                 if (nonSummary.length < 20) return;
                 summaryLock = true;
                 try {
                     const f = cfg();
-                    const toSummarize = nonSummary.slice(0, -10); // Summarize all but last 10 messages
+                    const toSummarize = nonSummary.slice(0, -10);
                     const recent = nonSummary.slice(-10);
                     if (toSummarize.length < 5) { summaryLock = false; return; }
-                    const sumPrompt = `请为以下文字冒险游戏的对话历史生成一份精炼的剧情摘要。要求：\n1. 保留关键事件、重要决定、角色变化、发现的物品/NPC/地点\n2. 记录角色的当前状态变化（心态、精神、欢愉等）\n3. 标出未解决的悬念和目标\n4. 控制在300字以内\n\n对话历史：\n${toSummarize.map(m => (m.role === 'user' ? '【玩家】' : '【叙事】') + ': ' + m.content).join('\n')}\n\n请直接输出摘要，不要其他文字。`;
-                    const sumBody = { model: f.model, messages: [{ role: 'user', content: sumPrompt }], max_tokens: 512, temperature: 0.3 };
-                    const rp = await window._sendProxyRequest(f.ep, sumBody, f.key, null, false);
-                    if (!rp.ok) {
-                        let friendlyMsg = '摘要生成失败 (HTTP ' + rp.status + ')';
-                        if (rp.status === 401) friendlyMsg = '摘要生成失败：认证失败，请检查API密钥';
-                        else if (rp.status === 429) friendlyMsg = '摘要生成失败：请求过于频繁';
-                        else if (rp.status >= 500) friendlyMsg = '摘要生成失败：服务器暂时不可用';
-                        throw new Error(friendlyMsg);
+                    // ===== 摘要上下文保护：防止对话过大时，单条摘要请求也爆上下文 =====
+                    let sumContent = toSummarize.map(m => (m.role === 'user' ? '【玩家】' : '【叙事】') + ': ' + (m.content || '')).join('\n');
+                    // 单条摘要控制在 20000 字符以内（约 5K tokens），超过则截断保留最新部分
+                    if (sumContent.length > 20000) {
+                        sumContent = '…（前面' + (sumContent.length - 20000) + '字省略）…\n' + sumContent.slice(-20000);
                     }
-                    const d = await rp.json();
-                    const summary = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
+                    const sumPrompt = `请为以下文字冒险游戏的对话历史生成一份精炼的剧情摘要。要求：\n1. 保留关键事件、重要决定、角色变化、发现的物品/NPC/地点\n2. 记录角色的当前状态变化（心态、精神、欢愉等）\n3. 标出未解决的悬念和目标\n4. 控制在300字以内\n\n对话历史：\n${sumContent}\n\n请直接输出摘要，不要其他文字。`;
+                    const sumBody = { model: f.model, messages: [{ role: 'user', content: sumPrompt }], max_tokens: 512, temperature: 0.3 };
+                    // ===== 给摘要生成也加 3 次重试 =====
+                    let summary = '';
+                    const MAX_RETRY = 3;
+                    for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
+                        if (attempt > 0) await new Promise(res => setTimeout(res, 800 * attempt));
+                        try {
+                            const abCtl = new AbortController();
+                            const to = setTimeout(() => { try { abCtl.abort(); } catch(_) {} }, 20000);
+                            let rp;
+                            try {
+                                rp = await window._sendProxyRequest(f.ep, sumBody, f.key, abCtl.signal, false);
+                            } finally { clearTimeout(to); }
+                            if (!rp.ok) {
+                                if ((rp.status === 429 || rp.status >= 500) && attempt < MAX_RETRY - 1) continue;
+                                throw new Error('HTTP ' + rp.status);
+                            }
+                            const d = await rp.json();
+                            summary = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
+                            if (summary) break;
+                        } catch (e) {
+                            if (attempt < MAX_RETRY - 1) continue;
+                            throw e;
+                        }
+                    }
                     if (summary) {
-                        // Keep last 10 messages, replace older ones with summary
                         hist = [
                             { role: 'system', content: '【前情摘要】' + summary },
                             ...recent
@@ -3366,10 +3384,10 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         contextSummary = summary;
                         sv(K.SUM, summary);
                         svh(hist);
-                        tst('已生成剧情摘要以保持记忆');
+                        tst('已生成剧情摘要以保持记忆（节省上下文）');
                     }
                 } catch (e) {
-                    // Silently fail - just keep the full history
+                    // 静默失败：保留完整历史即可
                 } finally {
                     summaryLock = false;
                 }
@@ -3417,6 +3435,88 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 // 代理请求辅助函数（使用全局定义的版本）
                 const sendProxyRequest = window._sendProxyRequest;
 
+                // ===== 上下文溢出保护：估算总字符数，超阈值强制先摘要 =====
+                const FORCE_SUMMARIZE_CHARS = 32000; // 约 8K tokens 前强制摘要（1中文字≈2.5tokens）
+                let estimatedTotalChars = sysPrompt.length;
+                hist.slice(-f.ctx * 2).forEach(m => { estimatedTotalChars += (m.content || '').length + 8; });
+                if (estimatedTotalChars > FORCE_SUMMARIZE_CHARS && !summaryLock) {
+                    try {
+                        tst('上下文较大，正在压缩记忆...');
+                        await generateContextSummary();
+                    } catch(e) { /* 摘要失败也继续，用原对话 */ }
+                }
+
+                // ===== 带指数退避重试 + 超时的安全请求函数 =====
+                async function requestWithRetry(targetUrl, body, key, signal, isStream, maxRetries, timeoutMs) {
+                    let lastError = null;
+                    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                        if (attempt > 0) {
+                            const waitMs = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 500, 5000);
+                            if (typeof tst === 'function') tst('第 ' + attempt + ' 次重试，等待 ' + Math.round(waitMs) + 'ms...');
+                            await new Promise(res => setTimeout(res, waitMs));
+                        }
+                        const innerAbort = new AbortController();
+                        let timeoutId = null;
+                        let alreadyAborted = false;
+                        if (timeoutMs > 0) {
+                            timeoutId = setTimeout(() => {
+                                alreadyAborted = true;
+                                try { innerAbort.abort(); } catch(_) {}
+                            }, timeoutMs);
+                        }
+                        // 同时监听外部 signal
+                        if (signal) {
+                            try {
+                                if (signal.aborted) innerAbort.abort();
+                                else signal.addEventListener('abort', () => innerAbort.abort(), { once: true });
+                            } catch(_) {}
+                        }
+                        try {
+                            const response = await sendProxyRequest(targetUrl, body, key, innerAbort.signal, isStream);
+                            if (timeoutId) clearTimeout(timeoutId);
+                            // 2xx 成功直接返回
+                            if (response.ok) return response;
+                            // 只对以下情况重试：429 限流、5xx 服务端错误、0 网络错误
+                            const shouldRetry = response.status === 429 || response.status >= 500;
+                            const et = await response.text().catch(() => '');
+                            let friendlyMsg = 'HTTP ' + response.status;
+                            if (response.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
+                            else if (response.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
+                            else if (response.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
+                            else if (response.status === 429) friendlyMsg = '请求过于频繁（429）';
+                            else if (response.status >= 500) friendlyMsg = '服务器错误（' + response.status + '）';
+                            try {
+                                const ej = JSON.parse(et);
+                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
+                                if (m) {
+                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
+                                    friendlyMsg += '：' + m;
+                                }
+                            } catch(_) {}
+                            friendlyMsg = friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg;
+                            if (shouldRetry && attempt < maxRetries) continue;
+                            const err = new Error(friendlyMsg);
+                            err.httpStatus = response.status;
+                            err.final = true;
+                            throw err;
+                        } catch (e) {
+                            if (timeoutId) clearTimeout(timeoutId);
+                            if (alreadyAborted && (!e || e.name === 'AbortError')) {
+                                lastError = new Error('请求超时（> ' + timeoutMs + 'ms），请检查网络或降低上下文长度后重试');
+                                lastError.timeout = true;
+                            } else if (signal && signal.aborted) {
+                                throw e; // 用户手动取消，不重试
+                            } else {
+                                lastError = e;
+                            }
+                            const isRetriable = !lastError.final && !lastError.httpStatus || (lastError.httpStatus && (lastError.httpStatus === 429 || lastError.httpStatus >= 500));
+                            if (isRetriable && attempt < maxRetries) continue;
+                            throw lastError;
+                        }
+                    }
+                    throw lastError || new Error('未知请求错误');
+                }
+
                 const f = cfg();
                 const indicatorEl = document.createElement('div');
                 indicatorEl.className = 'typing-indicator';
@@ -3438,44 +3538,36 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         const ct = new AbortController();
                         ctrl = ct;
                         const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: true };
-                        const rp = await sendProxyRequest(f.ep, requestBody, f.key, ct.signal, true);
-                        if (!rp.ok) {
-                            const et = await rp.text().catch(() => '未知');
-                            let friendlyMsg = 'HTTP ' + rp.status;
-                            if (rp.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
-                            else if (rp.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
-                            else if (rp.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
-                            else if (rp.status === 429) friendlyMsg = '请求过于频繁：请稍后再试';
-                            else if (rp.status >= 500) friendlyMsg = '服务器错误：服务商暂时不可用';
-                            try {
-                                const ej = JSON.parse(et);
-                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
-                                if (m) {
-                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
-                                    m = m.replace(/\*\*\*\*\d+/g, '****');
-                                    friendlyMsg += '：' + m;
-                                }
-                            } catch(parseErr) {}
-                            throw new Error(friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg);
-                        }
+                        // 流式：重试2次（共3次尝试），超时60秒（流式更宽容）
+                        const rp = await requestWithRetry(f.ep, requestBody, f.key, ct.signal, true, 2, 60000);
                         const rd = rp.body.getReader();
                         const dc = new TextDecoder();
                         let buf = '', bubblesInDOM = [];
-                        let isSSE = true; // 假设是SSE格式，后续检测
+                        let isSSE = true;
                         let firstChunk = true;
                         while (true) {
                             const { done, value } = await rd.read();
-                            if (done) break;
+                            if (done) {
+                                // ===== 修复：SSE 末包丢失 —— done 后处理 buf 中残留的不完整行（有些服务器最后一个包不带\n） =====
+                                if (isSSE && buf && buf.length > 0) {
+                                    const lines = (buf + '\n').split('\n');
+                                    for (const l of lines) {
+                                        if (!l.startsWith('data: ')) continue;
+                                        const d = l.slice(6).trim();
+                                        if (d === '[DONE]') continue;
+                                        try { const j = JSON.parse(d); if (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) full += j.choices[0].delta.content; } catch {}
+                                    }
+                                }
+                                break;
+                            }
                             const chunk = dc.decode(value, { stream: true });
                             buf += chunk;
                             
-                            // 检测是否为SSE格式（首个chunk检测）
                             if (firstChunk && buf.length > 10) {
                                 firstChunk = false;
-                                // 如果第一个chunk不是以 'data:' 开头，则视为非SSE响应
                                 if (!buf.includes('data:')) {
                                     isSSE = false;
-                                    break; // 跳出循环，进入fallback处理
+                                    break;
                                 }
                             }
                             
@@ -3505,7 +3597,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             }
                             scb();
                         }
-                        // Fallback: 如果不是SSE格式，尝试解析为普通JSON
+                        // Fallback: 非SSE格式解析
                         if (!isSSE && buf) {
                             try {
                                 const d = JSON.parse(buf);
@@ -3523,26 +3615,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         }
                     } else if (!f.strm && f.key) {
                         const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: false };
-                        const rp = await sendProxyRequest(f.ep, requestBody, f.key, null, false);
-                        if (!rp.ok) {
-                            const et = await rp.text().catch(() => '未知');
-                            let friendlyMsg = 'HTTP ' + rp.status;
-                            if (rp.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
-                            else if (rp.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
-                            else if (rp.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
-                            else if (rp.status === 429) friendlyMsg = '请求过于频繁：请稍后再试';
-                            else if (rp.status >= 500) friendlyMsg = '服务器错误：服务商暂时不可用';
-                            try {
-                                const ej = JSON.parse(et);
-                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
-                                if (m) {
-                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
-                                    m = m.replace(/\*\*\*\*\d+/g, '****');
-                                    friendlyMsg += '：' + m;
-                                }
-                            } catch(parseErr) {}
-                            throw new Error(friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg);
-                        }
+                        // 非流式：重试3次（共4次尝试），超时30秒
+                        const rp = await requestWithRetry(f.ep, requestBody, f.key, null, false, 3, 30000);
                         const d = await rp.json();
                         full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
                         const bb = (window.pai || pai)(full);
@@ -6921,11 +6995,117 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             { id: 'sewing_kit', name: '针线包', ingredients: ['铁丝', '布条', '绳子'], result: '针线包', desc: '缝补衣物和包扎伤口', difficulty: 1 },
             { id: 'solar_charger', name: '太阳能充电器', ingredients: ['太阳能板', '逆变器', '电线'], result: '太阳能充电器', desc: '野外充电装置', difficulty: 4 },
             { id: 'fishing_net', name: '渔网', ingredients: ['绳子', '铁丝', '尼龙绳'], result: '渔网', desc: '捕鱼效率更高的工具', difficulty: 2 },
-            { id: 'improved_filter', name: '高级滤水器', ingredients: ['简易滤水器', '木炭', '塑料布'], result: '简易滤水器', desc: '升级滤水器，过滤更彻底', difficulty: 3 }
+            { id: 'improved_filter', name: '高级滤水器', ingredients: ['简易滤水器', '木炭', '塑料布'], result: '高级滤水器', desc: '升级滤水器，过滤更彻底，可过滤病毒', difficulty: 3 },
+            // ===== 进阶食物配方 =====
+            { id: 'hardtack', name: '压缩饼干', ingredients: ['面粉', '盐', '水'], result: '压缩饼干x4', desc: '耐储存的干粮，饱腹持久', difficulty: 1 },
+            { id: 'jerky', name: '风干肉', ingredients: ['生肉', '盐', '绳子'], result: '风干肉x3', desc: '腌制风干的肉类，可保存数月', difficulty: 2 },
+            { id: 'smoked_fish', name: '熏鱼', ingredients: ['鲜鱼', '木柴', '盐'], result: '熏鱼x3', desc: '烟熏保存的鱼，风味独特', difficulty: 2 },
+            { id: 'dried_fruit', name: '果干', ingredients: ['水果', '绳子', '布'], result: '果干x4', desc: '晾晒风干的水果，便携零食', difficulty: 1 },
+            { id: 'bone_broth', name: '骨汤罐头', ingredients: ['骨头', '盐', '罐头盒'], result: '骨汤罐头x2', desc: '熬制浓缩骨汤，补充钙质', difficulty: 2 },
+            { id: 'mre_upgrade', name: '自热口粮', ingredients: ['单兵口粮', '生石灰', '塑料袋'], result: '自热口粮', desc: '升级版口粮，野外无需火源加热', difficulty: 3 },
+            { id: 'vitamin_extract', name: '维生素提取物', ingredients: ['蔬菜', '医用酒精', '蒸馏装置'], result: '维生素片x8', desc: '从新鲜蔬果提取浓缩维生素', difficulty: 4 },
+            // ===== 进阶医疗配方 =====
+            { id: 'iodine', name: '碘伏', ingredients: ['碘酒', '酒精', '蒸馏水'], result: '碘伏', desc: '低刺激皮肤消毒剂', difficulty: 2 },
+            { id: 'splint', name: '骨折固定板', ingredients: ['木板', '纱布', '胶带'], result: '骨折固定板', desc: '固定骨折伤肢，防止二次伤害', difficulty: 2 },
+            { id: 'stitch_kit', name: '缝合包', ingredients: ['手术刀', '针线包', '酒精'], result: '缝合包', desc: '伤口缝合工具，止大血管出血', difficulty: 3 },
+            { id: 'herbal_salve', name: '草药膏', ingredients: ['草药', '凡士林', '纱布'], result: '草药膏x3', desc: '天然草药外敷，治疗感染伤口', difficulty: 3 },
+            { id: 'antivenom', name: '抗毒血清', ingredients: ['毒蛇', '注射器', '离心机'], result: '抗毒血清', desc: '解毒神药，治疗蛇咬犬咬感染', difficulty: 5 },
+            { id: 'blood_bag', name: '血浆袋', ingredients: ['输血套装', '抗凝剂', '生理盐水'], result: '血浆袋', desc: '紧急输血用，挽回濒死生命', difficulty: 5 },
+            { id: 'morphine_syringe', name: '吗啡注射器', ingredients: ['止痛药', '注射器', '酒精'], result: '吗啡注射器x2', desc: '强效镇痛剂，重伤急救使用', difficulty: 4 },
+            { id: 'cpr_kit', name: '急救复苏包', ingredients: ['急救手术包', '氧气瓶', '电极片'], result: '心脏复苏包', desc: 'CPR全套工具，心脏骤停急救', difficulty: 5 },
+            // ===== 武器进阶升级链 =====
+            { id: 'pipe_gun', name: '简易手枪', ingredients: ['钢管', '子弹', '弹簧'], result: '简易手枪', desc: '手工改装单发手枪，后坐力大', difficulty: 4 },
+            { id: 'smg_craft', name: '简易冲锋枪', ingredients: ['钢管x2', '手枪零件', '弹簧x2'], result: '简易冲锋枪', desc: '自动改装武器，精度一般', difficulty: 5 },
+            { id: 'tactical_knife', name: '战术匕首', ingredients: ['弹簧钢', '磨刀石', '伞绳'], result: '战术匕首', desc: '高硬度军规匕首，附带伞绳握柄', difficulty: 3 },
+            { id: 'katanahandle', name: '刀装升级', ingredients: ['武士刀', '黄铜管', '鲛皮'], result: '上品打刀', desc: '升级刀柄刀装，挥刀更顺手', difficulty: 4 },
+            { id: 'compound_bow', name: '复合弓', ingredients: ['弓', '滑轮', '碳纤维布'], result: '复合弓', desc: '现代复合弓，拉力更大射程更远', difficulty: 5 },
+            { id: 'crossbow_scope', name: '瞄准镜弩', ingredients: ['十字弩', '瞄准镜', '支架'], result: '战术十字弩', desc: '加装瞄准镜和支架，精准狙击', difficulty: 5 },
+            { id: 'fire_axe_special', name: '破拆斧', ingredients: ['消防斧', '弹簧钢', '橡胶'], result: '破拆斧', desc: '升级版消防斧，破拆木门铁门更快', difficulty: 3 },
+            { id: 'taser_ammo', name: '电击枪弹', ingredients: ['电池', '细铁丝', '塑料'], result: '电击枪弹药x3', desc: '泰瑟枪替换弹，远距离电击', difficulty: 3 },
+            { id: 'ballistic_knife', name: '弹簧刀', ingredients: ['弹簧钢', '弹簧', '钢管'], result: '弹射飞刀', desc: '扳机弹射刀片，近战出其不意', difficulty: 4 },
+            { id: 'incendiary_ammo', name: '燃烧弩箭', ingredients: ['弩箭x5', '汽油', '布条'], result: '燃烧弩箭x5', desc: '命中起火的弩箭，对付群体丧尸', difficulty: 3 },
+            { id: 'explosive_arrow', name: '爆裂箭', ingredients: ['弓箭x5', '炸药', '雷管'], result: '爆裂箭x3', desc: '命中爆炸的箭矢，范围杀伤', difficulty: 5 },
+            // ===== 防具进阶升级链 =====
+            { id: 'kevlar_vest', name: '凯夫拉背心', ingredients: ['防弹衣', '碳纤维布', '环氧树脂'], result: '凯夫拉战术背心', desc: '轻量化强化防弹衣，更灵活', difficulty: 4 },
+            { id: 'riot_helmet', name: '防暴头盔', ingredients: ['军用头盔', '亚克力', '海绵'], result: '防暴头盔', desc: '加装面罩的防暴头盔，防破片防咬', difficulty: 3 },
+            { id: 'full_plate', name: '全身板甲', ingredients: ['钢材x3', '皮革x2', '铆钉x50'], result: '中世纪板甲', desc: '手工打制全身甲，刀枪不入但沉重', difficulty: 5 },
+            { id: 'chainmail', name: '锁子甲', ingredients: ['铁丝x5', '钳子', '铆钉'], result: '锁子甲衫', desc: '金属环编织软甲，防砍防抓', difficulty: 4 },
+            { id: 'combat_boots', name: '作战靴', ingredients: ['皮革x2', '钢板', '橡胶'], result: '钢头作战靴', desc: '钢头防刺作战靴，保护脚踝', difficulty: 3 },
+            { id: 'gauntlets', name: '金属护手', ingredients: ['钢材', '皮革', '铆钉'], result: '钢制护手', desc: '金属护手，格斗时挡刀不伤手', difficulty: 3 },
+            { id: 'shin_guards', name: '护胫甲', ingredients: ['钢材', '塑料', '胶带'], result: '护胫甲', desc: '小腿防护，防丧尸扑倒咬伤', difficulty: 2 },
+            { id: 'bite_proof', name: '防咬护颈', ingredients: ['皮革x2', '钢丝', '铆钉'], result: '防咬护颈', desc: '保护颈部大动脉，防丧尸撕咬关键部位', difficulty: 3 },
+            // ===== 电子/工具进阶 =====
+            { id: 'nv_upgrade', name: '头盔夜视仪', ingredients: ['夜视仪', '军用头盔', '支架'], result: '夜视头盔', desc: '整合夜视仪到头盔，解放双手', difficulty: 4 },
+            { id: 'solar_panel_array', name: '太阳能板阵列', ingredients: ['太阳能板x3', '铜线', '逆变器'], result: '太阳能阵列', desc: '多板并联，发电功率提升3倍', difficulty: 4 },
+            { id: 'ebike', name: '电动自行车', ingredients: ['自行车', '电机', '移动电源'], result: '电动自行车', desc: '改装电动车，长距离移动节省体力', difficulty: 5 },
+            { id: 'jammer', name: '信号干扰器', ingredients: ['对讲机', '扫描仪', '功放'], result: '信号干扰器', desc: '干扰无人机、无线电引信炸弹', difficulty: 5 },
+            { id: 'faraday_cage', name: '法拉第笼', ingredients: ['铜网x3', '钢材', '绝缘胶带'], result: '法拉第笼箱', desc: '屏蔽EMP电磁脉冲，保护电子设备', difficulty: 4 },
+            { id: 'metal_detector', name: '地下金属探测器', ingredients: ['铜线', '扬声器', '电池'], result: '金属探测器', desc: '搜索地下埋藏的金属物资', difficulty: 3 },
+            { id: 'door_barricade', name: '加固门闩', ingredients: ['钢材x2', '木板x3', '钉子x20'], result: '加固门闩套装', desc: '重型门闩，丧尸撞不开', difficulty: 3 },
+            { id: 'perimeter_alarm', name: '周界报警器', ingredients: ['电子防盗器x3', '细铁丝', '电池x2'], result: '周界报警套装', desc: '布设一圈，外围闯入立即响铃', difficulty: 3 },
+            { id: 'spike_strip', name: '阻车钉', ingredients: ['钢材', '钉子x30', '绳子'], result: '阻车钉x3', desc: '刺破车胎的路障，阻挡车辆', difficulty: 3 },
+            { id: 'watchtower', name: '瞭望塔组件', ingredients: ['木板x5', '绳子x3', '钉子x50'], result: '便携瞭望塔', desc: '拼装式3米高瞭望塔，监控周边', difficulty: 4 },
+            // ===== 农业/种植 =====
+            { id: 'compost', name: '堆肥箱', ingredients: ['木板x2', '塑料布', '泥土'], result: '堆肥箱', desc: '厨余落叶堆肥，改良贫瘠土壤', difficulty: 2 },
+            { id: 'grow_light', name: '植物生长灯', ingredients: ['LED灯带', '太阳能板', '定时器'], result: '室内植物灯', desc: '全光谱生长灯，室内种植蔬菜', difficulty: 4 },
+            { id: 'seed_bank', name: '种子保存罐', ingredients: ['玻璃罐', '干燥剂', '标签纸'], result: '种子银行', desc: '低温干燥保存种子，延长发芽率', difficulty: 2 },
+            { id: 'irrigation', name: '滴灌系统', ingredients: ['塑料瓶x4', '细塑料管', '绳子'], result: '自动滴灌装置', desc: '无人值守灌溉，节省人力时间', difficulty: 3 },
+            { id: 'greenhouse', name: '迷你温室', ingredients: ['塑料布x3', 'PVC管', '胶带'], result: '便携温室套件', desc: '小型温室，反季节种植抵御严寒', difficulty: 4 },
+            // ===== 陷阱/防御进阶 =====
+            { id: 'punji_stakes', name: '尖钉陷阱', ingredients: ['长木棍x5', '刀具', '绳子'], result: '尖钉陷阱x3', desc: '越南陷阱，刺入脚底感染重伤', difficulty: 2 },
+            { id: 'snare', name: '捕兽套', ingredients: ['钢丝绳', '弹簧', '木棍'], result: '捕兽套x3', desc: '勒捕小型动物，获取皮毛肉食', difficulty: 2 },
+            { id: 'bear_trap', name: '大型捕兽夹', ingredients: ['钢材x2', '弹簧x2', '铆钉'], result: '捕兽夹x2', desc: '咬合力极强，骨断筋折', difficulty: 4 },
+            { id: 'alarm_trap', name: '警报陷阱', ingredients: ['铁皮罐x3', '石头x3', '绳子'], result: '警报陷阱x5', desc: '触发时发出巨大声响，警告来敌', difficulty: 1 },
+            { id: 'concussion_grenade', name: '震爆弹', ingredients: ['炸药', '金属片', '电池'], result: '震爆弹x2', desc: '强光巨响眩晕敌人，非致命清理室内', difficulty: 4 },
+            { id: 'tear_gas', name: '催泪瓦斯', ingredients: ['辣椒素', '喷雾剂', '酒精'], result: '催泪瓦斯x3', desc: '驱散人群，室内攻坚利器', difficulty: 4 },
+            // ===== 工具/杂项 =====
+            { id: 'multitool_kit', name: '组合工具', ingredients: ['瑞士军刀', '多功能扳手', '胶带'], result: '专业组合工具', desc: '多工具组合，出门随身携带', difficulty: 2 },
+            { id: 'climbing_kit', name: '攀岩套装', ingredients: ['登山绳x2', '锁扣x5', '扁带'], result: '攀岩套装', desc: '高楼攀爬绳索下降必备', difficulty: 3 },
+            { id: 'lockpick_master', name: '专业开锁组', ingredients: ['开锁工具x3', '细铁丝', '润滑油'], result: '专业开锁套装', desc: '可开B级C级锁，防盗门也可尝试', difficulty: 3 },
+            { id: 'battery_rebuild', name: '电池复活包', ingredients: ['电芯x4', '焊锡丝', '保护板'], result: '复活锂电池组', desc: '拆开废旧电池换芯，得到大容量电池', difficulty: 3 },
+            { id: 'ham_radio', name: '业余电台', ingredients: ['手持电台', '功放', '天线'], result: '基地电台', desc: '50W大功率电台，百公里通联', difficulty: 5 },
+            { id: 'water_heater', name: '便携热水器', ingredients: ['不锈钢杯', '电热丝', '电池'], result: '电热水器', desc: '野外加热洗澡水，预防感冒', difficulty: 3 },
+            { id: 'portable_stove', name: '便携炉具', ingredients: ['铝罐', '酒精', '钢丝'], result: '酒精炉', desc: '小巧轻便的野营炉具，煮食取暖', difficulty: 2 },
+            { id: 'bug_out_bag', name: '末日生存包', ingredients: ['登山包', '手电筒', '医疗包', '压缩饼干x4', '瓶装水x2'], result: 'BOB逃生背包', desc: '预先打包好的72小时应急逃生背包，随时提包走人', difficulty: 3 }
         ];
 
         function getCraftingRecipes() {
             return CRAFT_RECIPES.slice();
+        }
+
+        // 【辅助】解析物品名和数量："木板x3" → {name:'木板', qty:3}
+        function parseItemQty(str) {
+            const s = (str || '').trim();
+            const m = s.match(/^(.*?)\s*x\s*(\d+)$/i);
+            if (m) return { name: m[1].trim(), qty: parseInt(m[2]) || 1 };
+            return { name: s, qty: 1 };
+        }
+        // 【辅助】从背包中获取某物品的总数量（支持 "x3" 后缀累加）
+        function getInventoryQty(inv, itemName) {
+            let total = 0;
+            inv.forEach(it => {
+                const { name, qty } = parseItemQty(it);
+                if (name === itemName) total += qty;
+            });
+            return total;
+        }
+        // 【辅助】从背包中消耗指定数量物品（消耗完的项删除，带xN的项减少数量）
+        function consumeInventoryQty(inv, itemName, needQty) {
+            let remain = needQty;
+            // 从后往前遍历，避免索引错位
+            for (let i = inv.length - 1; i >= 0 && remain > 0; i--) {
+                const { name, qty } = parseItemQty(inv[i]);
+                if (name !== itemName) continue;
+                if (qty <= remain) {
+                    remain -= qty;
+                    inv.splice(i, 1);
+                } else {
+                    const left = qty - remain;
+                    remain = 0;
+                    if (left <= 1) inv[i] = name;
+                    else inv[i] = name + 'x' + left;
+                }
+            }
         }
 
         function tryCraft(recipeId) {
@@ -6934,31 +7114,24 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             const s = gst();
             if (!s.inv) s.inv = [];
             const missing = [];
-            recipe.ingredients.forEach(ing => {
-                const idx = s.inv.findIndex(i => {
-                    const name = i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim();
-                    return name === ing;
-                });
-                if (idx < 0) {
-                    const count = s.inv.filter(i => i.includes(ing.substring(0,2))).length;
-                    if (count === 0) missing.push(ing);
-                } else {
-                    // Check and consume
-                    const item = s.inv[idx];
-                    const match = item.match(/(.*)x(\d+)/);
-                    if (match) {
-                        const count = parseInt(match[2]) - 1;
-                        if (count <= 0) s.inv.splice(idx, 1);
-                        else s.inv[idx] = match[1] + 'x' + count;
-                    } else {
-                        s.inv.splice(idx, 1);
-                    }
-                }
+            // 第一步：检查配料数量是否足够（精确匹配物品名 + 累加数量）
+            recipe.ingredients.forEach(ingStr => {
+                const { name: ingName, qty: ingQty } = parseItemQty(ingStr);
+                const have = getInventoryQty(s.inv, ingName);
+                if (have < ingQty) missing.push(ingName + (ingQty > 1 ? 'x' + ingQty : '') + '（差' + (ingQty - have) + '）');
             });
             if (missing.length > 0) {
                 return { success: false, message: '缺少：' + missing.join('、') };
             }
+            // 第二步：消耗所有配料（从后往前消耗防止索引错位）
+            recipe.ingredients.forEach(ingStr => {
+                const { name: ingName, qty: ingQty } = parseItemQty(ingStr);
+                consumeInventoryQty(s.inv, ingName, ingQty);
+            });
+            // 第三步：产出结果（如果结果带xN则直接推入，玩家使用时再解析）
             s.inv.push(recipe.result);
+            s.crafts = (s.crafts || 0) + 1;
+            if (typeof addLogEntry === 'function') addLogEntry('craft', '成功合成：' + recipe.result);
             sst(s);
             playSfx('craft');
             return { success: true, message: '合成成功！获得 ' + recipe.result, item: recipe.result };
@@ -6966,48 +7139,136 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
 
         function openCraftingModal() {
             const s = gst();
-            const invItems = (s.inv || []).map(i => {
-                const name = i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim();
-                return name;
+            // 统计每种物品的可用数量
+            const invQty = {};
+            (s.inv || []).forEach(it => {
+                const { name, qty } = parseItemQty(it);
+                invQty[name] = (invQty[name] || 0) + qty;
             });
-            const available = new Set(invItems);
             const recipes = CRAFT_RECIPES.map(r => {
-                const canCraft = r.ingredients.every(ing => available.has(ing));
-                return { ...r, canCraft, need: r.ingredients.filter(i => !available.has(i)).join('、') };
+                // 逐配料检查数量是否满足
+                let canCraft = true;
+                const needArr = [];
+                r.ingredients.forEach(ingStr => {
+                    const { name: ingName, qty: ingQty } = parseItemQty(ingStr);
+                    const have = invQty[ingName] || 0;
+                    if (have < ingQty) {
+                        canCraft = false;
+                        needArr.push(ingName + (ingQty > 1 ? 'x' + ingQty : ''));
+                    }
+                });
+                return { ...r, canCraft, need: needArr.join('、') };
             });
             const d = document.createElement('div');
             d.className = 'modal-overlay';
             d.style.zIndex = '9998';
-            let recipeHTML = recipes.map(r => {
-                const status = r.canCraft ? '<span style="color:#3a7c3a;">✓ 可合成</span>' : '<span style="color:#9d5a3a;">✗ 缺：' + r.need + '</span>';
-                const btn = r.canCraft ? '<button class="btn-header craft-btn" data-rid="' + r.id + '">合成</button>' : '<button class="btn-header" disabled style="opacity:0.4;">材料不足</button>';
-                return '<div style="background:#fffef7;border:1.5px solid #c5b9a0;border-radius:6px;padding:10px;margin:8px 0;filter:url(#light);">' +
-                    '<div style="font-weight:bold;color:#5c4028;margin-bottom:4px;">' + r.name + ' <span style="font-weight:normal;font-size:0.75rem;color:#8a7b6a;">难度' + r.difficulty + '</span></div>' +
-                    '<div style="font-size:0.78rem;color:#5a4e3e;margin-bottom:6px;">' + r.desc + '</div>' +
-                    '<div style="font-size:0.72rem;color:#7a6b5a;margin-bottom:6px;">材料：' + r.ingredients.join(' + ') + '</div>' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                    '<span style="font-size:0.72rem;">' + status + '</span>' + btn + '</div></div>';
+            // ===== 分类：按ID/关键词分组 =====
+            const categoryRules = [
+                { name: '🍞 食物加工', test: r => /hardtack|jerky|smoked|dried|broth|mre_upgrade|vitamin_extract|canned|food/i.test(r.id) || r.result.includes('饼干') || r.result.includes('肉') || r.result.includes('熏鱼') || r.result.includes('果干') || /压缩|风干|熏|骨汤|自热|维生素/.test(r.name) },
+                { name: '💊 医疗用品', test: r => /iodine|splint|stitch|herbal|antivenom|blood_bag|morphine|cpr|bandage|gauze|medkit|surgical|purify/i.test(r.id) || /绷带|医疗|碘伏|骨折|缝合|草药|抗毒|血浆|吗啡|复苏|净水|药片/.test(r.name + r.result) },
+                { name: '⚔️ 武器弹药', test: r => /pipe_gun|smg_craft|tactical|katanahandle|compound_bow|crossbow_scope|fire_axe_special|taser|ballistic_knife|incendiary|explosive_arrow|molotov|spark|bow_craft|arrow_craft|stun_baton|whetstone|spear|axe|crossbow/i.test(r.id) || /手枪|冲锋|匕首|打刀|复合|十字弩|破拆斧|电击|飞刀|燃烧|爆裂|弩箭|弓箭|长矛|链锯|唐刀|武士刀/.test(r.name + r.result) },
+                { name: '🛡️ 防具护具', test: r => /kevlar|riot_helmet|full_plate|chainmail|combat_boots|gauntlets|shin|bite_proof|armor_plate|shield|spike/i.test(r.id) || /凯夫拉|防暴|板甲|锁子|作战靴|护手|护胫|防咬|护心|盾牌|钉甲/.test(r.name + r.result) },
+                { name: '🔧 电子/工具', test: r => /nv_upgrade|solar_panel_array|ebike|jammer|faraday|metal_detector|door_barricade|perimeter_alarm|spike_strip|watchtower|radio|generator|battery_pack|solar_charger|rebreather|lockpick_master|battery_rebuild|ham_radio|water_heater|portable_stove|bug_out_bag|multitool_kit|climbing_kit/i.test(r.id) || /夜视|太阳能|电动|干扰|法拉第|探测器|门闩|周界|阻车|瞭望|对讲|发电|充电|防毒|开锁|电池|电台|热水器|炉具|生存包|组合|攀岩/.test(r.name + r.result) },
+                { name: '🌱 农业种植', test: r => /compost|grow_light|seed_bank|irrigation|greenhouse|smoker|rain|fishing/i.test(r.id) || /堆肥|生长灯|种子|滴灌|温室|熏肉|雨水|钓鱼|渔网/.test(r.name + r.result) },
+                { name: '🪤 陷阱防御', test: r => /punji|snare|bear_trap|alarm_trap|concussion|tear_gas|trap|booby|landmine|wire|filter|torch|candle/i.test(r.id) || /尖钉|捕兽|警报|震爆|催泪|地雷|铁丝|滤水|火把|蜡烛|简易陷阱|爆炸/.test(r.name + r.result) },
+                { name: '📦 其他/基础', test: () => true }
+            ];
+            const categoryList = [];
+            const used = new Set();
+            categoryRules.forEach(cat => {
+                const arr = recipes.filter(r => !used.has(r.id) && cat.test(r));
+                arr.forEach(r => used.add(r.id));
+                if (arr.length > 0) categoryList.push({ ...cat, list: arr });
+            });
+            // 难度星标
+            const diffStars = d => {
+                const n = Math.max(1, Math.min(5, parseInt(d) || 1));
+                return '★'.repeat(n) + '☆'.repeat(5 - n);
+            };
+            // 生成分类HTML
+            let recipeHTML = categoryList.map(cat => {
+                const items = cat.list.map(r => {
+                    // 给每种材料加上已拥有提示
+                    const ingWithHint = r.ingredients.map(ingStr => {
+                        const { name: inName, qty: inQty } = parseItemQty(ingStr);
+                        const have = invQty[inName] || 0;
+                        const ok = have >= inQty;
+                        const display = inQty > 1 ? inName + '×' + inQty : inName;
+                        const hint = ' <span style="color:' + (ok ? '#3a7c3a' : '#9d5a3a') + '">[' + have + '/' + inQty + ']</span>';
+                        return display + hint;
+                    }).join(' + ');
+                    const status = r.canCraft ? '<span style="color:#3a7c3a;">✓ 材料齐全</span>' : '<span style="color:#9d5a3a;">✗ 缺少：' + r.need + '</span>';
+                    const btn = r.canCraft ? '<button class="btn-header craft-btn" data-rid="' + r.id + '" style="background:linear-gradient(135deg,#d4a95b,#b58941);color:#fff;border:none;">🔨 合成</button>' : '<button class="btn-header" disabled style="opacity:0.5;">材料不足</button>';
+                    return '<div style="background:#fffef7;border:1.5px solid #c5b9a0;border-radius:8px;padding:11px;margin:8px 0;box-shadow:2px 2px 0 rgba(120,100,70,0.08);">' +
+                        '<div style="font-weight:bold;color:#5c4028;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;">' +
+                        '<span>' + r.name + ' <span style="font-weight:normal;font-size:0.72rem;color:#a08b6c;margin-left:6px;">' + diffStars(r.difficulty) + '（' + r.difficulty + '级）</span></span>' +
+                        '<span style="font-size:0.7rem;color:#8a7b6a;font-weight:normal;">产出: ' + r.result + '</span>' +
+                        '</div>' +
+                        '<div style="font-size:0.78rem;color:#5a4e3e;margin-bottom:6px;">' + r.desc + '</div>' +
+                        '<div style="font-size:0.75rem;color:#555;margin-bottom:8px;background:#f9f5e9;padding:5px 8px;border-radius:4px;border-left:3px solid #c9b88a;">材料：' + ingWithHint + '</div>' +
+                        '<div style="display:flex;justify-content:space-between;align-items:center;">' +
+                        '<span style="font-size:0.72rem;">' + status + '</span>' + btn + '</div></div>';
+                }).join('');
+                // 折叠面板（默认展开第一个，其他点击展开）
+                const isFirst = cat === categoryList[0];
+                const catId = 'craft-cat-' + Math.random().toString(36).slice(2, 8);
+                return '<div class="craft-category" style="margin-bottom:14px;">' +
+                    '<div style="background:linear-gradient(135deg,#f5e8cb,#ecdcb4);border:1.5px solid #c9b88a;border-radius:8px 8px 4px 4px;padding:8px 12px;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-weight:bold;color:#5c4028;" data-cat-toggle="#' + catId + '">' +
+                    '<span>' + cat.name + ' <span style="font-weight:normal;font-size:0.72rem;color:#8a7b6a;margin-left:4px;">（' + cat.list.length + '个配方）</span></span>' +
+                    '<span class="cat-arrow" style="transition:transform 0.2s;display:inline-block;transform:' + (isFirst ? 'rotate(180deg)' : 'rotate(0)') + ';">▼</span>' +
+                    '</div>' +
+                    '<div id="' + catId + '" style="' + (isFirst ? '' : 'display:none;') + 'padding:2px 4px 0;">' + items + '</div>' +
+                    '</div>';
             }).join('');
-            d.innerHTML = '<div class="modal-panel" style="max-width:480px;max-height:80vh;overflow-y:auto;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-                '<h3 style="color:#5c4028;margin:0;">🔨 合成/制造</h3>' +
+            // 统计信息
+            const totalRecipes = recipes.length;
+            const craftableCount = recipes.filter(r => r.canCraft).length;
+            d.innerHTML = '<div class="modal-panel" style="max-width:520px;max-height:85vh;overflow-y:auto;">' +
+                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">' +
+                '<h3 style="color:#5c4028;margin:0;">🔨 合成工作台</h3>' +
                 '<button class="btn-close" id="craftClose">×</button></div>' +
-                '<div style="font-size:0.78rem;color:#7a6b5a;margin-bottom:10px;">选择一个配方进行合成，需要收集所需材料</div>' +
+                '<div style="font-size:0.78rem;color:#7a6b5a;margin-bottom:10px;background:#f9f5e9;padding:7px 10px;border-radius:5px;border-left:3px solid #c9b88a;display:flex;justify-content:space-between;">' +
+                '<span>共 ' + totalRecipes + ' 个配方 · 难度★=简单 ★★★★★=大师</span>' +
+                '<span style="color:' + (craftableCount > 0 ? '#3a7c3a' : '#888') + ';">当前可合成：' + craftableCount + ' 个</span>' +
+                '</div>' +
                 recipeHTML + '</div>';
             document.body.appendChild(d);
+            // 分类折叠点击
+            d.querySelectorAll('[data-cat-toggle]').forEach(t => {
+                t.addEventListener('click', () => {
+                    const sel = t.getAttribute('data-cat-toggle');
+                    const panel = d.querySelector(sel);
+                    const arrow = t.querySelector('.cat-arrow');
+                    if (panel.style.display === 'none') {
+                        panel.style.display = '';
+                        if (arrow) arrow.style.transform = 'rotate(180deg)';
+                    } else {
+                        panel.style.display = 'none';
+                        if (arrow) arrow.style.transform = 'rotate(0)';
+                    }
+                });
+            });
             d.querySelector('#craftClose').onclick = () => d.remove();
             d.querySelectorAll('.craft-btn').forEach(btn => {
                 btn.onclick = () => {
                     const rid = btn.dataset.rid;
                     const result = tryCraft(rid);
                     if (result.success) {
+                        // 成功闪一下
+                        btn.style.background = 'linear-gradient(135deg,#3a7c3a,#2e632e)';
+                        btn.textContent = '✓ 成功';
                         tst(result.message);
                         playSfx('levelup');
-                        d.remove();
-                        // Refresh crafting modal
-                        setTimeout(openCraftingModal, 100);
+                        setTimeout(() => {
+                            d.remove();
+                            setTimeout(openCraftingModal, 100);
+                        }, 350);
                     } else {
+                        btn.style.background = 'linear-gradient(135deg,#9d5a3a,#7a4328)';
+                        const ot = btn.textContent;
+                        btn.textContent = '✗ 失败';
                         tst(result.message);
+                        setTimeout(() => { btn.style.background = ''; btn.textContent = ot; }, 700);
                     }
                 };
             });
