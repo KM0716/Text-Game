@@ -70,6 +70,8 @@
                 <button class="btn-header" id="btnTheme">浅色</button>
                 <button class="btn-header" id="btnSfx" title="音效开关">🔊</button>
                 <button class="btn-header" id="btnBgm" title="背景音乐">🎵</button>
+                <button class="btn-header" id="btnAchievements" title="成就">成就</button>
+                <button class="btn-header" id="btnEvents" title="突发事件">事件</button>
                 <button class="btn-header" id="btnIdle">挂机</button>
             </div>
         </header>
@@ -131,6 +133,25 @@
     </div>
 
     <div class="notify-container" id="notifyContainer"></div>
+
+    <!-- Achievements Panel -->
+    <div class="modal-overlay" id="achievementsModal" style="display:none;">
+        <div class="modal-panel" style="max-width:420px;">
+            <button class="modal-close" id="modalCloseAchievements">x</button>
+            <h3>🏆 成就系统</h3>
+            <div id="achievementsList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Events Panel -->
+    <div class="modal-overlay" id="eventsModal" style="display:none;">
+        <div class="modal-panel" style="max-width:420px;">
+            <button class="modal-close" id="modalCloseEvents">x</button>
+            <h3>⚡ 突发事件记录</h3>
+            <div id="eventsList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
+        </div>
+    </div>
+
     <div class="idle-badge" id="idleBadge">挂机中</div>
     <div class="god-badge" id="godBadge" style="display:none;">⚡ 上帝模式</div>
 
@@ -436,15 +457,13 @@
         </div>
         <div class="setting-group">
             <h4>存档与备份</h4>
-            <p class="field-hint">将所有游戏进度、设置、10 个存档槽打包为可下载文件，或从备份文件恢复。</p>
-            <div class="btn-row" style="flex-wrap:wrap;">
-                <button type="button" class="btn-modal" id="btnExportBackup">导出全部备份</button>
-                <label class="btn-modal" style="cursor:pointer;display:inline-block;margin:0;">
-                    选择备份文件导入
-                    <input type="file" id="inputImportBackup" accept="application/json,.json" style="display:none;">
-                </label>
+            <p class="field-hint">导出当前游戏全部数据为备份文件，或从备份文件恢复进度。</p>
+            <div class="btn-row" style="justify-content:flex-start;gap:6px;">
+                <button type="button" class="btn-modal" id="btnSetExportBackup" style="font-size:0.7rem;">导出全部备份</button>
+                <button type="button" class="btn-modal" id="btnSetImportBackup" style="font-size:0.7rem;">选择备份文件导入</button>
             </div>
-            <p id="importBackupStatus" class="field-hint" style="margin-top:8px;"></p>
+            <input type="file" id="inputSetImportBackup" accept=".json" style="display:none;">
+            <p id="setImportBackupStatus" class="field-hint" style="margin-top:8px;"></p>
         </div>
         <div class="setting-group">
             <h4>🌐 网络代理（跨域访问）</h4>

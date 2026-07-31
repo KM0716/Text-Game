@@ -263,7 +263,7 @@
 ★★★ 强制要求（必须遵守）★★★
 1. 物品同步：玩家使用、消耗、丢弃、给予他人任何物品时，你必须在回复末尾添加 [物品:-物品名] 标签。物品消耗多件时用 [物品:-物品名x数量]（如[物品:-压缩饼干x2]）。玩家获得新物品时添加 [物品:+物品名]。
 2. 位置同步：玩家移动到新地点时，必须添加 [地点:新地点名] 标签。
-3. 时间同步：当前游戏时刻已明确告诉你（见上方{{gameTime}}），你必须使用系统给出的时间进行叙事。禁止自行编造具体时刻（如"现在是下午3点"、"已是凌晨2点"等）。叙事中时间流逝超过30分钟时，必须添加 [时间:+Xh] 标签（如[时间:+1.5h]），系统会根据标签推进时间。禁止在叙事文本中自行描述具体钟点，只能用"过了一会儿"、"片刻之后"等模糊表达。
+3. 时间同步：当前游戏时刻已明确告诉你（见上方{{gameTime}}），你必须使用系统给出的时间进行叙事。禁止自行编造具体时刻（如"现在是下午3点"、"已是凌晨2点"等）。叙事中时间流逝超过30分钟时，必须添加 [时间:+Xh] 标签（如[时间:+1.5h]），系统会根据标签推进时间。禁止在叙事文本中自行描述具体钟点，只能用"过了一会儿"、"片刻之后"等模糊表达，除非是必要情况，例如“你查看了手表，现在是凌晨2点8分”。
 4. 装备同步：玩家拾取或更换装备时，必须添加 [装备:槽位=物品名] 标签（槽位：主手/副手/头部/身体/腿部/脚部/背包/饰品）。
 5. 线索同步：发现新线索时，必须添加 [线索:线索内容] 标签。
 6. 地图同步：发现新区域时，必须添加 [地图:解锁-区域名] 或 [地图:新增-区域名] 标签。
@@ -543,6 +543,38 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         s[key] = Math.max(min, Math.min(max, (typeof cur === 'number' ? cur : 0) + delta));
                         results.push(label + sign + val);
                     });
+                    // 处理文字型效果（非数值格式）
+                    if (results.length === 0 && itemInfo.effect) {
+                        const eff = itemInfo.effect;
+                        if (/治疗轻伤|包扎|止血/.test(eff)) {
+                            s.hp = Math.min(s.maxHp || 100, (s.hp || 50) + 15);
+                            if (s.injury && s.injury !== '无') s.injury = '轻微';
+                            results.push('生命+15');
+                        } else if (/治疗重伤/.test(eff)) {
+                            s.hp = Math.min(s.maxHp || 100, (s.hp || 50) + 35);
+                            s.injury = '无';
+                            results.push('生命+35 伤势痊愈');
+                        } else if (/治疗感染|抗生素/.test(eff)) {
+                            s.infection = 0;
+                            s.hp = Math.min(s.maxHp || 100, (s.hp || 50) + 10);
+                            results.push('感染消除');
+                        } else if (/消除炎症|消炎/.test(eff)) {
+                            if (s.status && s.status.includes('感染')) {
+                                s.status = s.status.filter(st => st !== '感染');
+                            }
+                            s.infection = 0;
+                            results.push('炎症消除');
+                        } else if (/缓解疼痛|止痛/.test(eff)) {
+                            s.spirit = Math.min(100, (s.spirit || 50) + 10);
+                            results.push('精神+10');
+                        } else if (/退烧/.test(eff)) {
+                            s.bodyTemp = 37;
+                            results.push('体温恢复正常');
+                        } else if (/消毒/.test(eff)) {
+                            s.infection = Math.max(0, (s.infection || 0) - 5);
+                            results.push('消毒完成');
+                        }
+                    }
                     if (results.length > 0) {
                         sst(s);
                         upui();
@@ -925,6 +957,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
 
             let hist = [], busy = false, ctrl = null, undo = null, theme = 'light', chr, sta, clk, sbx, sideMode = 'profile';
             const hasHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+            const isMobile = () => !hasHover || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 480;
+            window.isMobile = isMobile;
             let bpCat = 'food', bpSub = 'solid', bpPage = 0, bpView = 'cat'; // 'cat' | 'all' | 'star'
             let idleTimer = null, clockTimer = null;
 
@@ -1219,7 +1253,96 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     osc.start(ctx.currentTime); osc.stop(ctx.currentTime + dur);
                 } catch(e) {}
             }
+            const SE_FILES = {
+                'drop': 'SE/丢弃.wav',
+                'clue-write': 'SE/写线索.wav',
+                'clue-add': 'SE/写线索.wav',
+                'drink': 'SE/喝水.wav',
+                'use-water': 'SE/喝水.wav',
+                'open-profile': 'SE/打开个人.wav',
+                'char-open': 'SE/打开个人.wav',
+                'open-clue': 'SE/打开线索.wav',
+                'clue-open': 'SE/打开线索.wav',
+                'open-equip': 'SE/打开装备.wav',
+                'equip-open': 'SE/打开装备.wav',
+                'search': 'SE/搜索物资.wav',
+                'loot': 'SE/搜索物资.wav',
+                'random-event': 'SE/突发事件.wav',
+                'event': 'SE/突发事件.wav',
+                'equip-weapon': 'SE/装备武器.wav',
+                'equip': 'SE/装备武器.wav',
+                'pickup': 'SE/捡起/捡起小东西－xh20070419.wav',
+                'pickup-small': 'SE/捡起/捡起小东西－xh20070419.wav',
+                'pickup-big': 'SE/捡起/捡起大东西－xh20070419.wav',
+                'pickup-book': 'SE/捡起/捡起书－xh20070419.wav',
+                'pickup-bag': 'SE/捡起/捡起包－xh20070419.wav',
+                'pickup-food': 'SE/捡起/捡起吃的－xh20070419.wav',
+                'pickup-eat': 'SE/捡起/捡起吃的－xh20070419.wav',
+                'pickup-wood-big': 'SE/捡起/捡起大木头－xh20070419.wav',
+                'pickup-metal-big': 'SE/捡起/捡起大的金属－xh20070419.wav',
+                'pickup-gem': 'SE/捡起/捡起宝石－xh20070419.wav',
+                'pickup-wood-small': 'SE/捡起/捡起小木头－xh20070419.wav',
+                'pickup-metal-small': 'SE/捡起/捡起小的金属－xh20070419.wav',
+                'pickup-stick': 'SE/捡起/捡起棒－xh20070419.wav',
+                'pickup-water': 'SE/捡起/捡起水－xh20070419.wav',
+                'pickup-ore': 'SE/捡起/捡起矿石－xh20070419.wav',
+                'pickup-paper': 'SE/捡起/捡起羊皮纸－xh20070419.wav',
+                'pickup-meat': 'SE/捡起/捡起肉－xh20070419.wav',
+                'pickup-herb': 'SE/捡起/捡起药草－xh20070419.wav',
+                'pickup-clothes': 'SE/捡起/捡起衣服－xh20070419.wav',
+                'pickup-bell': 'SE/捡起/捡起铃铛－xh20070419.wav',
+                'store': 'SE/放好/把小的东西放在背包里－xh20070419.wav',
+                'store-small': 'SE/放好/把小的东西放在背包里－xh20070419.wav',
+                'store-big': 'SE/放好/把大的东西放在背包里－xh20070419.wav',
+                'store-book': 'SE/放好/把书放在背包里－xh20070419.wav',
+                'store-bag': 'SE/放好/把包放在背包里－xh20070419.wav',
+                'store-wood-big': 'SE/放好/把大木头放在背包里－xh20070419.wav',
+                'store-metal-big': 'SE/放好/把大金属放在背包里－xh20070419.wav',
+                'store-gem': 'SE/放好/把宝石放在背包里－xh20070419.wav',
+                'store-wood-small': 'SE/放好/把小木头放在背包里－xh20070419.wav',
+                'store-meat-small': 'SE/放好/把小肉放在背包里－xh20070419.wav',
+                'store-stick': 'SE/放好/把棒放在背包里－xh20070419.wav',
+                'store-water': 'SE/放好/把水背包里－xh20070419.wav',
+                'store-ore': 'SE/放好/把矿石放在背包里－xh20070419.wav',
+                'store-paper': 'SE/放好/把羊皮纸放在背包里－xh20070419.wav',
+                'store-meat': 'SE/放好/把肉放在背包里－xh20070419.wav',
+                'store-herb': 'SE/放好/把草药放在背包里－xh20070419.wav',
+                'store-clothes': 'SE/放好/把衣服放在背包里－xh20070419.wav',
+                'store-bell': 'SE/放好/把铃铛放在背包里－xh20070419.wav'
+            };
             function playSfx(type) {
+                if (!window._sfxEnabled) {
+                    const stored = localStorage.getItem('vn_sfx');
+                    window._sfxEnabled = stored !== '0';
+                }
+                if (!window._sfxEnabled) return;
+                const sePath = SE_FILES[type];
+                if (sePath) {
+                    try {
+                        if (!window._seCache) window._seCache = {};
+                        let audio = window._seCache[type];
+                        if (!audio) {
+                            audio = new Audio(sePath);
+                            audio.preload = 'auto';
+                            audio.volume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.6');
+                            window._seCache[type] = audio;
+                        } else {
+                            try { audio.currentTime = 0; } catch(e) {}
+                        }
+                        const p = audio.play();
+                        if (p && p.catch) p.catch(err => {
+                            if (window._seCache[type]) {
+                                delete window._seCache[type];
+                            }
+                            playToneSfx(type);
+                        });
+                        return;
+                    } catch(e) {
+                    }
+                }
+                playToneSfx(type);
+            }
+            function playToneSfx(type) {
                 if (!sfxEnabled) return;
                 switch(type) {
                     case 'click': playTone(800, 0.05, 'sine', 0.4); break;
@@ -1806,15 +1929,22 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 const hungerMult = { '缓慢': 0.6, '正常': 1, '快速': 1.5, '极快': 2.2 }[bx.cat8.fields.hungerRate.val] || 1;
                 const fatigueMult = { '缓慢': 0.6, '正常': 1, '快速': 1.5, '极快': 2.2 }[bx.cat8.fields.fatigueRate.val] || 1;
                 const recoverMult = { '缓慢': 0.6, '正常': 1, '快速': 1.5 }[bx.cat8.fields.staminaRecover.val] || 1;
-                const hungerDrain = 0.8 * gameHours * hungerMult;
+                const curH = Math.floor((c.elapsedSec || 0) / 3600) % 24;
+                const isNight = curH >= 20 || curH < 6;
+                // 饥饿衰减：夜间代谢减缓
+                const hungerDrain = 0.8 * gameHours * hungerMult * (isNight ? 0.7 : 1);
                 s.hunger = Math.max(0, Math.min(100, (s.hunger ?? 50) - hungerDrain));
-                const thirstDrain = 1.2 * gameHours * hungerMult;
+                // 口渴衰减：白天加速脱水
+                const thirstDrain = 1.2 * gameHours * hungerMult * (isNight ? 0.6 : 1.1);
                 s.thirst = Math.max(0, Math.min(100, (s.thirst ?? 50) - thirstDrain));
+                // 疲劳增长
                 let fatigueGain = 0.4 * gameHours * fatigueMult;
                 if ((s.hunger ?? 50) < 30) fatigueGain += 0.3 * gameHours * fatigueMult;
                 if ((s.thirst ?? 50) < 30) fatigueGain += 0.4 * gameHours * fatigueMult;
                 if (c.weather === '暴雨' || c.weather === '暴风雪') fatigueGain += 0.2 * gameHours;
+                if (isNight) fatigueGain += 0.15 * gameHours; // 夜间更易疲劳
                 s.fatigue = Math.max(0, Math.min(100, (s.fatigue ?? 30) + fatigueGain));
+                // 体温调节
                 let tempTarget = (c.temp != null ? c.temp : 15);
                 if ((s.fatigue ?? 30) > 70) tempTarget += 1.5;
                 if ((s.thirst ?? 50) < 20) tempTarget += 2;
@@ -1823,6 +1953,21 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (c.weather === '暴雨') tempTarget -= 1;
                 s.bodyTemp = s.bodyTemp != null ? s.bodyTemp + (tempTarget - s.bodyTemp) * 0.02 * gameHours : 37;
                 s.bodyTemp = Math.max(30, Math.min(42, Math.round(s.bodyTemp * 10) / 10));
+                // 感染进展：伤口感染会恶化
+                if (s.infection && s.infection > 0) {
+                    s.infection = Math.min(100, s.infection + 0.5 * gameHours);
+                    if (s.infection > 60 && s.hp > 0) {
+                        s.hp = Math.max(0, (s.hp ?? 50) - 0.3 * gameHours);
+                    }
+                }
+                // 极端饥饿/口渴导致生命值下降
+                if ((s.hunger ?? 50) <= 0) {
+                    s.hp = Math.max(0, (s.hp ?? 50) - 0.5 * gameHours);
+                }
+                if ((s.thirst ?? 50) <= 0) {
+                    s.hp = Math.max(0, (s.hp ?? 50) - 0.8 * gameHours);
+                }
+                // 精神状态
                 if ((s.hunger ?? 50) <= 0 || (s.thirst ?? 50) <= 0) {
                     const mentalShift = { '稳定': '焦虑', '希望': '焦虑', '焦虑': '绝望', '悲痛': '绝望' };
                     if (mentalShift[s.mentality]) s.mentality = mentalShift[s.mentality];
@@ -1830,15 +1975,25 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if ((s.hunger ?? 50) < 20 || (s.thirst ?? 50) < 20 || (s.fatigue ?? 30) > 80) {
                     s.spirit = Math.max(0, (s.spirit ?? 80) - 0.5 * gameHours);
                 }
-                // Stamina recovery: when resting or well-fed, recover fatigue
+                // 夜间精神略微下降
+                if (isNight && (s.fatigue ?? 30) > 50) {
+                    s.spirit = Math.max(0, (s.spirit ?? 80) - 0.2 * gameHours);
+                }
+                // 体力恢复：休息且吃饱喝足时恢复疲劳
                 if ((s.hunger ?? 50) > 60 && (s.thirst ?? 50) > 60 && (s.fatigue ?? 30) > 10) {
                     s.fatigue = Math.max(0, (s.fatigue ?? 30) - 0.2 * gameHours * recoverMult);
+                }
+                // 生命自然恢复：吃饱喝足且疲劳低时缓慢回血
+                if ((s.hp ?? 50) < (s.maxHp ?? 100) && (s.hunger ?? 50) > 50 && (s.thirst ?? 50) > 50 && (s.fatigue ?? 30) < 40) {
+                    s.hp = Math.min(s.maxHp ?? 100, (s.hp ?? 50) + 0.15 * gameHours * recoverMult);
                 }
                 sst(s);
             }
 
             // ===== Auto-bold items and names =====
-            function buildItemTooltipHTML(name) {
+            function buildItemTooltipHTML(rawName) {
+                if (!rawName) return null;
+                const name = String(rawName).replace(/<[^>]+>/g, '').trim();
                 if (!name || !isValidItemName(name)) return null;
                 const s = gst();
                 const inv = s && s.inv ? s.inv : [];
@@ -1847,7 +2002,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 // Only build tooltip for items that are either in inventory OR have preset data
                 if (!inInventory && !info) return null;
                 const emoji = itemEmoji(name);
-                let h = emoji + '「' + name + '」';
+                let h = emoji + '「' + esc(name) + '」';
                 if (info) {
                     const cnMap = { consumable: '消耗品', equip: '装备', material: '材料', key: '钥匙' };
                     const scMap = { food: '食品', water: '饮用水', medical: '医疗', weapon: '武器', armor: '防具', tool: '工具', backpack: '背包', fuel: '燃料', build: '建材', tech: '科技', misc: '杂项', tactical: '战术', key: '钥匙' };
@@ -1873,7 +2028,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (!containerEl) return;
                 containerEl.querySelectorAll('.auto-bold').forEach(el => {
                     if (el._itemInfoBound) return;
-                    const name = el.textContent.trim();
+                    const rawName = el.textContent.trim();
+                    const name = rawName.replace(/<[^>]+>/g, '').trim();
                     // Filter out non-item names (pure numbers, measurements, etc.)
                     if (!isValidItemName(name)) {
                         el._itemInfoBound = true;
@@ -1932,6 +2088,15 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 html = html.replace(/&lt;span\s+class=&quot;item-ref[^&]*&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g, '<span class="item-ref">$1</span>');
                 
                 html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="auto-bold">$1</strong>');
+                html = html.replace(/【([^】]+)】/g, '<strong class="auto-bold">$1</strong>');
+                // 保护已存在的 auto-bold 和 item-ref 标签避免嵌套
+                const protectedPlaceholders = [];
+                html = html.replace(/<(strong class="auto-bold"|span class="item-ref[^"]*)>([\s\S]*?)<\/(strong|span)>/g, (m, tagStart, inner, tagEnd) => {
+                    const idx = protectedPlaceholders.length;
+                    const tagName = tagStart.indexOf('strong') === 0 ? 'strong' : 'span';
+                    protectedPlaceholders.push({ tagName: tagName, tagAttr: tagStart, inner: inner });
+                    return '||PROT' + idx + '||';
+                });
                 const s = gst(), c = gch();
                 const names = [];
                 if (c && c.cn && c.cn.length >= 2) names.push(c.cn);
@@ -1944,7 +2109,6 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     const normalized = i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim();
                     if (normalized.length >= 2 && normalized !== i) names.push(normalized);
                 });
-                html = html.replace(/【([^】]+)】/g, '<strong class="auto-bold">$1</strong>');
                 const unique = [...new Set(names)];
                 if (unique.length) {
                     // Sort by length descending to match longer names first
@@ -1961,6 +2125,17 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         return '<span class="item-ref auto-bold" data-item-info="' + escAttr(info) + '">' + esc(name) + '</span>';
                     }
                     return '<span class="item-ref">' + esc(name) + '</span>';
+                });
+                // 还原保护的标签
+                html = html.replace(/\|\|PROT(\d+)\|\|/g, (m, idx) => {
+                    const n = parseInt(idx);
+                    const p = protectedPlaceholders[n];
+                    if (!p) return m;
+                    if (p.tagName === 'strong') {
+                        return '<strong class="auto-bold">' + p.inner + '</strong>';
+                    } else {
+                        return '<span class="' + p.tagAttr + '">' + p.inner + '</span>';
+                    }
                 });
                 return html;
             }
@@ -2074,25 +2249,29 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 const cont = $('clueNoteContent');
                 if (!cont) return;
                 const s = gst();
-                // Process clues with priority
-                let clues = [];
+                // 归一化所有线索为对象，并回写以避免 string/object 混用 bug
                 if (s && s.clues && s.clues.length) {
-                    clues = s.clues.map((c, i) => {
+                    s.clues = s.clues.map((c, i) => {
                         if (typeof c === 'string') {
-                            return { text: c, priority: 2, id: 'clue_' + i + '_' + Date.now() };
+                            return { text: c, priority: 2, id: 'clue_' + i + '_' + Date.now(), time: '' };
                         }
-                        return { 
-                            text: c.text || c.content || c, 
-                            priority: c.priority || 2, 
-                            id: c.id || ('clue_' + i + '_' + Date.now())
+                        return {
+                            text: c.text || c.content || String(c),
+                            priority: c.priority || 2,
+                            id: c.id || ('clue_' + i + '_' + Date.now()),
+                            time: c.time || ''
                         };
                     });
-                    // Sort by priority (1=high, 3=low), then by time (newest first)
-                    clues.sort((a, b) => {
-                        if (a.priority !== b.priority) return a.priority - b.priority;
-                        return 0;
-                    });
+                    sst(s);
                 }
+                // 读取归一化后的线索
+                let clues = (s && s.clues) ? s.clues.slice() : [];
+                // 按优先级排序（1=高, 3=低），同优先级保持原序
+                clues.sort((a, b) => {
+                    const pa = (a.priority || 2), pb = (b.priority || 2);
+                    if (pa !== pb) return pa - pb;
+                    return 0;
+                });
                 // Update clue count in header
                 const header = $('clueSidebar') ? $('clueSidebar').querySelector('.clue-sidebar-header span') : null;
                 if (header) {
@@ -2108,73 +2287,79 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         badge.style.display = 'none';
                     }
                 }
+                // 渲染线索列表（空列表也显示提示+按钮）
+                let html = '';
                 if (!clues.length) {
-                    cont.innerHTML = '<div class="clue-note-empty">暂无线索<br>去探索世界，发现更多真相吧～</div>';
-                    return;
+                    html += '<div class="clue-note-empty">暂无线索<br>去探索世界，发现更多真相吧～</div>';
+                } else {
+                    html += clues.map((c, i) => {
+                        const idx = clues.length - i;
+                        const priority = c.priority || 2;
+                        const pClass = 'p' + priority;
+                        const actions = '<div class="clue-actions">' +
+                            '<span data-act="edit" data-id="' + c.id + '">✎ 编辑</span>' +
+                            '<span data-act="del" data-id="' + c.id + '">✕ 删除</span>' +
+                            '</div>';
+                        return '<div class="clue-note-item" data-id="' + c.id + '">' +
+                            '<span class="clue-priority ' + pClass + '" data-priority="' + priority + '" title="点击切换优先级">' + priority + '</span>' +
+                            '<span style="font-weight:bold;margin-right:4px;color:#b58b5a;">#' + idx + '</span>' +
+                            esc(c.text || '') +
+                            actions +
+                            '</div>';
+                    }).join('');
                 }
-                cont.innerHTML = clues.map((c, i) => {
-                    const idx = clues.length - i;
-                    const cleanText = typeof c === 'string' ? c : c.text;
-                    const priority = typeof c === 'string' ? 2 : (c.priority || 2);
-                    const pClass = 'p' + priority;
-                    const actions = '<div class="clue-actions">' +
-                        '<span data-act="edit" data-id="' + (c.id || '') + '">✎ 编辑</span>' +
-                        '<span data-act="del" data-id="' + (c.id || '') + '">✕ 删除</span>' +
-                        '</div>';
-                    return '<div class="clue-note-item" data-id="' + (c.id || '') + '">' + 
-                        '<span class="clue-priority ' + pClass + '" data-priority="' + priority + '" title="点击切换优先级">' + priority + '</span>' +
-                        '<span style="font-weight:bold;margin-right:4px;color:#b58b5a;">#' + idx + '</span>' + 
-                        esc(cleanText) + 
-                        actions +
-                        '</div>';
-                }).join('');
+                // 始终添加操作按钮
+                html += '<div class="clue-sidebar-actions">' +
+                    '<button id="btnAddClue">+ 添加线索</button>' +
+                    '<button id="btnSortClue">自动排序</button>' +
+                    '</div>';
+                cont.innerHTML = html;
 
-                // Add action buttons area below clues
-                const actionDiv = document.createElement('div');
-                actionDiv.className = 'clue-sidebar-actions';
-                actionDiv.innerHTML = '<button id="btnAddClue">+ 添加线索</button><button id="btnSortClue">自动排序</button>';
-                cont.appendChild(actionDiv);
-
-                // Bind event delegation for clue interactions
+                // Bind events for clue items
                 cont.querySelectorAll('.clue-note-item').forEach(item => {
                     const priSpan = item.querySelector('.clue-priority');
-                    priSpan.onclick = () => {
-                        const curPri = parseInt(priSpan.dataset.priority);
-                        const newPri = curPri >= 3 ? 1 : curPri + 1;
-                        const s = gst();
-                        if (s && s.clues) {
-                            const itemId = item.dataset.id;
-                            const clueObj = s.clues.find(c => (typeof c === 'object' && c.id === itemId));
-                            if (clueObj) {
-                                clueObj.priority = newPri;
-                                sst(s);
-                                renderClueSidebar();
+                    if (priSpan) {
+                        priSpan.onclick = (e) => {
+                            e.stopPropagation();
+                            const curPri = parseInt(priSpan.dataset.priority);
+                            const newPri = curPri >= 3 ? 1 : curPri + 1;
+                            const s2 = gst();
+                            if (s2 && s2.clues) {
+                                const itemId = item.dataset.id;
+                                const clueObj = s2.clues.find(c => c.id === itemId);
+                                if (clueObj) {
+                                    clueObj.priority = newPri;
+                                    sst(s2);
+                                    renderClueSidebar();
+                                }
                             }
-                        }
-                    };
+                        };
+                    }
+                    // 阻止长按触发删除：使用 click 而非 touchstart/touchend
                     item.querySelectorAll('.clue-actions span').forEach(btn => {
-                        btn.onclick = () => {
+                        btn.onclick = (e) => {
+                            e.stopPropagation();
                             const act = btn.dataset.act;
                             const itemId = btn.dataset.id;
-                            const s = gst();
-                            if (!s || !s.clues) return;
+                            const s2 = gst();
+                            if (!s2 || !s2.clues) return;
                             if (act === 'del') {
-                                s.clues = s.clues.filter(c => {
-                                    if (typeof c === 'string') return false;
-                                    return c.id !== itemId;
-                                });
-                                sst(s);
+                                // 仅删除匹配 id 的线索，不影响其他线索
+                                s2.clues = s2.clues.filter(c => c.id !== itemId);
+                                sst(s2);
                                 renderClueSidebar();
                                 playSfx('drop');
                             } else if (act === 'edit') {
-                                const clueObj = s.clues.find(c => (typeof c === 'object' && c.id === itemId));
+                                const clueObj = s2.clues.find(c => c.id === itemId);
                                 if (clueObj) {
-                                    const newText = prompt('编辑线索内容：', clueObj.text);
-                                    if (newText !== null) {
-                                        clueObj.text = newText;
-                                        sst(s);
-                                        renderClueSidebar();
-                                    }
+                                    sketchPrompt('编辑线索内容：', clueObj.text || '', '编辑线索').then(newText => {
+                                        if (newText !== null && newText.trim()) {
+                                            clueObj.text = newText.trim();
+                                            sst(s2);
+                                            renderClueSidebar();
+                                            playSfx('pickup');
+                                        }
+                                    });
                                 }
                             }
                         };
@@ -2182,43 +2367,62 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 });
 
                 // Add clue button
-                cont.querySelector('#btnAddClue').onclick = () => {
-                    const text = prompt('请输入新线索内容：');
-                    if (text) {
-                        const s = gst();
-                        if (!s.clues) s.clues = [];
-                        s.clues.push({
-                            text: text,
-                            priority: 2,
-                            id: 'clue_' + Date.now(),
-                            time: gclk().day + '日 ' + fmtTime(gclk().elapsedSec)
+                const addBtn = cont.querySelector('#btnAddClue');
+                if (addBtn) {
+                    addBtn.onclick = () => {
+                        sketchPrompt('请输入新线索内容：', '', '添加线索').then(text => {
+                            if (text && text.trim()) {
+                                const s2 = gst();
+                                if (!s2.clues) s2.clues = [];
+                                s2.clues.push({
+                                    text: text.trim(),
+                                    priority: 2,
+                                    id: 'clue_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                                    time: (gclk().day || 1) + '日 ' + fmtTime(gclk().elapsedSec)
+                                });
+                                sst(s2);
+                                renderClueSidebar();
+                                playSfx('pickup');
+                                tst('新线索已添加');
+                            }
                         });
-                        sst(s);
-                        renderClueSidebar();
-                        playSfx('pickup');
-                        tst('新线索已添加');
-                    }
-                };
+                    };
+                }
 
                 // Sort button
-                cont.querySelector('#btnSortClue').onclick = () => {
-                    const s = gst();
-                    if (!s || !s.clues) return;
-                    // Assign priorities based on content keywords
-                    s.clues.forEach(c => {
-                        if (typeof c === 'object') {
-                            const text = c.text || '';
-                            if (/(重要|关键|核心|危险|警告|注意|紧急|必须)/.test(text)) c.priority = 1;
-                            else if (/(线索|提示|发现|记得|记住)/.test(text)) c.priority = 2;
-                            else c.priority = 3;
+                const sortBtn = cont.querySelector('#btnSortClue');
+                if (sortBtn) {
+                    sortBtn.onclick = () => {
+                        const s2 = gst();
+                        if (!s2 || !s2.clues || !s2.clues.length) {
+                            tst('暂无线索可排序');
+                            return;
                         }
-                    });
-                    sst(s);
-                    renderClueSidebar();
-                    tst('已自动排序线索');
-                };
+                        // 按关键词智能分级
+                        s2.clues.forEach(c => {
+                            const text = c.text || '';
+                            if (/(重要|关键|核心|危险|警告|注意|紧急|必须|致命|感染|密码|钥匙|代码|逃离|出口|秘密|隐藏)/.test(text)) {
+                                c.priority = 1;
+                            } else if (/(线索|提示|发现|记得|记住|地图|位置|方向|幸存者|商人|营地|任务|物品|路线|时间|天气)/.test(text)) {
+                                c.priority = 2;
+                            } else {
+                                c.priority = 3;
+                            }
+                        });
+                        // 按优先级排序
+                        s2.clues.sort((a, b) => {
+                            const pa = a.priority || 2, pb = b.priority || 2;
+                            if (pa !== pb) return pa - pb;
+                            return 0;
+                        });
+                        sst(s2);
+                        renderClueSidebar();
+                        tst('已自动排序线索（按关键词智能分级）');
+                        playSfx('pickup');
+                    };
+                }
 
-                // Clear any drag-position inline styles so the sidebar can open/close properly
+                // Clear any drag-position inline styles
                 const clueSb = $('clueSidebar');
                 if (clueSb) {
                     if (clueSb.style.left) clueSb.style.left = '';
@@ -3057,7 +3261,13 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     const sumPrompt = `请为以下文字冒险游戏的对话历史生成一份精炼的剧情摘要。要求：\n1. 保留关键事件、重要决定、角色变化、发现的物品/NPC/地点\n2. 记录角色的当前状态变化（心态、精神、欢愉等）\n3. 标出未解决的悬念和目标\n4. 控制在300字以内\n\n对话历史：\n${toSummarize.map(m => (m.role === 'user' ? '【玩家】' : '【叙事】') + ': ' + m.content).join('\n')}\n\n请直接输出摘要，不要其他文字。`;
                     const sumBody = { model: f.model, messages: [{ role: 'user', content: sumPrompt }], max_tokens: 512, temperature: 0.3 };
                     const rp = await window._sendProxyRequest(f.ep, sumBody, f.key, null, false);
-                    if (!rp.ok) throw new Error('摘要生成失败');
+                    if (!rp.ok) {
+                        let friendlyMsg = '摘要生成失败 (HTTP ' + rp.status + ')';
+                        if (rp.status === 401) friendlyMsg = '摘要生成失败：认证失败，请检查API密钥';
+                        else if (rp.status === 429) friendlyMsg = '摘要生成失败：请求过于频繁';
+                        else if (rp.status >= 500) friendlyMsg = '摘要生成失败：服务器暂时不可用';
+                        throw new Error(friendlyMsg);
+                    }
                     const d = await rp.json();
                     const summary = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
                     if (summary) {
@@ -3101,7 +3311,9 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 busy = true;
                 if (!isIdle) $('btnSend').disabled = true;
                 $('inputText').classList.add('busy');
-                apb({ ty: 'player', tx: isIdle ? '[自主] ' + showText : showText }, 0);
+                // 玩家气泡不渲染item-ref样式，将{{物品名}}转为纯文本【物品名】
+                const playerDisplayText = (isIdle ? '[自主] ' : '') + showText.replace(/\{\{([^}]+)\}\}/g, '【$1】');
+                apb({ ty: 'player', tx: playerDisplayText }, 0);
                 hist.push({ role: 'user', content: tx });
 
                 // If player is asking about clues, sync the clue sidebar immediately
@@ -3140,7 +3352,25 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         ctrl = ct;
                         const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: true };
                         const rp = await sendProxyRequest(f.ep, requestBody, f.key, ct.signal, true);
-                        if (!rp.ok) { const et = await rp.text().catch(() => '未知'); throw new Error('API请求失败 (' + rp.status + '): ' + et.substring(0, 80)); }
+                        if (!rp.ok) {
+                            const et = await rp.text().catch(() => '未知');
+                            let friendlyMsg = 'HTTP ' + rp.status;
+                            if (rp.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
+                            else if (rp.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
+                            else if (rp.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
+                            else if (rp.status === 429) friendlyMsg = '请求过于频繁：请稍后再试';
+                            else if (rp.status >= 500) friendlyMsg = '服务器错误：服务商暂时不可用';
+                            try {
+                                const ej = JSON.parse(et);
+                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
+                                if (m) {
+                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
+                                    m = m.replace(/\*\*\*\*\d+/g, '****');
+                                    friendlyMsg += '：' + m;
+                                }
+                            } catch(parseErr) {}
+                            throw new Error(friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg);
+                        }
                         const rd = rp.body.getReader();
                         const dc = new TextDecoder();
                         let buf = '', bubblesInDOM = [];
@@ -3207,7 +3437,25 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     } else if (!f.strm && f.key) {
                         const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: false };
                         const rp = await sendProxyRequest(f.ep, requestBody, f.key, null, false);
-                        if (!rp.ok) { const et = await rp.text().catch(() => '未知'); throw new Error('API请求失败 (' + rp.status + '): ' + et.substring(0, 80)); }
+                        if (!rp.ok) {
+                            const et = await rp.text().catch(() => '未知');
+                            let friendlyMsg = 'HTTP ' + rp.status;
+                            if (rp.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
+                            else if (rp.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
+                            else if (rp.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
+                            else if (rp.status === 429) friendlyMsg = '请求过于频繁：请稍后再试';
+                            else if (rp.status >= 500) friendlyMsg = '服务器错误：服务商暂时不可用';
+                            try {
+                                const ej = JSON.parse(et);
+                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
+                                if (m) {
+                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
+                                    m = m.replace(/\*\*\*\*\d+/g, '****');
+                                    friendlyMsg += '：' + m;
+                                }
+                            } catch(parseErr) {}
+                            throw new Error(friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg);
+                        }
                         const d = await rp.json();
                         full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
                         const bb = (window.pai || pai)(full);
@@ -3230,13 +3478,17 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     }
                 } catch (e) {
                     if (indicatorEl && indicatorEl.parentNode) indicatorEl.remove();
-                    apb({ ty: 'system', tx: '错误：' + e.message }, 0);
+                    let errMsg = '错误：' + e.message;
+                    if (/认证失败|密钥|API.*key/i.test(e.message)) {
+                        errMsg += '\n（可点击右上角「设置」按钮修改API配置）';
+                    }
+                    apb({ ty: 'system', tx: errMsg }, 0);
                     if (isIdle) stopIdle();
                 } finally {
                     busy = false;
                     if (!isIdle && !idleLocked) $('btnSend').disabled = false;
                     if (!isIdle) $('inputText').classList.remove('busy');
-                    if (!isIdle && !idleLocked) $('inputText').focus();
+                    if (!isIdle && !idleLocked && !isMobile()) $('inputText').focus();
                     upui();
                     scb();
                     // Auto-save after each game action (keep auto-slot in sync)
@@ -3438,7 +3690,13 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     ];
                     const initBody = { model: f.model, messages: msgs, max_tokens: 256, temperature: 0.6 };
                     const rp = await window._sendProxyRequest(f.ep, initBody, f.key, null, false);
-                    if (!rp.ok) throw new Error('API错误');
+                    if (!rp.ok) {
+                        let friendlyMsg = '初始化失败 (HTTP ' + rp.status + ')';
+                        if (rp.status === 401) friendlyMsg = '初始化失败：认证失败，请检查API密钥';
+                        else if (rp.status === 404) friendlyMsg = '初始化失败：接口不存在，请检查端点地址';
+                        else if (rp.status >= 500) friendlyMsg = '初始化失败：服务器暂时不可用';
+                        throw new Error(friendlyMsg);
+                    }
                     const d = await rp.json();
                     const content = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
                     const s = gst();
@@ -4413,7 +4671,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                                 const msg = eff && eff.length
                                     ? '使用了 ' + item + '（效果：' + eff.join(' ') + '）'
                                     : '使用了 ' + item;
-                                out(msg, 'whisper');
+                                apb({ ty: 'whisper', tx: msg }, 0);
                                 playSfx('heal');
                                 // Refresh backpack display
                                 if (typeof renderBackpack === 'function') renderBackpack();
@@ -4431,7 +4689,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             // Directly toggle equipment without sending to input
                             const s = gst();
                             const itemInfo = getItemInfo(getItemBaseName(item));
-                            if (!itemInfo) { hin('装备：' + item); playSfx('equip'); return; }
+                            if (!itemInfo) { tst('无法识别该物品的装备信息'); playSfx('drop'); return; }
                             // Find suitable slot
                             const slotMap = {
                                 'weapon': 'weapon', 'armor': 'body', 'tool': 'offhand',
@@ -4821,7 +5079,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 tst(cfg().debug ? '⚡ 上帝模式已激活' : '设置已保存');
             });
             // ===== Export / Import full backup =====
-            $('btnExportBackup') && $('btnExportBackup').addEventListener('click', () => {
+            $('btnSetExportBackup') && $('btnSetExportBackup').addEventListener('click', () => {
                 const chr = gch();
                 const backup = {
                     generatedAt: new Date().toISOString(),
@@ -4852,8 +5110,13 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     tst('导出失败：' + e.message, 'warn');
                 }
             });
-            $('inputImportBackup') && $('inputImportBackup').addEventListener('change', async (e) => {
-                const statusEl = $('importBackupStatus');
+            // 设置面板导入备份按钮：触发隐藏的file input
+            $('btnSetImportBackup') && $('btnSetImportBackup').addEventListener('click', () => {
+                const inp = $('inputSetImportBackup');
+                if (inp) { inp.value = ''; inp.click(); }
+            });
+            $('inputSetImportBackup') && $('inputSetImportBackup').addEventListener('change', async (e) => {
+                const statusEl = $('setImportBackupStatus');
                 const file = e.target.files && e.target.files[0];
                 if (!file) return;
                 try {
@@ -5067,10 +5330,16 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     if (response.ok) {
                         showProxyCfgStatus('✓ 测试请求成功 (HTTP ' + response.status + ')', 'success');
                     } else {
-                        showProxyCfgStatus('⚠ 请求失败 (HTTP ' + response.status + ')', 'error');
+                        let msg = '⚠ 请求失败 (HTTP ' + response.status + ')';
+                        if (response.status === 401) msg = '⚠ 请求失败：认证失败，请检查API密钥';
+                        else if (response.status === 403) msg = '⚠ 请求失败：访问被拒绝';
+                        else if (response.status === 404) msg = '⚠ 请求失败：目标接口不存在';
+                        else if (response.status === 429) msg = '⚠ 请求失败：请求过于频繁';
+                        else if (response.status >= 500) msg = '⚠ 请求失败：目标服务器暂时不可用';
+                        showProxyCfgStatus(msg, 'error');
                     }
                 } catch (e) {
-                    showProxyCfgStatus('� 请求异常: ' + e.message, 'error');
+                    showProxyCfgStatus('✗ 请求异常: ' + e.message, 'error');
                 }
             }
             
@@ -5222,6 +5491,20 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             $('btnBgm').addEventListener('pointerup', () => { if (bgmPressTimer) { clearTimeout(bgmPressTimer); bgmPressTimer = null; } });
             $('btnBgm').addEventListener('pointerleave', () => { if (bgmPressTimer) { clearTimeout(bgmPressTimer); bgmPressTimer = null; } });
             $('btnIdle').addEventListener('click', toggleIdle);
+            $('btnAchievements') && $('btnAchievements').addEventListener('click', () => {
+                renderAchievementsPanel();
+                $('achievementsModal').style.display = 'flex';
+            });
+            $('modalCloseAchievements') && $('modalCloseAchievements').addEventListener('click', () => {
+                $('achievementsModal').style.display = 'none';
+            });
+            $('btnEvents') && $('btnEvents').addEventListener('click', () => {
+                renderEventsPanel();
+                $('eventsModal').style.display = 'flex';
+            });
+            $('modalCloseEvents') && $('modalCloseEvents').addEventListener('click', () => {
+                $('eventsModal').style.display = 'none';
+            });
             // ===== Undo last turn / Regen AI reply =====
             $('btnUndoTurn') && $('btnUndoTurn').addEventListener('click', async () => {
                 if (busy) { tst('演算中，无法回退'); return; }
@@ -5634,8 +5917,18 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     const ep = $('welEndpoint').value;
                     const testBody = { model: $('welModelSelect').value || $('welModel').value, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 };
                     const r = await window._sendProxyRequest(ep, testBody, k, null, false);
-                    tst(r.ok ? '连接成功' : '失败 ' + r.status);
-                } catch { tst('网络错误'); }
+                    if (r.ok) {
+                        tst('连接成功');
+                    } else {
+                        let msg = '失败 (HTTP ' + r.status + ')';
+                        if (r.status === 401) msg = '失败：认证失败，请检查API密钥';
+                        else if (r.status === 403) msg = '失败：访问被拒绝';
+                        else if (r.status === 404) msg = '失败：接口不存在，请检查端点地址';
+                        else if (r.status === 429) msg = '失败：请求过于频繁';
+                        else if (r.status >= 500) msg = '失败：服务器暂时不可用';
+                        tst(msg);
+                    }
+                } catch { tst('网络错误：无法连接到服务器，请检查网络或端点地址'); }
             });
 
             $('btnCharConfirm').addEventListener('click', () => {
@@ -5700,10 +5993,55 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             // Character export function
             function exportCharacter() {
                 const c = gch();
+                // 生成可读的角色设定文本
+                const lines = [];
+                lines.push('══════════════════════════════════');
+                lines.push('  末日生存 — 角色设定卡');
+                lines.push('══════════════════════════════════');
+                lines.push('');
+                lines.push('【世界背景】');
+                lines.push('灾难名称：' + (c.dn || '未知'));
+                lines.push('当前时间：' + (c.days || '未知'));
+                lines.push('环境描述：' + (c.env || '未知'));
+                lines.push('地理位置：' + (c.geo || '未知'));
+                lines.push('主要地点：' + (c.loc || '未知'));
+                lines.push('');
+                lines.push('【角色信息】');
+                lines.push('姓名：' + (c.cn || '幸存者'));
+                lines.push('年龄：' + (c.ca || '未知'));
+                lines.push('性别：' + (c.gd || '未知'));
+                lines.push('体型：' + (c.bt || '未知'));
+                lines.push('身高：' + (c.ht || '未知') + 'cm');
+                lines.push('体重：' + (c.wt || '未知') + 'kg');
+                lines.push('职业：' + (c.job || '未知'));
+                lines.push('惯用手：' + (c.hand || '右'));
+                lines.push('血型：' + (c.bt2 || '未知'));
+                lines.push('');
+                lines.push('【背景故事】');
+                lines.push(c.bg || '无');
+                lines.push('');
+                if (c.extraFeature === '异能' && c.abilityName) {
+                    lines.push('【特殊能力】');
+                    lines.push('能力名称：' + (c.abilityName || ''));
+                    if (c.abilityDesc) lines.push('能力描述：' + c.abilityDesc);
+                    lines.push('');
+                }
+                lines.push('【初始状态】');
+                lines.push('初始物品：' + (c.it || '无'));
+                lines.push('出生地点：' + (c.sp || '未知'));
+                lines.push('心理状态：' + (c.mental || '稳定'));
+                if (c.fear) lines.push('恐惧来源：' + c.fear);
+                lines.push('');
+                lines.push('══════════════════════════════════');
+                lines.push('  导出时间：' + new Date().toLocaleString('zh-CN'));
+                lines.push('══════════════════════════════════');
+
+                // 同时导出JSON和可读文本
                 const exp = {
                     type: 'vn_character',
-                    version: '2.0',
+                    version: '2.1',
                     exportTime: new Date().toISOString(),
+                    readableText: lines.join('\n'),
                     data: c
                 };
                 const fn = (c.cn || '幸存者') + '_角色设定_' + new Date().toISOString().slice(0, 10) + '.json';
@@ -5712,7 +6050,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url; a.download = fn; a.click();
-                URL.revokeObjectURL(url);
+                setTimeout(() => URL.revokeObjectURL(url), 5000);
                 tst('角色设定已导出：' + fn);
                 playSfx('success');
             }
@@ -5731,9 +6069,11 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         playSfx('levelup');
                         // Show success hint
                         const btn = $('btnImportCharacter');
-                        const orig = btn.textContent;
-                        btn.textContent = '✅ 导入成功';
-                        setTimeout(() => { btn.textContent = orig; }, 2000);
+                        if (btn) {
+                            const orig = btn.textContent;
+                            btn.textContent = '✅ 导入成功';
+                            setTimeout(() => { btn.textContent = orig; }, 2000);
+                        }
                     } catch (err) {
                         tst('导入失败：' + err.message);
                         playSfx('fail');
@@ -6089,6 +6429,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     if (finalCfg.ep) $('welEndpoint').value = finalCfg.ep;
                     if (finalCfg.model) { const sl = $('welModelSelect'); if (sl && [...sl.options].some(o => o.value === finalCfg.model)) sl.value = finalCfg.model; }
                     if (finalCfg.preset && $('welEndpointPreset')) $('welEndpointPreset').value = finalCfg.preset;
+                    if (finalCfg.key) $('welKey').value = finalCfg.key;
                     $('welcomeModal').style.display = 'flex';
                 } else if (loadedFromSave) {
                     // Step 2: Has API key + loaded from save - restore silently
@@ -6111,7 +6452,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 const wm = $('welcomeModal'), cm = $('charModal');
                 const wmHidden = !wm || wm.style.display === 'none' || !wm.style.display;
                 const cmHidden = !cm || cm.style.display === 'none' || !cm.style.display;
-                if (wmHidden && cmHidden) {
+                if (wmHidden && cmHidden && !isMobile()) {
                     setTimeout(() => $('inputText').focus(), 100);
                 }
                 // Show tutorial on first launch
@@ -6125,7 +6466,10 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         document.removeEventListener('keydown', startBgmOnce);
                         document.removeEventListener('touchstart', startBgmOnce);
                         bgmInit();
-                        bgmPlayCategory('title');
+                        // 游戏初始默认营地背景音
+                        BGM._currentCategory = 'camp';
+                        BGM._currentFile = 'bgm_camp1.mp3';
+                        bgmPlay('bgm_camp1.mp3');
                         const _s = gst(), _c = gch(), _clk = gclk();
                         bgmAutoSwitch({
                             location: _c.sp || _c.location || '',
@@ -7308,15 +7652,70 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             { id: 'hardcore', name: '硬核玩家', desc: '存活且从未感染', icon: '🔥', check: () => { const s = gst(); return (s.infection || 0) === 0 && gclk().day >= 5; } },
             { id: 'gear_head', name: '装备达人', desc: '同时装备4件物品', icon: '🛡️', check: () => { const s = gst(); const eq = s.equip; if (!eq) return false; return Object.values(eq).filter(v => v && v.trim()).length >= 4; } }
         ];
+        const ACH_KEY = 'vn_achievements';
         const unlockedAchievements = new Set();
+        // 从localStorage加载已解锁成就，避免刷新后重复弹出
+        try {
+            const saved = localStorage.getItem(ACH_KEY);
+            if (saved) {
+                JSON.parse(saved).forEach(id => unlockedAchievements.add(id));
+            }
+        } catch(e) {}
+        function saveAchievements() {
+            try {
+                localStorage.setItem(ACH_KEY, JSON.stringify([...unlockedAchievements]));
+            } catch(e) {}
+        }
         function checkAchievements() {
             ACHIEVEMENTS.forEach(a => {
                 if (!unlockedAchievements.has(a.id) && a.check()) {
                     unlockedAchievements.add(a.id);
+                    saveAchievements();
                     tst('🏆 成就解锁：' + a.name + ' — ' + a.desc);
                     playSfx('levelup');
                     addLogEntry('achievement', '成就解锁：' + a.name);
+                    logEvent('achievement', '成就解锁：' + a.name);
                 }
+            });
+        }
+        // 渲染成就面板
+        function renderAchievementsPanel() {
+            const list = $('achievementsList');
+            if (!list) return;
+            list.innerHTML = '';
+            ACHIEVEMENTS.forEach(a => {
+                const unlocked = unlockedAchievements.has(a.id);
+                const el = document.createElement('div');
+                el.className = 'achievement-item' + (unlocked ? '' : ' locked');
+                el.innerHTML = '<div class="ach-icon">' + a.icon + '</div>' +
+                    '<div class="ach-info">' +
+                    '<div class="ach-name">' + esc(a.name) + (unlocked ? ' ✓' : ' 🔒') + '</div>' +
+                    '<div class="ach-desc">' + esc(a.desc) + '</div>' +
+                    '</div>';
+                list.appendChild(el);
+            });
+        }
+        // 事件记录存储
+        let eventLog = [];
+        function logEvent(type, text) {
+            const clk = gclk();
+            eventLog.unshift({ type, text, time: fmtTime(clk.elapsedSec) + ' D' + (clk.day || 1) });
+            if (eventLog.length > 50) eventLog.pop();
+        }
+        // 渲染事件面板
+        function renderEventsPanel() {
+            const list = $('eventsList');
+            if (!list) return;
+            if (eventLog.length === 0) {
+                list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">暂无突发事件记录</div>';
+                return;
+            }
+            list.innerHTML = '';
+            eventLog.forEach(e => {
+                const el = document.createElement('div');
+                el.className = 'event-item';
+                el.innerHTML = '<div class="ev-time">' + esc(e.time) + '</div>' + esc(e.text);
+                list.appendChild(el);
             });
         }
 
@@ -7328,12 +7727,14 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             onLowHealth: (s) => {
                 if (s.hp < 30 && Math.random() < 0.3) {
                     snotify('status', '警告', '生命值偏低！');
+                    logEvent('warning', '生命值偏低！');
                     addLogEntry('event', '事件：生命危机');
                 }
             },
             onLowHunger: (s) => {
                 if (s.hunger < 20 && Math.random() < 0.4) {
                     snotify('status', '警告', '饥饿难耐！');
+                    logEvent('warning', '饥饿难耐！');
                     addLogEntry('event', '事件：严重饥饿');
                 }
             },
@@ -7341,12 +7742,14 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (clk && clk.elapsedSec && (clk.elapsedSec % 86400 > 64800) && (clk.elapsedSec % 86400 < 72000)) {
                     if (Math.random() < 0.15) {
                         snotify('info', '夜晚', '夜幕降临，注意安全');
+                        logEvent('info', '夜幕降临，注意安全');
                     }
                 }
             },
             onZombieThreat: (s) => {
                 if (s.hp < 50 && s.infection > 30 && Math.random() < 0.2) {
                     snotify('danger', '威胁', '尸群正在逼近！');
+                    logEvent('danger', '尸群正在逼近！');
                     addLogEntry('event', '事件：尸群逼近');
                 }
             }
@@ -8043,9 +8446,17 @@ async function testProxyRequest() {
             });
         }
         if (response.ok) { showProxyCfgStatus('✓ 测试请求成功 (HTTP ' + response.status + ')', 'success'); }
-        else { showProxyCfgStatus('⚠ 请求失败 (HTTP ' + response.status + ')', 'error'); }
+        else {
+            let msg = '⚠ 请求失败 (HTTP ' + response.status + ')';
+            if (response.status === 401) msg = '⚠ 请求失败：认证失败，请检查API密钥';
+            else if (response.status === 403) msg = '⚠ 请求失败：访问被拒绝';
+            else if (response.status === 404) msg = '⚠ 请求失败：目标接口不存在';
+            else if (response.status === 429) msg = '⚠ 请求失败：请求过于频繁';
+            else if (response.status >= 500) msg = '⚠ 请求失败：目标服务器暂时不可用';
+            showProxyCfgStatus(msg, 'error');
+        }
     } catch (e) {
-        showProxyCfgStatus('❌ 请求异常: ' + e.message, 'error');
+        showProxyCfgStatus('✗ 请求异常: ' + e.message, 'error');
     }
 }
 
