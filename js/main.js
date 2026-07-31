@@ -336,6 +336,80 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
 
 注意：状态值（饱腹/口渴/疲劳/体温）会随游戏时间自然衰减，你无需手动维护。在叙事中应体现饥饿、口渴、疲劳的进展。
 
+【状态联动规则 — 行动后必须更新属性】
+玩家执行以下行动时，你必须在回复末尾输出对应的属性标签，反映行动对角色状态的影响：
+1. 休息/睡眠 → [疲劳:降低后值] [时间:+Xh]（疲劳降低幅度取决于休息时长和环境安全性）
+2. 进食/饮水 → [饱腹:增加后值] 或 [口渴:增加后值] + [物品:-食物名]（恢复幅度取决于食物量）
+3. 剧烈运动/战斗/奔跑 → [疲劳:增加后值] [饱腹:降低后值] [口渴:降低后值]（消耗更大）
+4. 受伤 → [血量:当前值] [伤势:伤情描述]（如被咬伤需考虑感染风险）
+5. 使用药品/治疗 → [血量:恢复后值] [伤势:好转描述] [物品:-药品名]
+6. 进入极端环境（暴雪/酷热） → [体温:变化后值]（体温趋向环境温度）
+7. 搬运重物 → [负重:变化后值]
+8. 心理受创/恐怖场景 → [心态:变化后状态] [精神:变化后值]
+9. 战斗胜利 → [战斗:胜] [精神:变化后值]（战斗后精神略升或因杀戮略降）
+10. 社交互动（正面） → [精神:变化后值]（良好社交恢复精神）
+规则要点：每次行动后，至少输出1-2个受影响的属性标签，确保状态与剧情同步。不要遗漏属性更新，否则游戏数据会与叙事脱节。
+
+【状态阈值触发效果 — 必须在叙事中体现】
+当角色状态越过以下阈值时，你必须在叙事中描写对应后果，并通过标签同步状态：
+- 饱腹<10：角色虚弱无力，行动成功率-30%，可能昏厥（[状态:虚脱]）
+- 口渴<10：角色脱水眩晕，体温调节失常，行动成功率-30%
+- 疲劳>85：角色极度疲惫，移动速度减半，战斗闪避-40%，可能突然昏睡（[状态:虚脱]）
+- 疲劳>95：角色强制昏睡2-4小时，期间毫无防备（[时间:+Xh] [疲劳:降低后值]）
+- 精神<15：角色产生幻觉，判断力严重下降，可能误判NPC为威胁（[心态:创伤]）
+- 体温<34：角色失温颤抖，动作迟缓，持续下降将致命（[状态:失温]）
+- 体温>39：角色高热谵妄，可能神志不清
+- 感染>70：角色出现变异前兆（高热、瞳孔异常、攻击性增强），需紧急治疗
+- 负重>最大负重90%：角色移动速度-30%，奔跑 impossible，疲劳消耗+50%
+规则要点：状态阈值不是装饰，必须在叙事中真实影响角色行为和判定。虚弱的角色不应做出强力行动，幻觉中的角色不应被信任为正常判断。
+
+【行动耗时参考 — 时间推进依据】
+当前流速模式：{{timeFlowMode}}
+不同行动消耗的游戏时间参考：
+- 搜索物资：1-2h（视区域大小）；仔细搜查大型建筑可达3-4h
+- 战斗：0.5-1h（短促遭遇）；持久战2-3h
+- 短休息/打盹：1-2h（恢复疲劳-15~20）
+- 深度睡眠：6-8h（恢复疲劳-40~60，恢复精神+15）
+- 移动（步行）：1-3h（视距离）；奔跑可缩短但疲劳+15
+- 制作/合成：0.5-2h（视复杂度）
+- 治疗/包扎：0.5-1h
+- 与NPC深入对话：0.5-1h
+- 侦察/观察：0.5-1h
+流速规则要点：
+◆ 加速流速模式：每次行动必须用 [时间:+Xh] 标签显式推进游戏时间，禁止"瞬间完成"的描写。连续高强度行动应累积疲劳。
+◆ 现实流速模式：禁止使用 [时间:+Xh] 标签（时间由玩家设备时钟实时同步，AI无权修改）。行动耗时仅在叙事中自然体现（如"你花了大约一小时仔细搜索"），但不改变游戏时钟。短时间内的连续行动（如AI响应间隔只有几十秒）应描述为"几分钟内完成的小动作"（整理装备、观察环境、简短对话），而非"耗时数小时的大行动"。深度睡眠、长距离移动等大耗时行动仅在挂机模式或玩家长时间离开后通过叙事跳过处理。
+
+【智能判定规则 — GM决策框架】
+1. 行动成功率判定：根据角色属性（技能/特质/装备/状态）+ 环境因素（天气/时间/地形）+ 随机性综合判定。高技能角色在擅长领域成功率更高，低状态（饥饿/疲劳/受伤）降低成功率。
+2. 后果递进原则：同类行动连续执行时，效果递减或风险递增。如：连续搜索同一区域物资减少，连续战斗疲劳积累更快，连续休息恢复效率递减。
+3. 环境感知：AI必须根据当前天气、时间、位置动态调整事件概率。夜间丧尸更活跃，雨天视线模糊，密闭空间回声放大。
+4. NPC智能行为：NPC会根据自身需求（饥饿/安全/信任度）做出自主决策，不会始终等待玩家指令。高信任NPC可能主动提供帮助或情报，低信任NPC可能拒绝合作或背叛。
+5. 资源稀缺管理：物资分布合理，同一区域搜索后需时间刷新。稀有物资（弹药/药品/高级装备）仅在特定高风险区域出现。
+6. 时间压力：某些情境需要紧迫感（尸群逼近/建筑坍塌/感染扩散），AI应在叙事中制造时间压力，避免玩家无限拖延。
+
+【量化判定参考表 — GM判定的数值依据】
+为保障判定公正可预期，GM在判定行动成功率时参考以下修正（基础成功率50%，累加修正后限制在5%~95%）：
+◆ 属性修正（状态良好加成，状态差惩罚）
+- 饱腹<20：-15% | 疲劳>70：-20% | 伤势=重伤：-30% | 精神<20：-25%
+- 饱腹>60且疲劳<40且无伤：+15%（状态佳）
+- 心态=坚定：+10% | 心态=创伤：-15%
+◆ 技能/特质修正
+- 行动命中玩家专属技能（{{skl}}）：+25%
+- 正面特质（{{tp}}）匹配行动：+15%（如"勇敢"匹配战斗，"细心"匹配搜索）
+- 负面特质（{{tn}}）冲突行动：-20%（如"胆小"匹配正面战斗，"鲁莽"匹配潜行）
+- 职业相关行动：+20%（如医疗职业治疗、军人职业战斗、机械师职业修理）
+◆ 环境修正
+- 夜间（无光源）搜索/侦察：-25% | 夜间潜行：+10%
+- 雨天/雾天视线类行动：-20% | 雨天追踪气味：-40%
+- 极端气温（<0°C或>35°C）持续行动：-15%
+- 熟悉地点（已解锁地图）：+10% | 陌生高危区域：-15%
+- 噪音环境（发电机旁/暴雨中）潜行：+15%
+◆ 装备修正
+- 专用工具匹配任务（如开锁器开锁、望远镜侦察）：+25%
+- 装备损坏/无装备强行行动：-30%
+- 武器耐久<20：战斗-15%
+判定结果分层：成功率≥80%大成功（可能附带意外收获）；50-79%成功；20-49%失败但可逃生；<20%严重失败（受伤/损失/暴露）。GM应在叙事中体现判定的随机性与公正性，禁止"主角光环"式必胜。
+
 【强化AI理解玩家意图的关键指引：
 ★ 玩家意图识别与操作映射：
 - "用XX合成" / "做XX" / "合成XX" / "制作XX" → 自动触发 [合成:XX] 标签
@@ -374,11 +448,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 ep: 'https://api.openai.com/v1/chat/completions', key: '', model: 'gpt-4o',
                 maxT: 2048, temp: 0.7, ctx: 24, tspd: 20, strm: true, fsz: '15px',
                 prompt: DPROMPT, idleInt: 60, idleOn: false, idleDir: '休养', idleCustom: '',
-                worldLock: false, lastSlot: null, debug: false,
-                // 代理配置
-                useProxy: false,
-                proxyUrl: 'https://forward-proxy-njswknvuhg.cn-shanghai.fcapp.run/api/proxy',
-                proxySecret: 'GameProxy_2026Secret_8731'
+                worldLock: false, lastSlot: null, debug: false
             };
             const DSTA = { hunger: 70, thirst: 70, fatigue: 20, bodyTemp: 36.8, injury: '无', enc: 5, hp: 100, maxHp: 100, inv: ['破损背包', '半瓶水', '手电筒', '压缩饼干x2', '绷带x2'], clues: [], status: [], vehicle: '无', mapUnlock: [], mentality: '稳定', spirit: 85, joy: 0, pleasureUnlocked: false, actionBar: [], location: '废弃公寓', traits: ['生存本能', '警觉'],
                 equip: { head: '', body: '', legs: '', feet: '', weapon: '', offhand: '', backpack: '破损背包', accessory: '' },
@@ -520,6 +590,10 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (/车|自行|摩托|汽油/.test(itemName)) return '🚗';
                 if (/钥匙|锁|门卡/.test(itemName)) return '🔑';
                 return '📦';
+            }
+            function wrapEmoji(name) {
+                const e = typeof itemEmoji === 'function' ? itemEmoji(name) : '📦';
+                return '<span class="emoji-icon" data-item="' + esc(name) + '">' + e + '</span>';
             }
             // Parse item effect string (e.g. '饱腹+30 口渴+10') and apply changes to state
             function applyItemEffect(itemName) {
@@ -1084,6 +1158,18 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     return { ...fb, ...obj };
                 } catch { return fb; }
             }
+            function storageReportText() {
+                try {
+                    const sizeKB = Math.round(JSON.stringify(localStorage).length / 1024);
+                    let breakdown = [];
+                    const keySize = (key) => { try { const v = localStorage.getItem(key); return v ? Math.round(v.length/1024) : 0; } catch { return 0; } };
+                    for (const k of Object.values(K)) {
+                        const kb = keySize(k);
+                        if (kb > 0) breakdown.push(k + ': ~' + kb + 'KB');
+                    }
+                    return '当前占用：约 ' + sizeKB + 'KB\n存储项明细：' + breakdown.join(' · ');
+                } catch { return ''; }
+            }
             function sv(k, v) {
                 try {
                     const json = JSON.stringify(v);
@@ -1108,17 +1194,47 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         console.warn('[Storage] Main save failed (quota?):', k, e.message);
                         // 如果配额超限，尝试更激进的裁剪
                         if (e.name === 'QuotaExceededError' || e.code === 22) {
-                            if (k === K.HIS && v && v.length > 50) {
-                                const trimmed = v.slice(-50);
-                                try { localStorage.setItem(k, JSON.stringify(trimmed)); } catch {}
-                            } else {
-                                // 清理所有历史存档的备份来释放空间
+                            try {
+                                const report = storageReportText ? storageReportText() : '';
+                                const promptMsg = '⚠️ 本地存储空间已满！\n\n' + report + '\n\n系统将尝试自动裁剪对话历史来释放空间。\n\n【建议】：请尽快使用「设置 → 导出备份」手动导出完整存档到本地文件，防止数据丢失。\n\n是否允许自动裁剪对话历史？';
+                                setTimeout(() => {
+                                    const showQ = () => {
+                                        if (typeof sketchConfirm === 'function') {
+                                            sketchConfirm(promptMsg + '\n\n（点击「确定」= 允许裁剪；「取消」= 稍后手动处理）').then(ok => {
+                                                if (!ok) return;
+                                                doQuotaTrim();
+                                            }).catch(() => {});
+                                        } else {
+                                            if (confirm(promptMsg)) doQuotaTrim();
+                                        }
+                                    };
+                                    let storageTrimDone = false;
+                                    function doQuotaTrim() {
+                                        if (storageTrimDone) return; storageTrimDone = true;
+                                        try {
+                                            if (k === K.HIS && v && v.length > 50) {
+                                                const beforeCount = v.length;
+                                                const trimmed = v.slice(-50);
+                                                try { localStorage.setItem(k, JSON.stringify(trimmed)); tst('对话历史已裁剪：保留最近50条'); } catch {}
+                                                try { generateContextSummary(); } catch {}
+                                            } else {
+                                                try { Object.values(K).forEach(key => { if (key !== k + '_bak') localStorage.removeItem(key + '_bak'); }); } catch {}
+                                                try { localStorage.setItem(k, json); } catch {}
+                                            }
+                                        } catch(err) {}
+                                    }
+                                    showQ();
+                                }, 0);
+                            } catch(err2) {
                                 try {
-                                    Object.values(K).forEach(key => {
-                                        if (key !== k + '_bak') localStorage.removeItem(key + '_bak');
-                                    });
-                                } catch {}
-                                try { localStorage.setItem(k, json); } catch {}
+                                    if (k === K.HIS && v && v.length > 50) {
+                                        const trimmed = v.slice(-50);
+                                        try { localStorage.setItem(k, JSON.stringify(trimmed)); } catch {}
+                                    } else {
+                                        try { Object.values(K).forEach(key => { if (key !== k + '_bak') localStorage.removeItem(key + '_bak'); }); } catch {}
+                                        try { localStorage.setItem(k, json); } catch {}
+                                    }
+                                } catch(err3) {}
                             }
                         }
                     }
@@ -1196,39 +1312,205 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             function cfg() { const c = ld(K.CFG, DCFG); if (migrateCfg(c)) scf(c); return c; }
             function scf(c) { sv(K.CFG, c); afs(c.fsz); }
             
-            // 全局代理请求函数（可供欢迎页面测试、游戏主循环等多处调用）
+            // 全局请求函数（可供欢迎页面测试、游戏主循环等多处调用）
             window._sendProxyRequest = async function(targetUrl, body, apiKey, signal, isStream) {
-                const proxyConf = cfg();
-                if (!proxyConf.useProxy || !proxyConf.proxyUrl) {
-                    // 直连模式
-                    return fetch(targetUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-                        body: JSON.stringify(body),
-                        signal: signal
-                    });
-                }
-                // 代理模式
-                const proxyPayload = {
-                    targetUrl: targetUrl,
+                const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
+                if (isStream) headers['Accept'] = 'text/event-stream';
+                return fetch(targetUrl, {
                     method: 'POST',
-                    body: body,
-                    headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' }
-                };
-                // 如果是流式请求，添加Accept头
-                if (isStream) {
-                    proxyPayload.headers['Accept'] = 'text/event-stream';
-                }
-                return fetch(proxyConf.proxyUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Proxy-Secret': proxyConf.proxySecret || ''
-                    },
-                    body: JSON.stringify(proxyPayload),
+                    headers: headers,
+                    body: JSON.stringify(body),
                     signal: signal
                 });
             };
+            // ===== 背包操作统一封装（支持数量后缀x2/x3匹配）=====
+            function parseItemQty(item) {
+                if (!item) return { base: '', qty: 0, raw: '' };
+                const m = item.match(/^(.+?)x(\d+)$/);
+                if (m) return { base: m[1], qty: parseInt(m[2]), raw: item };
+                return { base: item, qty: 1, raw: item };
+            }
+            function formatItemQty(base, qty) {
+                if (qty <= 0) return null;
+                if (qty === 1) return base;
+                return base + 'x' + qty;
+            }
+            // 在背包中查找物品匹配的索引和数量信息；matchMode=exact/base/contains
+            function invFindIndex(inv, itemName, matchMode) {
+                const pq = parseItemQty(itemName);
+                mode = matchMode || 'base';
+                for (let i = 0; i < inv.length; i++) {
+                    const pq2 = parseItemQty(inv[i]);
+                    if (mode === 'exact' && pq2.raw === pq.raw) return { idx: i, base: pq2.base, qty: pq2.qty, raw: pq2.raw };
+                    if (mode === 'base' && pq2.base === pq.base) return { idx: i, base: pq2.base, qty: pq2.qty, raw: pq2.raw };
+                    if (mode === 'contains' && (pq2.base.includes(pq.base) || pq.base.includes(pq2.base))) return { idx: i, base: pq2.base, qty: pq2.qty, raw: pq2.raw };
+                }
+                return { idx: -1 };
+            }
+            // 检测背包是否拥有某物品（含x数量后缀）
+            function invHas(itemName, qty) {
+                const s = gst();
+                if (!s.inv) s.inv = [];
+                const need = qty || 1;
+                let found = 0;
+                for (let i = 0; i < s.inv.length; i++) {
+                    const pq = parseItemQty(s.inv[i]);
+                    if (pq.base === parseItemQty(itemName).base) {
+                        found += pq.qty;
+                        if (found >= need) return true;
+                    }
+                }
+                return false;
+            }
+            // 添加物品到背包（自动合并同base的数量，返回实际添加结果 {base, addedQty, totalQty}）
+            function invAdd(itemName, qty) {
+                const s = gst();
+                if (!s.inv) s.inv = [];
+                const pq = parseItemQty(itemName);
+                const addQty = (qty != null ? qty : pq.qty) || 1;
+                let foundEntry = null;
+                for (let i = 0; i < s.inv.length; i++) {
+                    const pq2 = parseItemQty(s.inv[i]);
+                    if (pq2.base === pq.base) { foundEntry = { i, base: pq2.base, cur: pq2.qty }; break; }
+                }
+                if (foundEntry) {
+                    const newQty = foundEntry.cur + addQty;
+                    s.inv[foundEntry.i] = formatItemQty(foundEntry.base, newQty);
+                    sst(s);
+                    return { base: foundEntry.base, addedQty: addQty, totalQty: newQty };
+                } else {
+                    const raw = formatItemQty(pq.base, addQty);
+                    s.inv.push(raw);
+                    sst(s);
+                    return { base: pq.base, addedQty: addQty, totalQty: addQty };
+                }
+            }
+            // 从背包移除物品（优先数量后缀），返回是否成功 {success, removedQty}
+            function invRemove(itemName, qty) {
+                const s = gst();
+                if (!s.inv) s.inv = [];
+                const pq = parseItemQty(itemName);
+                let need = (qty != null ? qty : pq.qty) || 1;
+                let removed = 0;
+                for (let pass = 0; pass < 2 && need > 0; pass++) {
+                    for (let i = 0; i < s.inv.length && need > 0; i++) {
+                        const pq2 = parseItemQty(s.inv[i]);
+                        const matchExact = (pass === 0 && pq2.base === pq.base);
+                        const matchFuzzy = (pass === 1 && pq.base && (pq2.base.includes(pq.base) || pq.base.includes(pq2.base)) && pq2.base !== pq.base);
+                        if (!matchExact && !matchFuzzy) continue;
+                        const take = Math.min(need, pq2.qty);
+                        const remain = pq2.qty - take;
+                        if (remain <= 0) s.inv.splice(i, 1);
+                        else s.inv[i] = formatItemQty(pq2.base, remain);
+                        removed += take; need -= take;
+                        if (pass === 1) i--;
+                    }
+                }
+                sst(s);
+                return { success: removed > 0, removedQty: removed, remaining: need };
+            }
+            // ===== 装备槽位推断统一函数 =====
+            const SLOT_KEYWORDS = {
+                head: ['头盔','帽子','头灯','面罩','防毒面具','护目镜','头套','头巾','安全帽','作战头盔','防弹头盔','贝雷帽','帽'],
+                body: ['背心','夹克','衣','服','甲','外套','冲锋衣','防弹衣','战术背心','作战服','雨衣','大衣','毛衣','衬衫','T恤'],
+                legs: ['裤','裙','牛仔裤','作战裤','工装裤','运动裤'],
+                feet: ['鞋','靴','袜','运动鞋','军靴','登山靴','作战靴','雨靴','拖鞋'],
+                weapon: ['斧','刀','棍','枪','剑','棒','锤','矛','弩','锯','钳','扳手','铁管','钢管','球棒','平底锅','匕首','刺刀','步枪','手枪','霰弹枪','冲锋枪','狙击枪','机枪'],
+                offhand: ['盾','护臂','护肘','护膝','手电筒','战术手电','医疗包','急救包'],
+                backpack: ['背包','包','箱','袋','登山包','战术背包','军用背包','双肩包','腰包'],
+                accessory: ['戒','链','表','环','坠','符','项链','手链','戒指','耳环','护符','徽章']
+            };
+            const SUBCATEGORY_SLOT_MAP = {
+                weapon: 'weapon', armor: 'body', tool: 'offhand', backpack: 'backpack',
+                tech: 'offhand', misc: 'accessory', helmet: 'head', pants: 'legs', shoes: 'feet',
+                clothing: 'body', jewelry: 'accessory', shield: 'offhand'
+            };
+            function getEquipSlot(itemName, info) {
+                if (info && info.slot) return info.slot;
+                const sub = info && info.subCategory;
+                if (sub && SUBCATEGORY_SLOT_MAP[sub.toLowerCase ? sub.toLowerCase() : sub]) return SUBCATEGORY_SLOT_MAP[sub.toLowerCase()];
+                const cat = info && info.category;
+                if (cat === 'weapon' || info && info.type === 'weapon') return 'weapon';
+                for (const [slot, keywords] of Object.entries(SLOT_KEYWORDS)) {
+                    if (keywords.some(kw => itemName && itemName.includes(kw))) return slot;
+                }
+                try {
+                    const mem = JSON.parse(localStorage.getItem('vn_slotMem') || '{}');
+                    const base = parseItemQty(itemName).base;
+                    if (mem[base]) return mem[base];
+                } catch(e) {}
+                return null;
+            }
+            function getEquipPreviewText(slotKey, newBaseName, oldBaseName, newInfo, oldInfo) {
+                const parts = [];
+                const oldDur = (oldInfo && oldInfo.durability) || 0;
+                const newDur = (newInfo && newInfo.durability) || 0;
+                const slot = slotLabel(slotKey);
+                if (newBaseName) {
+                    if (oldBaseName) parts.push(slot + '：' + oldBaseName + ' → ' + newBaseName);
+                    else parts.push(slot + '装备：' + newBaseName);
+                } else {
+                    if (oldBaseName) parts.push(slot + '卸下：' + oldBaseName);
+                }
+                if (newDur !== oldDur && (newDur || oldDur)) {
+                    parts.push('耐久 ' + (oldDur||0) + ' → ' + (newDur||0));
+                }
+                if (newBaseName || oldBaseName) {
+                    const heavy = /背包|军用|战术|防弹|钢|铁|合金/;
+                    let oldW = heavy.test(oldBaseName||'') ? 3 : 1;
+                    let newW = heavy.test(newBaseName||'') ? 3 : 1;
+                    if (oldW !== newW) parts.push('负重约 +' + (newW - oldW) + 'kg');
+                }
+                return parts.join(' · ');
+            }
+            function showEquipSlotSelector(itemName, itemInfo, onSelected) {
+                const slots = [
+                    {k:'head', label:'头部', icon:'⛑️'},
+                    {k:'body', label:'躯干', icon:'🥋'},
+                    {k:'legs', label:'腿部', icon:'👖'},
+                    {k:'feet', label:'足部', icon:'👟'},
+                    {k:'weapon', label:'主手', icon:'⚔️'},
+                    {k:'offhand', label:'副手', icon:'🛡️'},
+                    {k:'backpack', label:'背包', icon:'🎒'},
+                    {k:'accessory', label:'饰品', icon:'💍'}
+                ];
+                const ov = document.createElement('div');
+                ov.className = 'modal-overlay';
+                ov.style.zIndex = '99999';
+                const panel = document.createElement('div');
+                panel.className = 'modal-panel';
+                panel.style.maxWidth = '360px';
+                panel.style.padding = '18px';
+                panel.style.transform = 'rotate(-0.2deg)';
+                panel.innerHTML =
+                    '<h3 style="margin:0 0 10px;">📌 选择装备槽位</h3>' +
+                    '<div style="font-size:0.75rem;color:var(--ink-soft);margin-bottom:12px;">无法自动识别 <strong>' + esc(itemEmoji(itemName) + ' ' + itemName) + '</strong> 的装备位置，请手动选择：</div>' +
+                    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;" class="slot-sel-grid"></div>' +
+                    '<div style="margin-top:14px;text-align:right;"><button class="btn btn-sm equip-cancel-sel" style="padding:5px 14px;">取消</button></div>';
+                const gridEl = panel.querySelector('.slot-sel-grid');
+                slots.forEach(sl => {
+                    const b = document.createElement('div');
+                    b.className = 'equip-slot equip-slot--empty';
+                    b.style.cursor = 'pointer';
+                    b.innerHTML = '<div class="equip-slot__header"><span class="equip-slot__icon">' + sl.icon + '</span><span>' + sl.label + '</span></div>';
+                    b.title = '装备到「' + sl.label + '」槽位';
+                    b.addEventListener('click', () => {
+                        try {
+                            const base = parseItemQty(itemName).base;
+                            const mem = JSON.parse(localStorage.getItem('vn_slotMem') || '{}');
+                            mem[base] = sl.k;
+                            localStorage.setItem('vn_slotMem', JSON.stringify(mem));
+                        } catch(e) {}
+                        ov.remove();
+                        onSelected(sl.k);
+                    });
+                    gridEl.appendChild(b);
+                });
+                panel.querySelector('.equip-cancel-sel').addEventListener('click', () => ov.remove());
+                ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+                ov.appendChild(panel);
+                document.body.appendChild(ov);
+            }
             function gst() { if (!sta) { sta = ld(K.STA, DSTA); if (migrateSta(sta)) sst(sta); } return sta; }
             function sst(s) { sta = s; sv(K.STA, s); }
             function gch() { if (!chr) { chr = ld(K.CHR, DCHR); if (migrateChr(chr)) sch(chr); } return chr; }
@@ -1251,6 +1533,54 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             }
             function gsv() { return ld(K.SAV, {}); }
             function ssv(s) { sv(K.SAV, s); }
+            function validateSaveData(sn, strict) {
+                const errs = [];
+                if (!sn || typeof sn !== 'object') { errs.push('存档格式不是合法对象'); return { valid:false, errs, recovered:null }; }
+                const rec = { hi: [], st: null, ch: null, clk: null, sbx: null, cfg: null, tm: Date.now() };
+                if (sn.hi != null) {
+                    if (!Array.isArray(sn.hi)) errs.push('hi 不是数组');
+                    else rec.hi = sn.hi.filter(x => x && x.role && typeof x.content === 'string').slice(0, 500);
+                }
+                if (strict && rec.hi.length === 0 && (!sn.st)) errs.push('对话历史和状态均为空');
+                if (sn.st != null) {
+                    if (typeof sn.st !== 'object') errs.push('st 不是对象');
+                    else {
+                        const ms = migrateSta(JSON.parse(JSON.stringify(sn.st)));
+                        if (!ms.inv) ms.inv = [];
+                        if (!ms.equip) ms.equip = { head:'', body:'', legs:'', feet:'', weapon:'', offhand:'', backpack:'', accessory:'' };
+                        if (ms.hunger == null) ms.hunger = 50;
+                        if (ms.thirst == null) ms.thirst = 50;
+                        if (ms.fatigue == null) ms.fatigue = 20;
+                        if (ms.hp == null) ms.hp = 100;
+                        if (ms.maxHp == null) ms.maxHp = 100;
+                        if (ms.bodyTemp == null) ms.bodyTemp = 36.8;
+                        ms.hunger = Math.max(0, Math.min(100, ms.hunger));
+                        ms.thirst = Math.max(0, Math.min(100, ms.thirst));
+                        ms.fatigue = Math.max(0, Math.min(100, ms.fatigue));
+                        ms.hp = Math.max(0, Math.min(ms.maxHp || 100, ms.hp));
+                        ms.bodyTemp = Math.max(30, Math.min(45, ms.bodyTemp));
+                        rec.st = ms;
+                    }
+                } else if (strict) errs.push('st 状态字段缺失');
+                if (sn.ch != null) {
+                    if (typeof sn.ch !== 'object') errs.push('ch 不是对象');
+                    else rec.ch = Object.assign({}, DCHR, sn.ch);
+                }
+                if (sn.clk != null) {
+                    if (typeof sn.clk !== 'object') errs.push('clk 不是对象');
+                    else rec.clk = Object.assign({}, DCLK, sn.clk);
+                }
+                if (sn.sbx != null) {
+                    if (typeof sn.sbx !== 'object') errs.push('sbx 不是对象');
+                    else rec.sbx = mergeSbx(sn.sbx);
+                }
+                if (sn.cfg != null && typeof sn.cfg === 'object') rec.cfg = sn.cfg;
+                const valid = !strict ? true : errs.length === 0 || (errs.length <= 2 && rec.st != null);
+                if (rec.st == null) rec.st = JSON.parse(JSON.stringify(DSTA));
+                if (rec.ch == null) rec.ch = JSON.parse(JSON.stringify(DCHR));
+                if (rec.clk == null) rec.clk = JSON.parse(JSON.stringify(DCLK));
+                return { valid, errs, recovered: rec };
+            }
             function ldh() { return ld(K.HIS, []); }
             function svh(h) { sv(K.HIS, h.slice(-500)); }
             function gclk() {
@@ -1945,7 +2275,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         if (curH >= 20 && curH < 22 && prevHour < 20 && prevHour >= 18) {
                             // 刚进入夜晚时提示
                             if (Math.random() < 0.3) {
-                                snotify('status', '夜晚降临', '夜间丧尸更活跃，注意安全');
+                                snotify('info', '夜晚降临', '夜间丧尸更活跃，注意安全');
                             }
                         }
                     }
@@ -2003,6 +2333,10 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     c.season = season;
                     if (Math.random() < 0.5) c.weather = randWeather(season, c.weather);
                     c.temp = randTemp(season, c.temp);
+                    // 追踪夜间存活次数（用于成就判定）
+                    const s = gst();
+                    s.nightSurvived = (s.nightSurvived || 0) + 1;
+                    sst(s);
                 }
                 decayStatus(hours);
                 sclk(c);
@@ -2227,68 +2561,180 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 return html;
             }
 
-            // ===== Side notification bubbles (queue mode) =====
+            // ===== Side notification bubbles (queue mode with per-category cooldown) =====
             let notifyQueue = [];
             let notifyBusy = false;
-            let _lastNotifySig = '';
-            let _lastNotifyTime = 0;
+            let _notifyCurrentBatchId = 0;
+            let _notifyThisBatchSet = new Set();
+            // 按通知签名的冷却记录：Map<sig, lastShownTimestamp>
+            const _notifyCooldownMap = new Map();
+            function snotifyStartBatch() { _notifyCurrentBatchId = Date.now(); _notifyThisBatchSet = new Set(); }
+            function snotifyEndBatch() { _notifyCurrentBatchId = 0; }
+            window._snotifyStartBatch = snotifyStartBatch;
+            window._snotifyEndBatch = snotifyEndBatch;
+            // 分类冷却时间（毫秒）：警告类冷却更久，避免重复刷屏
+            const _notifyCooldownByType = {
+                'warn': 60000,     // 警告：60秒
+                'danger': 45000,   // 危险：45秒
+                'info': 30000,     // 信息：30秒
+                'status': 3000,    // 状态变更：3秒
+                'add': 2000,       // 获得物品：2秒
+                'remove': 2000,    // 失去物品：2秒
+                'clue': 2000,      // 线索：2秒
+                'map': 5000,       // 地图：5秒
+                'vehicle': 5000,   // 载具：5秒
+                'ability': 3000,   // 异能：3秒
+                'craft': 3000,     // 合成：3秒
+                'event': 10000,    // 事件：10秒
+                'skill_add': 5000, // 技能：5秒
+                'trait_add': 5000, // 特质：5秒
+                'trait_rem': 5000,
+                'memory': 5000
+            };
             function snotify(type, label, value) {
-                // Safety net: suppress notifications during history replay
                 if (_replayingHistory) return;
                 const container = $('notifyContainer');
                 if (!container) return;
-                // Build signature for deduplication: identical notification within 2s is rejected
-                const sig = [type || '', label || '', value || ''].join('\u0001');
                 const now = Date.now();
-                if (sig === _lastNotifySig && now - _lastNotifyTime < 2000) return;
-                // Also check queue head for pending duplicates
-                if (notifyQueue.length > 0) {
-                    const head = notifyQueue[0];
-                    const headSig = [head.type || '', head.label || '', head.value || ''].join('\u0001');
-                    if (headSig === sig) return;
+                const cd = _notifyCooldownByType[type] || 3000;
+                const valueSig = [type || '', label || '', value || ''].join('\u0001');
+                const noValueSig = [type || '', label || ''].join('\u0001');
+                if (_notifyCurrentBatchId > 0) {
+                    if (_notifyThisBatchSet.has(valueSig)) return;
+                    _notifyThisBatchSet.add(valueSig);
+                } else {
+                    if (_notifyCooldownMap.has(noValueSig) && (now - _notifyCooldownMap.get(noValueSig) < cd)) return;
+                    if (notifyQueue.some(n => [n.type || '', n.label || '', n.value || ''].join('\u0001') === valueSig)) return;
+                }
+                _notifyCooldownMap.set(noValueSig, now);
+                // 清理过期的冷却记录（避免Map无限增长）
+                if (_notifyCooldownMap.size > 100) {
+                    for (const [k, t] of _notifyCooldownMap) {
+                        if (now - t > 120000) _notifyCooldownMap.delete(k);
+                    }
                 }
                 notifyQueue.push({ type, label, value });
-                _lastNotifySig = sig;
-                _lastNotifyTime = now;
+                try { sessionStorage.setItem('vn_notifyQueue', JSON.stringify(notifyQueue)); } catch(e) {}
                 if (!notifyBusy) processNotifyQueue();
             }
             function processNotifyQueue() {
                 const container = $('notifyContainer');
+                if (container) {
+                    const isMob = typeof isMobile === 'function' ? isMobile() : (window.innerWidth < 768);
+                    if (isMob) {
+                        container.classList.add('notify-mobile');
+                        if (!document.getElementById('notifyMobileStyle_inline')) {
+                            const st = document.createElement('style');
+                            st.id = 'notifyMobileStyle_inline';
+                            st.textContent = '#notifyContainer.notify-mobile{top:60px;right:8px;left:8px;bottom:auto;width:auto;}#notifyContainer.notify-mobile .notify-bubble{margin:0 0 6px;max-width:100%;}';
+                            document.head.appendChild(st);
+                        }
+                    } else {
+                        container.classList.remove('notify-mobile');
+                    }
+                }
                 if (!container) { notifyQueue = []; return; }
                 if (notifyQueue.length === 0) { notifyBusy = false; return; }
                 notifyBusy = true;
-                const { type, label, value } = notifyQueue.shift();
-                const el = document.createElement('div');
-                let cls = 'notify-bubble', icon = '', prefix = '';
-                if (type === 'add') { cls += ' type-add'; icon = '+'; prefix = '获得'; }
-                else if (type === 'remove') { cls += ' type-remove'; icon = '−'; prefix = '失去'; }
-                else if (type === 'clue') { cls += ' type-clue'; icon = '!'; prefix = '新线索'; }
-                else if (type === 'status') { cls += ' type-status'; icon = '~'; prefix = label; }
-                else if (type === 'map') { cls += ' type-clue'; icon = 'M'; prefix = '地图解锁'; }
-                else if (type === 'vehicle') { cls += ' type-add'; icon = 'V'; prefix = '载具'; }
-                el.className = cls;
-                // Attach game clock time to notification
-                const clk = gclk();
-                const timeTag = '<span style="font-size:0.55rem;opacity:0.6;margin-left:4px;">[' + fmtTime(clk.elapsedSec) + ' D' + (clk.day || 1) + ']</span>';
-                if (type === 'status') {
-                    el.innerHTML = '<span class="notify-icon">' + icon + '</span>' + esc(label) + ' → <strong>' + esc(value) + '</strong>' + timeTag;
-                } else {
-                    el.innerHTML = '<span class="notify-icon">' + icon + '</span>' + prefix + ' <strong>' + esc(value) + '</strong>' + timeTag;
-                }
-                container.appendChild(el);
-                requestAnimationFrame(() => el.classList.add('show'));
-                setTimeout(() => {
-                    el.classList.add('hide');
+                const batch = Math.min(3, notifyQueue.length);
+                for (let b = 0; b < batch; b++) {
+                    const { type, label, value } = notifyQueue.shift();
+                    const el = document.createElement('div');
+                    let cls = 'notify-bubble', icon = '', prefix = '';
+                    if (type === 'add') { cls += ' type-add'; icon = '+'; prefix = '获得'; }
+                    else if (type === 'remove') { cls += ' type-remove'; icon = '−'; prefix = '失去'; }
+                    else if (type === 'clue') { cls += ' type-clue'; icon = '!'; prefix = '新线索'; }
+                    else if (type === 'status') { cls += ' type-status'; icon = '~'; prefix = label; }
+                    else if (type === 'map') { cls += ' type-clue'; icon = 'M'; prefix = '地图解锁'; }
+                    else if (type === 'vehicle') { cls += ' type-add'; icon = 'V'; prefix = '载具'; }
+                    else if (type === 'warn') { cls += ' type-status'; icon = '⚠'; prefix = label || '警告'; }
+                    else if (type === 'danger') { cls += ' type-remove'; icon = '☠'; prefix = label || '危险'; }
+                    else if (type === 'info') { cls += ' type-clue'; icon = 'ℹ'; prefix = label || '提示'; }
+                    else if (type === 'ability') { cls += ' type-add'; icon = '✦'; prefix = label || '异能'; }
+                    else if (type === 'craft') { cls += ' type-add'; icon = '⚒'; prefix = label || '合成'; }
+                    else if (type === 'event') { cls += ' type-clue'; icon = '★'; prefix = label || '事件'; }
+                    else if (type === 'skill_add') { cls += ' type-add'; icon = '↑'; prefix = label || '技能'; }
+                    else if (type === 'trait_add') { cls += ' type-add'; icon = '◆'; prefix = '获得特质'; }
+                    else if (type === 'trait_rem') { cls += ' type-remove'; icon = '◇'; prefix = '失去特质'; }
+                    el.className = cls;
+                    const close = document.createElement('span');
+                    close.className = 'notify-close';
+                    close.textContent = '✕';
+                    close.title = '关闭';
+                    close.style.cssText = 'position:absolute;top:2px;right:4px;font-size:0.6rem;cursor:pointer;opacity:0.55;padding:1px 4px;';
+                    close.addEventListener('click', (ev) => {
+                        ev.stopPropagation();
+                        el.classList.add('hide');
+                        setTimeout(() => { if (el.parentNode) el.remove(); }, 250);
+                    });
+                    el.appendChild(close);
+                    el.style.position = 'relative';
+                    el.addEventListener('click', () => {
+                        el.classList.add('hide');
+                        setTimeout(() => { if (el.parentNode) el.remove(); }, 250);
+                    });
+                    const clk = gclk();
+                    const timeTag = '<span style="font-size:0.55rem;opacity:0.6;margin-left:4px;">[' + fmtTime(clk.elapsedSec) + ' D' + (clk.day || 1) + ']</span>';
+                    if (type === 'status' || type === 'warn' || type === 'danger' || type === 'info') {
+                        el.innerHTML = '<span class="notify-icon">' + icon + '</span>' + esc(prefix) + (value ? ' → <strong>' + esc(value) + '</strong>' : '') + timeTag;
+                    } else {
+                        el.innerHTML = '<span class="notify-icon">' + icon + '</span>' + prefix + ' <strong>' + esc(value) + '</strong>' + timeTag;
+                    }
+                    try {
+                        const vStr = value != null ? String(value) : '';
+                        if (vStr && (type === 'status' || type === 'warn' || type === 'danger' || type === 'info' || type === 'add' || type === 'remove')) {
+                            const nv = parseFloat(vStr);
+                            if (!isNaN(nv) && (vStr.includes('%') || /^\d+(\.\d+)?$/.test(vStr.trim()))) {
+                                const hint = document.createElement('span');
+                                hint.style.cssText = 'font-size:0.55rem;opacity:0.55;margin-left:4px;';
+                                const lbl = (label || '').trim();
+                                const propMap = {'饱腹':'hunger','口渴':'thirst','疲劳':'fatigue','HP':'hp','血量':'hp','体温':'bodyTemp','精神':'spirit','欢愉':'joy','负重':'enc'};
+                                let trend = '';
+                                if (propMap[lbl]) {
+                                    const sn = gst();
+                                    const key = propMap[lbl];
+                                    const prev = parseFloat(window._prevStatus && window._prevStatus[key]);
+                                    if (!isNaN(prev)) {
+                                        const diff = nv - prev;
+                                        if (diff > 0.01) trend = ' <span style="color:var(--notify-add)">↑' + (diff > 1 ? Math.round(diff) : diff.toFixed(1)) + '</span>';
+                                        else if (diff < -0.01) trend = ' <span style="color:var(--color-danger)">↓' + (diff < -1 ? Math.round(-diff) : (-diff).toFixed(1)) + '</span>';
+                                    }
+                                }
+                                hint.innerHTML = trend;
+                                el.appendChild(hint);
+                            }
+                        }
+                    } catch(e) {}
+                    container.appendChild(el);
+                    const delay = b * 70;
+                    el.style.transitionDelay = (delay / 1000) + 's';
+                    el._ts = Date.now() + delay;
+                    requestAnimationFrame(() => {
+                        setTimeout(() => { el.classList.add('show'); el.style.transitionDelay = ''; }, delay);
+                    });
                     setTimeout(() => {
-                        el.remove();
-                        // Chain process next
-                        setTimeout(() => processNotifyQueue(), 150);
-                    }, 400);
-                }, 2200);
-                // Limit visible bubbles
-                while (container.children.length > 3) {
-                    const old = container.firstChild;
-                    if (old) { old.classList.add('hide'); setTimeout(() => old.remove(), 350); }
+                        el.classList.add('hide');
+                        setTimeout(() => { if (el.parentNode) el.remove(); }, 400);
+                    }, 2500);
+                }
+                if (container.children.length > 12) {
+                    const all = Array.from(container.children);
+                    const overflow = container.children.length - 12;
+                    for (let k = 0; k < overflow && k < all.length; k++) {
+                        const old = all[k];
+                        if (!old) continue;
+                        const ts = old._ts || 0;
+                        const age = Date.now() - ts;
+                        if (age >= 1800 || old.classList.contains('hide')) {
+                            old.classList.add('hide');
+                            setTimeout(() => { if (old.parentNode) old.remove(); }, 300);
+                        }
+                    }
+                }
+                if (notifyQueue.length > 0) {
+                    setTimeout(() => processNotifyQueue(), 600);
+                } else {
+                    notifyBusy = false;
                 }
             }
 
@@ -2667,6 +3113,14 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             }
 
             function mds(ch) {
+                try {
+                    const s0 = gst();
+                    window._prevStatus = {
+                        hunger: s0.hunger, thirst: s0.thirst, fatigue: s0.fatigue,
+                        hp: s0.hp, bodyTemp: s0.bodyTemp, spirit: s0.spirit,
+                        joy: s0.joy, enc: s0.enc
+                    };
+                } catch(e) {}
                 const s = gst();
                 const c = gch();
                 if (ch.hp !== undefined) { 
@@ -2697,9 +3151,13 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 }
                 if (ch.hp !== undefined && ch.hp <= 30 && ch.hp > 0) playSfx('warn');
                 if (ch.ai) { if (!s.inv.includes(ch.ai)) { s.inv.push(ch.ai); playSfx('pickup'); } }
-                // Handle multiple item additions (ptg aiList)
+                // Handle multiple item additions (ptg aiList) — 限制每次最多收集8种物品
                 if (ch.aiList && Array.isArray(ch.aiList)) {
-                    ch.aiList.forEach(v => { if (v && !s.inv.includes(v)) { s.inv.push(v); playSfx('pickup'); } });
+                    const newItems = ch.aiList.filter(v => v && !s.inv.includes(v)).slice(0, 8);
+                    newItems.forEach(v => { s.inv.push(v); playSfx('pickup'); });
+                    if (ch.aiList.length > 8) {
+                        snotify('status', '物资限制', '单次收集已上限8种，多余物品未拾取');
+                    }
                 }
                 if (ch.bookmark) {
                     if (!s.bookmarks) s.bookmarks = [];
@@ -2715,9 +3173,10 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         s.npcRel[npc].lastMeet = gclk().day;
                     });
                 }
+                if (ch.hunger !== undefined) s.hunger = Math.max(0, Math.min(100, ch.hunger));
                 if (ch.thirst !== undefined) s.thirst = Math.max(0, Math.min(100, ch.thirst));
                 if (ch.fatigue !== undefined) s.fatigue = Math.max(0, Math.min(100, ch.fatigue));
-                if (ch.bodyTemp !== undefined) s.bodyTemp = ch.bodyTemp;
+                if (ch.bodyTemp !== undefined) s.bodyTemp = Math.max(30, Math.min(45, ch.bodyTemp));
                 if (ch.injury !== undefined) s.injury = ch.injury;
                 if (ch.enc !== undefined) s.enc = Math.max(0, ch.enc);
                 if (ch.mentality !== undefined) s.mentality = ch.mentality;
@@ -2757,9 +3216,16 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     if (!s.equip) s.equip = { head:'',body:'',legs:'',feet:'',weapon:'',offhand:'',backpack:'',accessory:'' };
                     Object.keys(ch.equip).forEach(k => { s.equip[k] = ch.equip[k]; });
                 }
-                if (ch.cl) { if (!s.clues) s.clues = []; if (!s.clues.includes(ch.cl)) s.clues.push(ch.cl); }
+                if (ch.cl) { if (!s.clues) s.clues = []; const exist = s.clues.some(c => (typeof c === 'string' ? c === ch.cl : (c && c.text === ch.cl))); if (!exist) s.clues.push({ text: ch.cl, priority: 2, id: 'clue_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), time: (gclk().day || 1) + '日 ' + fmtTime(gclk().elapsedSec) }); }
+                if (ch.clList && Array.isArray(ch.clList)) { if (!s.clues) s.clues = []; ch.clList.forEach(v => { const exist = s.clues.some(c => (typeof c === 'string' ? c === v : (c && c.text === v))); if (!exist) s.clues.push({ text: v, priority: 2, id: 'clue_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6), time: (gclk().day || 1) + '日 ' + fmtTime(gclk().elapsedSec) }); }); }
                 if (ch.stAdd) { if (!s.status) s.status = []; if (!s.status.includes(ch.stAdd)) s.status.push(ch.stAdd); }
-                if (ch.stRem) { if (s.status) s.status = s.status.filter(x => x !== ch.stRem); }
+                if (ch.stRem) {
+                    if (s.status) s.status = s.status.filter(x => x !== ch.stRem);
+                    // 追踪治愈次数（用于成就判定）
+                    if (ch.stRem.startsWith('治愈-') || ['流血','感染','中毒','骨折','失温','恐慌','虚脱'].includes(ch.stRem)) {
+                        s.healCount = (s.healCount || 0) + 1;
+                    }
+                }
                 if (ch.veh) s.vehicle = ch.veh;
                 if (ch.mapAdd) { if (!s.mapUnlock) s.mapUnlock = []; if (!s.mapUnlock.includes(ch.mapAdd)) s.mapUnlock.push(ch.mapAdd); }
                 if (ch.mapNew) {
@@ -2864,10 +3330,10 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 const notes = [];
                 const firedSet = new Set();
                 tx = tx.replace(/\[([^\]]+)\]/g, (m, tg) => {
-                    if (tg.startsWith('饱腹:')) { const v = parseInt(tg.split(':')[1]) || 0; ch.hunger = v; const key = 'status:饱腹:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '饱腹', val: v + '%' }); } }
-                    else if (tg.startsWith('口渴:')) { const v = parseInt(tg.split(':')[1]) || 0; ch.thirst = v; const key = 'status:口渴:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '口渴', val: v + '%' }); } }
-                    else if (tg.startsWith('疲劳:')) { const v = parseInt(tg.split(':')[1]) || 0; ch.fatigue = v; const key = 'status:疲劳:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '疲劳', val: v + '%' }); } }
-                    else if (tg.startsWith('体温:')) { const v = parseFloat(tg.split(':')[1]) || 37; ch.bodyTemp = v; const key = 'status:体温:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '体温', val: v + '°C' }); } }
+                    if (tg.startsWith('饱腹:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.hunger = v; const key = 'status:饱腹:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '饱腹', val: v + '%' }); } }
+                    else if (tg.startsWith('口渴:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.thirst = v; const key = 'status:口渴:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '口渴', val: v + '%' }); } }
+                    else if (tg.startsWith('疲劳:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.fatigue = v; const key = 'status:疲劳:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '疲劳', val: v + '%' }); } }
+                    else if (tg.startsWith('体温:')) { const v = Math.max(30, Math.min(45, parseFloat(tg.split(':')[1]) || 37)); ch.bodyTemp = v; const key = 'status:体温:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '体温', val: v + '°C' }); } }
                     else if (tg.startsWith('伤势:')) { const v = tg.split(':').slice(1).join(':').trim(); ch.injury = v; const key = 'status:伤势:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '伤势', val: v }); } }
                     else if (tg.startsWith('负重:')) { const v = parseFloat(tg.split(':')[1]) || 0; ch.enc = v; const key = 'status:负重:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '负重', val: v + 'kg' }); } }
                     else if (tg.startsWith('物品:+')) {
@@ -2885,7 +3351,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         ch.riList.push({ name: riName, qty: riQty });
                         const key = 'remove:' + raw; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'remove', val: raw }); }
                     }
-                    else if (tg.startsWith('线索:')) { const v = tg.split(':').slice(1).join(':').trim(); ch.cl = v; const key = 'clue:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'clue', val: v }); } }
+                    else if (tg.startsWith('线索:')) { const v = tg.split(':').slice(1).join(':').trim(); if (!ch.clList) ch.clList = []; ch.clList.push(v); ch.cl = v; const key = 'clue:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'clue', val: v }); } }
                     else if (tg.startsWith('时间:+')) {
                         // Parse time value with unit: h=hours, m=minutes, 分=分钟.
                         // Supports formats like: [时间:+2h], [时间:+30m], [时间:+1.5h], [时间:+120分]
@@ -3065,19 +3531,22 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             }
                         }
                     }
-                    notes.forEach((n, i) => {
-                        setTimeout(() => {
-                            if (n.ty === 'add') snotify('add', n.label || '', n.val);
-                            else if (n.ty === 'remove') snotify('remove', n.label || '', n.val);
-                            else if (n.ty === 'clue') snotify('clue', n.label || '', n.val);
-                            else if (n.ty === 'status') snotify('status', n.label, n.val);
-                            else if (n.ty === 'map') snotify('map', n.label || '地图解锁', n.val);
-                            else if (n.ty === 'vehicle') snotify('vehicle', n.label || '', n.val);
-                            else if (n.ty === 'location') snotify('map', '位置变更', n.val);
-                            else if (n.ty === 'trait_add') snotify('add', '获得特质', n.val);
-                            else if (n.ty === 'trait_rem') snotify('remove', '失去特质', n.val);
-                            else if (n.ty === 'ability') snotify('status', n.label, n.val);
-                        }, i * 250);
+                    notes.forEach((n) => {
+                        if (n.ty === 'add') snotify('add', n.label || '', n.val);
+                        else if (n.ty === 'remove') snotify('remove', n.label || '', n.val);
+                        else if (n.ty === 'clue') snotify('clue', n.label || '', n.val);
+                        else if (n.ty === 'status') snotify('status', n.label, n.val);
+                        else if (n.ty === 'map') snotify('map', n.label || '地图解锁', n.val);
+                        else if (n.ty === 'vehicle') snotify('vehicle', n.label || '', n.val);
+                        else if (n.ty === 'location') snotify('map', '位置变更', n.val);
+                        else if (n.ty === 'trait_add') snotify('trait_add', n.label || '', n.val);
+                        else if (n.ty === 'trait_rem') snotify('trait_rem', n.label || '', n.val);
+                        else if (n.ty === 'ability') snotify('ability', n.label, n.val);
+                        else if (n.ty === 'craft') snotify('craft', n.label || '', n.val);
+                        else if (n.ty === 'event') snotify('event', n.label || '', n.val);
+                        else if (n.ty === 'skill_add') snotify('skill_add', n.label || '', n.val);
+                        else if (n.ty === 'skill_rem') snotify('remove', n.label || '技能减退', n.val);
+                        else if (n.ty === 'memory') snotify('info', n.label || '关键记忆', n.val);
                     });
                 }
                 return tx.replace(/\n{3,}/g, '\n\n').trim();
@@ -3126,6 +3595,9 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     injury: s.injury, enc: s.enc, inv: s.inv.join('、') || '空',
                     clues: s.clues.join('；') || '暂无', it: c.it || '', sp: c.sp || '',
                     gameTime: fmtTime(cl.elapsedSec) + ' 第' + (cl.day || 1) + '天 ' + dayPhase(cl.elapsedSec),
+                    timeFlowMode: (cl.dayLenSec === 86400)
+                        ? '现实流速（1:1实时同步，游戏时间=现实时间，禁止使用[时间:+Xh]标签，时间由玩家设备时钟驱动）'
+                        : '加速流速（1秒现实≈' + Math.ceil(86400 / (cl.dayLenSec || 1200)) + '秒游戏，可使用[时间:+Xh]标签推进游戏时间）',
                     atmosphere: cl.temp != null ? cl.temp : '12',
                     season: cl.season || seasonFromDay(cl.day || 1),
                     sandboxInfo: sbxInfo, hiddenPresets: hiddenP,
@@ -3224,8 +3696,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     else if (tag === 'monologue') bb.push({ ty: 'monologue', tx });
                     else if (tag === 'clue') bb.push({ ty: 'clue', tx });
                     else if (tag === 'choice') {
-                        // [choice]选项1|选项2|选项3[/choice] or [choice]选项1\n选项2\n选项3[/choice]
-                        const opts = tx.split(/[|\n]/).map(s => s.trim()).filter(Boolean);
+                        const opts = safeSplitChoices(tx);
                         bb.push({ ty: 'choice', opts });
                     }
                     lastIdx = m.index + m[0].length;
@@ -3300,10 +3771,52 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (tgt && el._ft != null) { tgt.innerHTML = abold(el._ft); el._bolded = true; attachItemInfoToBoldElements(el); }
             }
 
+            let _chatFoldEnabled = true;
+            const CHAT_FOLD_THRESHOLD = 180;
+            const CHAT_FOLD_KEEP = 120;
+            function checkChatFold() {
+                if (!_chatFoldEnabled) return;
+                const ca = $('chatArea');
+                if (!ca) return;
+                if (ca.querySelector('.chat-fold-layer')) return;
+                if (ca.children.length <= CHAT_FOLD_THRESHOLD) return;
+                const foldCount = ca.children.length - CHAT_FOLD_KEEP;
+                if (foldCount < 30) return;
+                const foldLayer = document.createElement('div');
+                foldLayer.className = 'chat-fold-layer';
+                foldLayer.style.cssText = 'background:var(--bg-paper-alt);border:1.5px dashed var(--border-light);border-radius:6px;margin:8px 14px;padding:8px;text-align:center;cursor:pointer;font-size:0.75rem;color:var(--ink-soft);transition:background 0.2s;';
+                foldLayer.innerHTML = '📂 已折叠 ' + foldCount + ' 条更早的对话（点击展开查看）';
+                foldLayer.title = '点击展开更早的' + foldCount + '条对话';
+                const hiddenWrap = document.createElement('div');
+                hiddenWrap.className = 'chat-fold-hidden';
+                hiddenWrap.style.display = 'none';
+                foldLayer.addEventListener('click', () => {
+                    const hidden = foldLayer.nextElementSibling;
+                    if (hidden && hidden.classList.contains('chat-fold-hidden')) {
+                        const showing = hidden.style.display !== 'none';
+                        if (showing) {
+                            hidden.style.display = 'none';
+                            foldLayer.innerHTML = '📂 已折叠 ' + foldCount + ' 条更早的对话（点击展开查看）';
+                            foldLayer.style.background = 'var(--bg-paper-alt)';
+                        } else {
+                            hidden.style.display = '';
+                            foldLayer.innerHTML = '📁 收起更早的 ' + foldCount + ' 条对话';
+                            foldLayer.style.background = 'var(--bg-paper)';
+                        }
+                    }
+                });
+                const all = Array.from(ca.children).slice(0, foldCount);
+                all.forEach(el => hiddenWrap.appendChild(el));
+                ca.insertBefore(foldLayer, ca.firstChild);
+                ca.insertBefore(hiddenWrap, foldLayer.nextSibling);
+                scb();
+            }
+
             function apb(b, spd) {
                 const ee = $('chatEmpty'); if (ee) ee.style.display = 'none';
                 const el = cbe(b);
                 $('chatArea').appendChild(el);
+                checkChatFold();
                 scb();
                 if (spd > 0 && b.tx) {
                     const tgt = el.querySelector('.typing-target');
@@ -3374,6 +3887,74 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     summaryLock = false;
                 }
             }
+            // 根据当前状态生成默认互动选项（AI遗漏[choice]时补充）
+            function generateDefaultChoices() {
+                const s = gst();
+                const opts = [];
+                if ((s.hunger ?? 50) < 30) opts.push('寻找食物');
+                if ((s.thirst ?? 50) < 30) opts.push('寻找饮用水');
+                if ((s.fatigue ?? 30) > 70) opts.push('找个安全的地方休息');
+                if ((s.hp ?? 100) < 50) opts.push('检查并处理伤势');
+                opts.push('搜索周围的物资');
+                opts.push('观察周围环境');
+                if (opts.length < 3) opts.push('继续前进');
+                return opts.slice(0, 4);
+            }
+            // AI遗漏属性/时间标签时，根据状态做合理的小幅补充（保证状态连续性）
+            function generateDefaultTags(s, full) {
+                if (!s) return '';
+                const tags = [];
+                const had = (re) => re.test(full);
+                if (!had(/\[饱腹:/)) {
+                    const cur = s.hunger != null ? s.hunger : 50;
+                    tags.push('[饱腹:' + Math.max(0, Math.min(100, Math.round(cur - 2))) + ']');
+                }
+                if (!had(/\[口渴:/)) {
+                    const cur = s.thirst != null ? s.thirst : 50;
+                    tags.push('[口渴:' + Math.max(0, Math.min(100, Math.round(cur - 3))) + ']');
+                }
+                if (!had(/\[疲劳:/)) {
+                    const cur = s.fatigue != null ? s.fatigue : 20;
+                    tags.push('[疲劳:' + Math.max(0, Math.min(100, Math.round(cur + 2))) + ']');
+                }
+                if (!had(/\[时间:/) && !had(/\[加速:/)) {
+                    tags.push('[时间:+1h]');
+                }
+                return tags.join('');
+            }
+            // 安全切分 choice 选项：兼容 1. 2. 3. / A. B. C. / 、/ ，/ || / | / 分号 等常见分隔
+            function safeSplitChoices(raw) {
+                if (!raw) return ['继续前进','观察环境','搜索物资','原地休息'];
+                let t = (raw || '').trim().replace(/^[\s\-—–•●*]+|[\s\-—–•●*]+$/g, '');
+                const numMatch = t.match(/(^|\s)(\d{1,2})[.)、\]】]\s*([^\n\r\d][^\n\r]*?)(?=(\s\d{1,2}[.)、\]】])|$)/g);
+                if (numMatch && numMatch.length >= 2) {
+                    const r = numMatch.map(s => s.replace(/^\s*(\d{1,2})[.)、\]】]\s*/, '').trim()).filter(Boolean);
+                    if (r.length >= 2) return r.slice(0, 6);
+                }
+                const abcdMatch = t.match(/(^|\s)[A-Z][.)、\]】]\s*([^\n\rA-Z][^\n\r]*?)(?=(\s[A-Z][.)、\]】])|$)/g);
+                if (abcdMatch && abcdMatch.length >= 2) {
+                    const r = abcdMatch.map(s => s.replace(/^\s*[A-Z][.)、\]】]\s*/, '').trim()).filter(Boolean);
+                    if (r.length >= 2) return r.slice(0, 6);
+                }
+                if (/[\r\n]/.test(t)) {
+                    const r = t.split(/[\r\n]+/).map(s => s.replace(/^[\s\-—–•●*\d]+\s*[.)、\]】:：]?\s*/, '').trim()).filter(Boolean);
+                    if (r.length >= 2) return r.slice(0, 6);
+                }
+                if (t.includes('||')) {
+                    return t.split('||').map(s => s.trim()).filter(Boolean).slice(0, 6);
+                }
+                if (/[、；;]/.test(t)) {
+                    return t.split(/[、；;]+/).map(s => s.trim()).filter(Boolean).slice(0, 6);
+                }
+                const byPipe = t.split('|').map(s => s.trim()).filter(Boolean);
+                if (byPipe.length >= 2) return byPipe.slice(0, 6);
+                if (t.length > 20) {
+                    const byComma = t.split(/[,，\s]{2,}/).map(s => s.trim()).filter(x => x.length > 2);
+                    if (byComma.length >= 2) return byComma.slice(0, 6);
+                }
+                return [t || '继续前进', '观察环境', '搜索物资'];
+            }
+
             async function hin(inp, isIdle, displayText, systemPromptExtra) {
                 if (busy) return;
                 if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return; }
@@ -3392,10 +3973,15 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         }
                     });
                 }
-                undo = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), bubbleCount: $('chatArea') ? $('chatArea').children.length : 0 };
+                undo = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), ach: unlockedAchievements ? [...unlockedAchievements] : [], bubbleCount: $('chatArea') ? $('chatArea').children.length : 0, turnId: Date.now() };
+                snotifyStartBatch();
+                // 重置 pai 事件触发的 turn 标记（防止跨回合误触发）
+                if (typeof window._paiSetTurn === 'function') window._paiSetTurn(undo.turnId);
                 // Reset pai() log counter so new AI turn doesn't skip log entries
                 if (typeof window._resetPaiLog === 'function') window._resetPaiLog();
                 busy = true;
+                // 清除上一回合遗留的随机事件/NPC 定时器（跨回合保护）
+                if (typeof window._paiClearEventTimers === 'function') window._paiClearEventTimers();
                 if (!isIdle) $('btnSend').disabled = true;
                 $('inputText').classList.add('busy');
                 // 玩家气泡不渲染item-ref样式，将{{物品名}}转为纯文本【物品名】
@@ -3426,7 +4012,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 try {
                     let sysPrompt = gsp();
                     if (isIdle) {
-                        sysPrompt += '\n\n【挂机模式】当前为自动挂机模式，日志将以[monologue]（内心独白/系统日志）形式输出。请以简洁的日志式叙述输出角色自主行动结果，结合角色设定、环境、当前状态和沙盒参数，尽量避开危险行动，以生存、探索、休息、收集资源为主。输出控制在200字以内。请将行动日志包裹在[monologue]标签中。';
+                        const _isRealFlow = (gclk().dayLenSec === 86400);
+                        sysPrompt += '\n\n【挂机模式】当前为自动挂机模式，日志将以[monologue]（内心独白/系统日志）形式输出。请以简洁的日志式叙述输出角色自主行动结果，结合角色设定、环境、当前状态和沙盒参数，尽量避开危险行动，以生存、探索、休息、收集资源为主。输出控制在200字以内。请将行动日志包裹在[monologue]标签中。\n\n【挂机流速适配 — 关键】当前' + (_isRealFlow ? '现实流速' : '加速流速') + '。若为现实流速：每次挂机仅描述几分钟内的短时动作（整理装备/观察环境/简短对话/小规模搜索/喝水吃干粮），状态变化幅度小（疲劳±5、饱腹±3、口渴±3），禁止使用[时间:+Xh]标签，禁止描述"睡眠数小时""长途跋涉"等大耗时行动（这些由现实时钟自然推进）。若为加速流速：每次挂机可描述1-2小时的行动，状态变化按行动耗时参考表执行，使用[时间:+Xh]推进时间。\n\n【挂机自主决策优先级 — 必须按序决策】\n挂机不是随机游荡，角色应按以下优先级自主决策（高优先级需求未满足时不做低优先级事）：\n1. 生存急救（最高）：饱腹<30优先觅食；口渴<30优先找水；疲劳>70优先休息；受伤/感染优先治疗。状态危急时取消一切探索。\n2. 安全避险：夜间（22:00-6:00）优先寻找安全据点躲避；丧尸密集区优先撤离；天气极端（暴雪/暴雨）优先避难。\n3. 健康恢复：精神<30时安排休息或轻松活动（整理物资/回忆）；体温异常时调节环境（添衣/取暖/降温）。\n4. 资源储备：状态稳定时搜索附近物资，优先补充消耗品（水/食物/药品）。\n5. 探索发展：资源充足时谨慎探索新区域，标记线索，避免深入未知。\n6. 社交关系：遇到友好NPC时适度互动，不主动挑衅敌对势力。\n挂机风险评估：每轮行动前评估"失败最坏后果"，若可能致死或重伤则放弃该行动改选保守方案。挂机期间禁止主动挑起战斗（除非被攻击），禁止进入标注高危的区域。';
                     }
                     // Inject extra system prompt context (e.g., decision assistance)
                     if (systemPromptExtra) {
@@ -3489,7 +4076,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                                 if (d === '[DONE]') continue;
                                 try { const j = JSON.parse(d); if (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) full += j.choices[0].delta.content; } catch {}
                             }
-                            const allBubbles = (window.pai || pai)(full);
+                            const allBubbles = (window.pai || pai)(full, true);
                             while (bubblesInDOM.length < allBubbles.length) {
                                 bubblesInDOM.push(apb(allBubbles[bubblesInDOM.length], -1));
                             }
@@ -3503,16 +4090,20 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                                     lastDOM._bolded = true;
                                 }
                             }
+                            checkChatFold();
                             scb();
                         }
+                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
                         // Fallback: 如果不是SSE格式，尝试解析为普通JSON
                         if (!isSSE && buf) {
                             try {
                                 const d = JSON.parse(buf);
                                 full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
+                                if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
                                 if (full) {
-                                    const bb = (window.pai || pai)(full);
+                                    const bb = (window.pai || pai)(full, false);
                                     for (const b of bb) apb(b, f.tspd);
+                                    checkChatFold();
                                 }
                             } catch {
                                 full = '[system]无法解析AI响应';
@@ -3520,6 +4111,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             }
                         } else {
                             bubblesInDOM.forEach(el => applyBoldToBubble(el));
+                            // 流式渲染期间使用silent模式跳过了mds状态变更，此处统一应用一次
+                            if (full) (window.pai || pai)(full, false);
                         }
                     } else if (!f.strm && f.key) {
                         const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: false };
@@ -3545,14 +4138,26 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         }
                         const d = await rp.json();
                         full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
-                        const bb = (window.pai || pai)(full);
+                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
+                        const bb = (window.pai || pai)(full, false);
                         for (const b of bb) apb(b, f.tspd);
+                        checkChatFold();
                     } else {
                         full = '[system]未配置API密钥。请点击右上角「设置」配置。';
-                        (window.pai || pai)(full).forEach(b => apb(b, 0));
+                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
+                        (window.pai || pai)(full, false).forEach(b => apb(b, 0));
+                        checkChatFold();
                     }
                     if (indicatorEl && indicatorEl.parentNode) indicatorEl.remove();
+                    if (full && full.length > 60000) { full = full.slice(0, 60000) + '\n\n[系统：回复超长严重截断]'; }
                     if (full) {
+                        // 补充缺失的属性/时间标签（挂机模式也补充）
+                        const s0 = gst();
+                        const defTags = generateDefaultTags(s0, full);
+                        if (defTags) {
+                            full = defTags + '\n' + full;
+                            try { (window.pai || pai)(defTags, false); } catch(e) {}
+                        }
                         // For idle mode, ensure the response has monologue wrapper
                         if (isIdle && !/\[monologue\]/i.test(full)) {
                             full = '[monologue]' + full + '[/monologue]';
@@ -3560,6 +4165,12 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         // Note: ptg() is already called inside pai() above,
                         // which handles tag parsing, mds() state update, and snotify() notifications.
                         // Do NOT call ptg() again here — it would double-process state changes.
+                        // 检查AI是否输出了互动选项，缺失则补充默认选项（挂机模式除外）
+                        if (!isIdle && !/\[choice\]/i.test(full)) {
+                            const defaultOpts = generateDefaultChoices();
+                            apb({ ty: 'choice', opts: defaultOpts }, 0);
+                            full += '\n[choice]' + defaultOpts.join('|') + '[/choice]';
+                        }
                         hist.push({ role: 'assistant', content: full });
                         svh(hist);
                     }
@@ -3569,14 +4180,41 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     if (/认证失败|密钥|API.*key/i.test(e.message)) {
                         errMsg += '\n（可点击右上角「设置」按钮修改API配置）';
                     }
+                    if (/服务器错误|服务商暂时不可用|429|频繁|网络|超时|timeout|fetch|abort|Failed to fetch/i.test(e.message)) {
+                        errMsg += '\n\n💡 API服务商暂时不可用，请稍后重新发送本次行动，系统将重新生成推演结果。';
+                        if (!isIdle && tx) {
+                            const inpEl = $('inputText');
+                            if (inpEl) inpEl.value = tx;
+                        }
+                    }
                     apb({ ty: 'system', tx: errMsg }, 0);
+                    if (/服务器错误|服务商暂时不可用|429|频繁|网络|超时|timeout|fetch|abort|Failed to fetch/i.test(e.message) && !isIdle && tx) {
+                        const retryFn = function() {
+                            const inpEl2 = $('inputText');
+                            if (inpEl2) inpEl2.value = tx;
+                            if (!busy) hin(tx, false);
+                        };
+                        window._retryLastAction = retryFn;
+                        apb({ ty: 'choice', opts: ['🔄 重新发送本次行动', '✕ 取消，手动输入'] }, 0);
+                        setTimeout(() => {
+                            const choices = document.querySelectorAll('.vn-choice-bubble');
+                            if (!choices || !choices.length) return;
+                            const last = choices[choices.length - 1];
+                            const btns = last.querySelectorAll('button, .vn-choice-item');
+                            if (btns[0]) btns[0].onclick = (ev) => { ev.stopPropagation(); if (window._retryLastAction) window._retryLastAction(); };
+                            if (btns[1]) btns[1].onclick = (ev) => { ev.stopPropagation(); const ie = $('inputText'); if (ie) ie.focus(); };
+                        }, 100);
+                    }
                     if (isIdle) stopIdle();
+                    snotifyEndBatch();
                 } finally {
                     busy = false;
+                    snotifyEndBatch();
                     if (!isIdle && !idleLocked) $('btnSend').disabled = false;
                     if (!isIdle) $('inputText').classList.remove('busy');
                     if (!isIdle && !idleLocked && !isMobile()) $('inputText').focus();
                     upui();
+                    checkChatFold();
                     scb();
                     // Auto-save after each game action (keep auto-slot in sync)
                     // ALWAYS save, even during idle mode, to prevent data loss on refresh
@@ -3661,7 +4299,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             window.ccb = ccb; window.svh = svh; window.apb = apb; window.scb = scb;
             window.migrateSta = migrateSta; window.migrateChr = migrateChr; window.migrateCfg = migrateCfg;
             window.mergeSbx = mergeSbx; window.ssbx = ssbx; window.gsbx = gsbx;
-            window.ldh = ldh; window.ssv = ssv; window.gsv = gsv;
+            window.ldh = ldh; window.ssv = ssv; window.gsv = gsv; window.validateSaveData = validateSaveData;
             window.gsp = gsp;
             window.esc = esc; window.abold = abold; window.spBar = spBar;
             window.buildItemTooltipHTML = buildItemTooltipHTML;
@@ -3863,6 +4501,22 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 tst('挂机已开启（方向：' + (f.idleDir || '休养') + '），每' + f.idleInt + '秒自动行动');
                 idleTimer = setInterval(() => {
                     if (busy) return;
+                    const s4 = gst();
+                    const lowList = [];
+                    if ((s4.hunger ?? 50) <= 20) lowList.push('饱腹');
+                    if ((s4.thirst ?? 50) <= 20) lowList.push('口渴');
+                    if ((s4.fatigue ?? 0) >= 90) lowList.push('疲劳过高');
+                    if ((s4.hp ?? 100) <= 30) lowList.push('HP危险');
+                    if ((s4.bodyTemp ?? 37) <= 33 || (s4.bodyTemp ?? 37) >= 42) lowList.push('体温异常');
+                    if ((s4.spirit ?? 85) <= 25) lowList.push('精神崩溃');
+                    if (lowList.length > 0) {
+                        stopIdle();
+                        const msg = '⚠️ 挂机已自动停止：' + lowList.join('、') + '，请立即处理！';
+                        snotify('danger', '挂机中止', lowList.join('、'));
+                        tst(msg);
+                        playSfx('danger');
+                        return;
+                    }
                     if (document.hidden && !cfg().key) return;
                     const action = getIdleAction();
                     hin(action, true);
@@ -4134,13 +4788,16 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             function toggleItemStarred(name) {
                 const s = gst();
                 if (!s.stars) s.stars = [];
-                const idx = s.stars.indexOf(name);
-                if (idx >= 0) {
-                    s.stars.splice(idx, 1);
-                    tst('已取消常用：' + name);
+                const base = getItemBaseName(name);
+                // 移除任何 baseName 匹配的旧记录（无论是base还是带x后缀）
+                const cleanStars = s.stars.filter(x => getItemBaseName(x) !== base);
+                if (cleanStars.length === s.stars.length) {
+                    // 不存在，添加（统一存 baseName）
+                    s.stars = cleanStars.concat([base]);
+                    tst('已标常用：' + base);
                 } else {
-                    s.stars.push(name);
-                    tst('已标常用：' + name);
+                    s.stars = cleanStars;
+                    tst('已取消常用：' + base);
                 }
                 sst(s);
             }
@@ -4151,14 +4808,13 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             function isItemStarred(item) {
                 const s = gst();
                 const base = getItemBaseName(item);
-                return s.stars && (s.stars.indexOf(base) >= 0 || s.stars.indexOf(item) >= 0);
+                return s.stars && s.stars.some(x => getItemBaseName(x) === base);
             }
             function renderBackpackCell(grid, item) {
                 const cell = document.createElement('div');
-                const emoji = itemEmoji(item);
                 const starClass = isItemStarred(item) ? 'bp-cell stared' : 'bp-cell';
                 cell.className = starClass;
-                cell.innerHTML = '<div class="bp-icon-cell">' + emoji + '</div><div class="bp-name">' + esc(item) + '</div>';
+                cell.innerHTML = '<div class="bp-icon-cell">' + wrapEmoji(item) + '</div><div class="bp-name">' + esc(item) + '</div>';
                 let touchTimer = null;
                 cell.addEventListener('click', (e) => { showItemContextMenu(e, item); });
                 cell.addEventListener('contextmenu', (e) => { e.preventDefault(); showItemContextMenu(e, item); });
@@ -4217,11 +4873,25 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 } else {
                     catRow.style.display = 'none';
                     subRow.style.display = 'none';
-                    const stars = gst().stars || [];
-                    const summary = summarizeInvSummary().filter(s => stars.indexOf(s.name) >= 0);
+                    const s = gst();
+                    const starBases = new Set((s.stars || []).map(x => getItemBaseName(x)));
+                    const summary = summarizeInvSummary().filter(si => starBases.has(getItemBaseName(si.name)));
                     summary.sort((a, b) => a.name.localeCompare(b.name, 'zh'));
                     filtered = summary.map(s => s.display);
                     if (!filtered.length) filtered = ['NO_STARRED_EMPTY'];
+                }
+                const kw = ($('bpSearch') && $('bpSearch').value || '').trim().toLowerCase();
+                if (kw) {
+                    filtered = filtered.filter(name => {
+                        if (name === 'NO_STARRED_EMPTY' || !name) return false;
+                        const base = parseItemQty(name).base.toLowerCase();
+                        const info = getItemInfo(parseItemQty(name).base);
+                        const desc = info && (info.desc || info.subCategory || info.type || info.category || '') || '';
+                        return base.includes(kw) || desc.toLowerCase().includes(kw);
+                    });
+                    if (!filtered.length) filtered = ['NO_SEARCH_EMPTY'];
+                    const totalPagesK = Math.max(1, Math.ceil(filtered.length / 9));
+                    if (bpPage >= totalPagesK) bpPage = totalPagesK - 1;
                 }
                 const perPage = 9;
                 const totalPages = Math.max(1, Math.ceil(filtered.length / perPage));
@@ -4237,6 +4907,11 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             const cell = document.createElement('div');
                             cell.className = 'bp-cell empty';
                             cell.innerHTML = '<div class="bp-name" style="font-size:0.68rem;color:var(--ink-soft);">暂无常用物品<br>在分类视图点击物品 → 常用 加入</div>';
+                            grid.appendChild(cell);
+                        } else if (item === 'NO_SEARCH_EMPTY') {
+                            const cell = document.createElement('div');
+                            cell.className = 'bp-cell empty';
+                            cell.innerHTML = '<div class="bp-name" style="font-size:0.7rem;color:var(--color-warn);">🔍 未找到匹配物品<br>试试其他关键词</div>';
                             grid.appendChild(cell);
                         } else {
                             renderBackpackCell(grid, item);
@@ -4259,7 +4934,36 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     $('bpInfo').textContent = '常用 ' + (gst().stars || []).length + ' 类';
                 }
             }
-            function openBackpack() { bpCat = 'food'; bpSub = 'solid'; bpPage = 0; renderBackpack(); $('backpackModal').style.display = 'flex'; }
+            let _bpSearchInited = false;
+            function openBackpack() {
+                bpCat = 'food'; bpSub = 'solid'; bpPage = 0;
+                renderBackpack();
+                const m = $('backpackModal');
+                if (!_bpSearchInited && m) {
+                    const bpHeader = m.querySelector('.bp-header') || m.querySelector('.modal-header');
+                    if (!m.querySelector('#bpSearch')) {
+                        const wrap = document.createElement('div');
+                        wrap.style.cssText = 'padding:0 14px 10px;';
+                        wrap.innerHTML = '<input id="bpSearch" type="text" placeholder="🔍 搜索背包物品…" style="width:100%;padding:7px 10px;border:2px solid var(--input-border);border-radius:4px;background:var(--input-bg);color:var(--text);font-family:inherit;font-size:0.78rem;outline:none;">';
+                        const target = bpHeader ? bpHeader.parentNode : m.firstChild;
+                        if (bpHeader && bpHeader.nextSibling) bpHeader.parentNode.insertBefore(wrap, bpHeader.nextSibling);
+                        else if (m.firstChild) m.insertBefore(wrap, m.firstChild.nextSibling ? m.firstChild.nextSibling : m.firstChild);
+                        const inp = wrap.querySelector('#bpSearch');
+                        inp.addEventListener('input', () => { bpPage = 0; renderBackpack(); });
+                        inp.addEventListener('focus', () => inp.select());
+                    }
+                    _bpSearchInited = true;
+                }
+                $('backpackModal').style.display = 'flex';
+            }
+            // 根据物品名称/信息推断装备槽位（用于本地装备操作）
+            // 旧名兼容，内部统一走 getEquipSlot
+            function guessEquipSlot(name, info) { return getEquipSlot(name, info); }
+            function slotLabel(slot) {
+                const labels = { head: '头部', body: '躯干', legs: '腿部', feet: '足部', weapon: '主手', offhand: '副手', backpack: '背包', accessory: '饰品' };
+                return labels[slot] || slot;
+            }
+
             function openEquipment() { renderEquipment(); $('equipmentModal').style.display = 'flex'; }
 
             function renderEquipment() {
@@ -4328,13 +5032,42 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     equippableItems.forEach(item => {
                         const btn = document.createElement('div');
                         btn.className = 'equip-bp-item';
-                        btn.innerHTML = itemEmoji(item.name) + ' ' + esc(item.name);
+                        btn.innerHTML = wrapEmoji(item.name) + ' ' + esc(item.name);
                         btn.title = item.info.desc || '点击装备';
-                        btn.addEventListener('click', () => {
+                        btn.addEventListener('click', async () => {
                             if (busy) { tst('正在演算中'); return; }
-                            $('equipmentModal').style.display = 'none';
-                            hin('装备：' + item.name);
+                            let slot = guessEquipSlot(item.name, item.info);
+                            if (!slot) {
+                                showEquipSlotSelector(item.name, item.info, (chosenSlot) => {
+                                    const s2 = gst();
+                                    if (!s2.equip) s2.equip = {};
+                                    if (s2.equip[chosenSlot]) invAdd(s2.equip[chosenSlot], 1);
+                                    s2.equip[chosenSlot] = parseItemQty(item.name).base;
+                                    invRemove(item.name, 1);
+                                    addLogEntry('system', '装备了 ' + item.name + ' → ' + slotLabel(chosenSlot));
+                                    checkAchievements();
+                                    playSfx('equip');
+                                    snotify('add', '装备', item.name + ' → ' + slotLabel(chosenSlot));
+                                    renderEquipment();
+                                    upui();
+                                });
+                                return;
+                            }
+                            const s = gst();
+                            const oldItem = s.equip && s.equip[slot] || '';
+                            const oldInfo = oldItem ? getItemInfo(oldItem) : null;
+                            const prevText = getEquipPreviewText(slot, item.name, oldItem, item.info, oldInfo);
+                            if (prevText && !await sketchConfirm('【装备预览】\n' + prevText + '\n\n确定要装备吗？')) return;
+                            if (!s.equip) s.equip = {};
+                            if (s.equip[slot]) invAdd(s.equip[slot], 1);
+                            s.equip[slot] = parseItemQty(item.name).base;
+                            invRemove(item.name, 1);
+                            addLogEntry('system', '装备了 ' + item.name);
+                            checkAchievements();
                             playSfx('equip');
+                            snotify('add', '装备', item.name + ' → ' + slotLabel(slot));
+                            renderEquipment();
+                            upui();
                         });
                         itemsContainer.appendChild(btn);
                     });
@@ -4364,9 +5097,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     detail.innerHTML = '<div class="equip-empty-hint">此槽位为空。<br>从背包中选择可装备物品进行装备。</div>';
                     return;
                 }
-                const emoji = itemEmoji(itemName);
                 let html = '<div class="equip-detail">';
-                html += '<div class="equip-detail__title">' + emoji + ' ' + esc(itemName) + '</div>';
+                html += '<div class="equip-detail__title">' + wrapEmoji(itemName) + ' ' + esc(itemName) + '</div>';
                 if (itemInfo) {
                     if (itemInfo.category) html += '<div>分类：<strong>' + esc(itemInfo.category) + '</strong>' + (itemInfo.subCategory ? ' / ' + esc(itemInfo.subCategory) : '') + '</div>';
                     if (itemInfo.effect) html += '<div>效果：<strong>' + esc(itemInfo.effect) + '</strong></div>';
@@ -4375,6 +5107,10 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 } else {
                     html += '<div class="equip-detail__desc">暂无详细信息。</div>';
                 }
+                const oldName = itemName;
+                const oldInfo0 = itemInfo;
+                const prev = getEquipPreviewText(slotKey, '', oldName, null, oldInfo0);
+                if (prev) html += '<div style="font-size:0.65rem;color:var(--ink-soft);margin:6px 0 0;padding:4px 6px;background:var(--bg-paper-alt);border-left:3px solid var(--accent);border-radius:2px;">💡 卸下后：' + esc(prev) + '</div>';
                 html += '<div class="equip-actions">';
                 html += '<button class="equip-btn equip-btn--primary" data-act="details">查看详情</button>';
                 html += '<button class="equip-btn equip-btn--danger" data-act="unequip">卸下</button>';
@@ -4389,23 +5125,31 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             const s = gst();
                             if (s.equip && s.equip[slotKey] && s.equip[slotKey] === itemName) {
                                 s.equip[slotKey] = '';
-                                // 放回背包（如果不存在）
-                                if (s.inv && s.inv.indexOf(itemName) < 0) {
-                                    const baseName = getItemBaseName(itemName);
-                                    const existIdx = s.inv.findIndex(i => getItemBaseName(i) === baseName);
-                                    if (existIdx < 0) s.inv.push(itemName);
-                                }
-                                sst(s);
+                                // 放回背包
+                                invAdd(itemName, 1);
                                 addLogEntry('system', '卸下了 ' + itemName);
                                 checkAchievements();
                                 playSfx('equip');
-                                tst('已卸下：' + itemName);
+                                snotify('remove', '装备', itemName);
                                 renderEquipment();
                             } else {
-                                // 交给 AI 处理
-                                $('equipmentModal').style.display = 'none';
-                                hin('卸下装备：' + itemName);
-                                playSfx('equip');
+                                // 本地卸下操作，不触发AI对话
+                                const s2 = gst();
+                                if (s2.equip) {
+                                    const foundSlot = Object.keys(s2.equip).find(k => s2.equip[k] === itemName);
+                                    if (foundSlot) {
+                                        s2.equip[foundSlot] = '';
+                                        invAdd(itemName, 1);
+                                        addLogEntry('system', '卸下了 ' + itemName);
+                                        checkAchievements();
+                                        playSfx('equip');
+                                        snotify('remove', '装备', itemName);
+                                        renderEquipment();
+                                        upui();
+                                    } else {
+                                        tst('未找到该装备所在槽位');
+                                    }
+                                }
                             }
                         } else if (act === 'details') {
                             showItemDetail(itemName, itemInfo);
@@ -4620,17 +5364,22 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     const svs = gsv(); const sn = svs[key];
                     if (!sn) { out('读档失败，存档槽为空：' + key, 'warn'); return; }
                     stopIdle();
-                    hist = JSON.parse(JSON.stringify(sn.hi));
-                    sst(migrateSta(JSON.parse(JSON.stringify(sn.st))));
-                    if (sn.ch) sch(migrateChr(JSON.parse(JSON.stringify(sn.ch))));
-                    if (sn.clk) sclk(JSON.parse(JSON.stringify(sn.clk)));
-                    if (sn.sbx) { sbx = mergeSbx(JSON.parse(JSON.stringify(sn.sbx))); ssbx(sbx); }
-                    if (sn.cfg) {
+                    const r = validateSaveData(sn, false);
+                    hist = r.recovered.hi.slice();
+                    sst(r.recovered.st);
+                    sch(r.recovered.ch);
+                    sclk(r.recovered.clk);
+                    if (r.recovered.sbx) { sbx = mergeSbx(r.recovered.sbx); ssbx(sbx); }
+                    if (r.recovered.cfg) {
                         const curCfg = cfg();
-                        const merged = { ...curCfg, ...sn.cfg };
+                        const merged = { ...curCfg, ...r.recovered.cfg };
                         if (!merged.key && curCfg.key) merged.key = curCfg.key;
-                        if (sn.cfg.key === '' || sn.cfg.key === null || sn.cfg.key === undefined) merged.key = curCfg.key;
+                        if (r.recovered.cfg.key === '' || r.recovered.cfg.key === null || r.recovered.cfg.key === undefined) merged.key = curCfg.key;
                         scf(migrateCfg(merged));
+                    }
+                    if (r.errs.length > 0) {
+                        snotify('warn', '存档导入', '已自动修复 ' + r.errs.length + ' 处字段缺失');
+                        tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
                     }
                     rbt(); upui(); out('已从槽 ' + key + ' 读档');
                     return;
@@ -4677,6 +5426,23 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     if (idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return; }
                     hin(aim[1]);
                     out('已直接发送AI：' + (aim[1].slice(0, 30) + (aim[1].length > 30 ? '…' : '')));
+                    return;
+                }
+
+                // Chat fold control
+                if (/^fold$/i.test(input)) { _chatFoldEnabled = true; checkChatFold(); out('已启用聊天折叠（气泡>' + CHAT_FOLD_THRESHOLD + '时自动折叠）'); return; }
+                if (/^unfold$/i.test(input)) {
+                    _chatFoldEnabled = false;
+                    const ca = $('chatArea');
+                    if (ca) {
+                        ca.querySelectorAll('.chat-fold-hidden').forEach(w => {
+                            const parent = w.parentNode;
+                            while (w.firstChild) parent.insertBefore(w.firstChild, w);
+                            w.remove();
+                        });
+                        ca.querySelectorAll('.chat-fold-layer').forEach(l => l.remove());
+                    }
+                    out('已禁用聊天折叠，所有历史对话DOM已恢复');
                     return;
                 }
 
@@ -4738,22 +5504,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                                 // Apply item effects locally
                                 const eff = applyItemEffect(item);
                                 // Remove item from inventory (decrement count)
-                                if (s && s.inv) {
-                                    const invIdx = s.inv.indexOf(item);
-                                    if (invIdx >= 0) {
-                                        // Check if item has quantity suffix like x2
-                                        const itemStr = s.inv[invIdx];
-                                        const qtyMatch = itemStr.match(/^(.+?)x(\d+)$/);
-                                        if (qtyMatch) {
-                                            const n = parseInt(qtyMatch[2]) - 1;
-                                            if (n <= 0) s.inv.splice(invIdx, 1);
-                                            else s.inv[invIdx] = qtyMatch[1] + 'x' + n;
-                                        } else {
-                                            s.inv.splice(invIdx, 1);
-                                        }
-                                        sst(s);
-                                    }
-                                }
+                                invRemove(item, 1);
                                 // Show usage feedback
                                 const msg = eff && eff.length
                                     ? '使用了 ' + item + '（效果：' + eff.join(' ') + '）'
@@ -4772,39 +5523,54 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             }
                         } else if (act === 'equip') {
                             if (busy) { tst('正在演算中'); return; }
-                            $('backpackModal').style.display = 'none';
-                            // Directly toggle equipment without sending to input
-                            const s = gst();
+                            const s0 = gst();
                             const itemInfo = getItemInfo(getItemBaseName(item));
                             if (!itemInfo) { tst('无法识别该物品的装备信息'); playSfx('drop'); return; }
-                            // Find suitable slot
-                            const slotMap = {
-                                'weapon': 'weapon', 'armor': 'body', 'tool': 'offhand',
-                                'backpack': 'backpack', 'tech': 'offhand', 'misc': 'accessory'
-                            };
-                            const slot = slotMap[itemInfo.subCategory] || 'offhand';
-                            if (!s.equip) s.equip = {};
-                            if (s.equip[slot] === item) {
-                                // Unequip
-                                playSfx('drop');
-                                tst('已卸下：' + item);
-                            } else {
-                                // Equip
-                                if (s.equip[slot]) {
-                                    // Return current equip to inventory
-                                    s.inv.push(s.equip[slot]);
-                                }
-                                // Remove from inventory
-                                const idx = s.inv.indexOf(item);
-                                if (idx >= 0) s.inv.splice(idx, 1);
-                                s.equip[slot] = item;
-                                playSfx('equip');
-                                tst('已装备：' + item);
+                            let slot = getEquipSlot(item, itemInfo);
+                            if (!slot) {
+                                const $modal = $('backpackModal');
+                                if ($modal) $modal.style.display = 'none';
+                                showEquipSlotSelector(item, itemInfo, (chosenSlot) => {
+                                    const s3 = gst();
+                                    if (!s3.equip) s3.equip = {};
+                                    if (s3.equip[chosenSlot] === parseItemQty(item).base || s3.equip[chosenSlot] === item) {
+                                        const backName = s3.equip[chosenSlot];
+                                        s3.equip[chosenSlot] = '';
+                                        invAdd(backName, 1);
+                                        playSfx('drop');
+                                        snotify('remove', '装备', parseItemQty(backName).base);
+                                    } else {
+                                        if (s3.equip[chosenSlot]) invAdd(s3.equip[chosenSlot], 1);
+                                        invRemove(item, 1);
+                                        s3.equip[chosenSlot] = parseItemQty(item).base;
+                                        sst(s3);
+                                        playSfx('equip');
+                                        snotify('add', '装备', parseItemQty(item).base + ' → ' + slotLabel(chosenSlot));
+                                    }
+                                    sst(s3);
+                                    upui();
+                                    if (typeof renderBackpack === 'function') renderBackpack();
+                                });
+                                return;
                             }
-                            sst(s);
+                            $('backpackModal').style.display = 'none';
+                            if (!s0.equip) s0.equip = {};
+                            if (s0.equip[slot] === parseItemQty(item).base || s0.equip[slot] === item) {
+                                const backName = s0.equip[slot];
+                                s0.equip[slot] = '';
+                                invAdd(backName, 1);
+                                playSfx('drop');
+                                snotify('remove', '装备', parseItemQty(backName).base);
+                            } else {
+                                if (s0.equip[slot]) invAdd(s0.equip[slot], 1);
+                                invRemove(item, 1);
+                                s0.equip[slot] = parseItemQty(item).base;
+                                sst(s0);
+                                playSfx('equip');
+                                snotify('add', '装备', parseItemQty(item).base + ' → ' + slotLabel(slot));
+                            }
+                            sst(s0);
                             upui();
-                            // Notify system for AI awareness
-                            snotify('status', '装备', item);
                         } else if (act === 'drop') {
                             if (busy) { tst('正在演算中'); return; }
                             $('backpackModal').style.display = 'none';
@@ -5108,9 +5874,6 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 $('idleCustomWrap').style.display = ($('idleDirection').value === '自定义') ? 'block' : 'none';
                 $('idleDirection').onchange = () => { $('idleCustomWrap').style.display = ($('idleDirection').value === '自定义') ? 'block' : 'none'; };
                 $('godModeToggle').checked = !!c.debug;
-                $('useProxyToggle').checked = !!c.useProxy;
-                $('proxyUrl').value = c.proxyUrl || '';
-                $('proxySecret').value = c.proxySecret || '';
                 $('promptEditor').value = c.prompt || DPROMPT;
                 // Populate debug cheat sheet
                 const dcs = $('debugCheatSheet');
@@ -5156,10 +5919,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     idleCustom: $('idleCustom').value || '',
                     worldLock: cfg().worldLock || false,
                     debug: $('godModeToggle').checked,
-                    preset: preset,
-                    useProxy: $('useProxyToggle').checked,
-                    proxyUrl: $('proxyUrl').value || DCFG.proxyUrl,
-                    proxySecret: $('proxySecret').value || DCFG.proxySecret
+                    preset: preset
                 });
                 upui();
                 $('settingsModal').style.display = 'none';
@@ -5212,16 +5972,17 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     const text = await file.text();
                     const backup = JSON.parse(text);
                     if (!backup || typeof backup !== 'object') throw new Error('文件格式不正确');
-                    if (!backup.cfg || !backup.chr || !backup.hist) throw new Error('缺少必要的备份数据（可能不是本游戏的备份）');
+                    const sn = { hi: backup.hist || backup.hi, st: backup.sta || backup.st, ch: backup.chr || backup.ch, clk: backup.clk, sbx: backup.sbx, cfg: backup.cfg };
+                    const r = validateSaveData(sn, true);
+                    if (!r.valid) throw new Error('存档校验失败：' + r.errs.join('; '));
                     // Cross-player detection: check if the backup's character name differs from current
                     const curChr = gch();
-                    const bkChr = backup.chr || {};
+                    const bkChr = r.recovered.ch || {};
                     const bkName = bkChr.cn || bkChr.characterName || '未知角色';
                     const curName = curChr.cn || curChr.characterName || '当前角色';
                     const isCrossPlayer = (bkName !== curName);
                     let confirmMsg = '确定要导入该备份吗？\n生成时间：' + (backup.generatedAt || '未知') + '\n当前的所有游戏进度和存档槽将被覆盖。此操作不可撤销。';
                     if (isCrossPlayer) {
-                        // Second confirmation for cross-player import
                         if (!await sketchConfirm('⚠️ 检测到这不是当前玩家的存档！\n\n当前角色：' + curName + '\n备份角色：' + bkName + '\n\n这是来自另一个玩家/角色的存档，将完全覆盖当前进度。\n\n确定要继续导入吗？此操作不可撤销！')) {
                             if (statusEl) statusEl.textContent = '已取消导入';
                             return;
@@ -5229,14 +5990,18 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         confirmMsg = '即将导入「' + bkName + '」的存档，覆盖当前「' + curName + '」的全部进度。\n\n确定要继续吗？';
                     }
                     if (!await sketchConfirm(confirmMsg)) { if (statusEl) statusEl.textContent = '已取消导入'; return; }
-                    if (backup.cfg) scf(backup.cfg);
-                    if (backup.chr) sch(backup.chr);
-                    if (backup.sta) sst(backup.sta);
-                    if (backup.clk) sclk(backup.clk);
-                    if (backup.sbx) ssbx(backup.sbx);
-                    if (backup.hist && Array.isArray(backup.hist)) hist = backup.hist;
+                    if (r.recovered.cfg) scf(r.recovered.cfg);
+                    sch(r.recovered.ch);
+                    sst(r.recovered.st);
+                    sclk(r.recovered.clk);
+                    if (r.recovered.sbx) ssbx(r.recovered.sbx);
+                    hist = r.recovered.hi.slice();
                     if (backup.theme) { theme = backup.theme; try { localStorage.setItem('vn_theme', theme); } catch {} document.documentElement.setAttribute('data-theme', theme); }
                     if (backup.saves) try { localStorage.setItem('vn_saves', JSON.stringify(backup.saves)); } catch {}
+                    if (r.errs.length > 0) {
+                        snotify('warn', '存档导入', '已自动修复 ' + r.errs.length + ' 处字段缺失');
+                        tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
+                    }
                     upui();
                     if (statusEl) { statusEl.style.color = 'var(--notify-add)'; statusEl.textContent = '✅ 导入成功！游戏已加载备份内容。'; }
                     tst('备份导入成功');
@@ -5256,192 +6021,6 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 upui();
                 tst($('godModeToggle').checked ? '⚡ 上帝模式已激活：你无所不能、永不死亡' : '上帝模式已关闭');
             });
-            // 代理开关事件监听
-            $('useProxyToggle').addEventListener('change', () => {
-                const cur = cfg();
-                scf({ ...cur, useProxy: $('useProxyToggle').checked });
-                tst($('useProxyToggle').checked ? '🌐 代理模式已启用：请求将通过代理服务器转发' : '🌐 代理模式已关闭：直连API服务器');
-            });
-            $('proxyUrl').addEventListener('change', () => {
-                const cur = cfg();
-                scf({ ...cur, proxyUrl: $('proxyUrl').value || DCFG.proxyUrl });
-            });
-            $('proxySecret').addEventListener('change', () => {
-                const cur = cfg();
-                scf({ ...cur, proxySecret: $('proxySecret').value || DCFG.proxySecret });
-            });
-            
-            // ===== 代理请求配置持久化（独立localStorage） =====
-            const PROXY_CFG_KEY = 'dz_proxy_req_cfg';
-            
-            // 默认代理请求配置
-            const DEFAULT_PROXY_REQ_CFG = {
-                targetUrl: '',
-                method: 'POST',
-                body: '',
-                headers: ''
-            };
-            
-            /**
-             * 显示配置状态提示
-             * @param {string} message - 提示文本
-             * @param {string} type - 类型：success/error/info
-             */
-            function showProxyCfgStatus(message, type = 'success') {
-                const statusEl = $('proxyCfgStatus');
-                if (!statusEl) return;
-                statusEl.textContent = message;
-                statusEl.style.display = 'block';
-                statusEl.style.color = type === 'error' ? 'var(--color-danger)' : 
-                                      type === 'info' ? 'var(--ink-light)' : 'var(--color-success)';
-                setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-            }
-            
-            /**
-             * 加载代理请求配置（从localStorage）
-             */
-            function loadProxyReqConfig() {
-                try {
-                    const saved = localStorage.getItem(PROXY_CFG_KEY);
-                    if (!saved) return;
-                    const config = JSON.parse(saved);
-                    // 回填输入框
-                    if (config.targetUrl !== undefined && $('proxyTargetUrl')) $('proxyTargetUrl').value = config.targetUrl;
-                    if (config.method !== undefined && $('proxyMethod')) $('proxyMethod').value = config.method;
-                    if (config.body !== undefined && $('proxyBody')) $('proxyBody').value = config.body;
-                    if (config.headers !== undefined && $('proxyHeaders')) $('proxyHeaders').value = config.headers;
-                    showProxyCfgStatus('✓ 已加载历史配置', 'info');
-                } catch (e) {
-                    console.warn('加载代理请求配置失败:', e.message);
-                    // 容错处理：损坏的JSON不阻塞游戏
-                    try { localStorage.removeItem(PROXY_CFG_KEY); } catch {}
-                }
-            }
-            
-            /**
-             * 保存代理请求配置到localStorage
-             */
-            function saveProxyReqConfig() {
-                try {
-                    const config = {
-                        targetUrl: $('proxyTargetUrl') ? $('proxyTargetUrl').value.trim() : '',
-                        method: $('proxyMethod') ? $('proxyMethod').value : 'POST',
-                        body: $('proxyBody') ? $('proxyBody').value.trim() : '',
-                        headers: $('proxyHeaders') ? $('proxyHeaders').value.trim() : ''
-                    };
-                    // 验证JSON格式（如果有body或headers）
-                    if (config.body) {
-                        try { JSON.parse(config.body); } catch {
-                            showProxyCfgStatus('⚠ 请求Body不是有效的JSON格式', 'error');
-                            return;
-                        }
-                    }
-                    if (config.headers) {
-                        try { JSON.parse(config.headers); } catch {
-                            showProxyCfgStatus('⚠ 请求头不是有效的JSON格式', 'error');
-                            return;
-                        }
-                    }
-                    localStorage.setItem(PROXY_CFG_KEY, JSON.stringify(config));
-                    showProxyCfgStatus('✓ 配置已保存', 'success');
-                } catch (e) {
-                    console.error('保存代理请求配置失败:', e.message);
-                    showProxyCfgStatus('保存失败: ' + e.message, 'error');
-                }
-            }
-            
-            /**
-             * 清空代理请求配置
-             */
-            function clearProxyReqConfig() {
-                try {
-                    localStorage.removeItem(PROXY_CFG_KEY);
-                    if ($('proxyTargetUrl')) $('proxyTargetUrl').value = '';
-                    if ($('proxyMethod')) $('proxyMethod').value = 'POST';
-                    if ($('proxyBody')) $('proxyBody').value = '';
-                    if ($('proxyHeaders')) $('proxyHeaders').value = '';
-                    showProxyCfgStatus('✓ 配置已清空', 'info');
-                } catch (e) {
-                    console.error('清空代理请求配置失败:', e.message);
-                    showProxyCfgStatus('清空失败: ' + e.message, 'error');
-                }
-            }
-            
-            /**
-             * 测试代理请求（使用当前配置发送测试请求）
-             */
-            async function testProxyRequest() {
-                const targetUrl = $('proxyTargetUrl') ? $('proxyTargetUrl').value.trim() : '';
-                if (!targetUrl) {
-                    showProxyCfgStatus('⚠ 请先填写目标接口地址', 'error');
-                    return;
-                }
-                const method = $('proxyMethod') ? $('proxyMethod').value : 'POST';
-                const bodyStr = $('proxyBody') ? $('proxyBody').value.trim() : '';
-                const headersStr = $('proxyHeaders') ? $('proxyHeaders').value.trim() : '';
-                
-                let bodyObj = null;
-                let headersObj = {};
-                
-                // 解析Body
-                if (bodyStr) {
-                    try { bodyObj = JSON.parse(bodyStr); } catch {
-                        showProxyCfgStatus('⚠ 请求Body不是有效的JSON格式', 'error');
-                        return;
-                    }
-                }
-                
-                // 解析Headers
-                if (headersStr) {
-                    try { headersObj = JSON.parse(headersStr); } catch {
-                        showProxyCfgStatus('⚠ 请求头不是有效的JSON格式', 'error');
-                        return;
-                    }
-                }
-                
-                showProxyCfgStatus('⏳ 正在发送测试请求...', 'info');
-                try {
-                    const cfg = cfg();
-                    let response;
-                    if (cfg.useProxy && cfg.proxyUrl) {
-                        // 使用代理
-                        response = await window._sendProxyRequest(targetUrl, bodyObj || {}, cfg.key || 'test', null, false);
-                    } else {
-                        // 直连
-                        response = await fetch(targetUrl, {
-                            method: method,
-                            headers: { 'Content-Type': 'application/json', ...headersObj },
-                            body: method === 'POST' && bodyObj ? JSON.stringify(bodyObj) : undefined
-                        });
-                    }
-                    if (response.ok) {
-                        showProxyCfgStatus('✓ 测试请求成功 (HTTP ' + response.status + ')', 'success');
-                    } else {
-                        let msg = '⚠ 请求失败 (HTTP ' + response.status + ')';
-                        if (response.status === 401) msg = '⚠ 请求失败：认证失败，请检查API密钥';
-                        else if (response.status === 403) msg = '⚠ 请求失败：访问被拒绝';
-                        else if (response.status === 404) msg = '⚠ 请求失败：目标接口不存在';
-                        else if (response.status === 429) msg = '⚠ 请求失败：请求过于频繁';
-                        else if (response.status >= 500) msg = '⚠ 请求失败：目标服务器暂时不可用';
-                        showProxyCfgStatus(msg, 'error');
-                    }
-                } catch (e) {
-                    showProxyCfgStatus('✗ 请求异常: ' + e.message, 'error');
-                }
-            }
-            
-            // 绑定按钮事件
-            $('btnSaveProxyCfg') && $('btnSaveProxyCfg').addEventListener('click', saveProxyReqConfig);
-            $('btnClearProxyCfg') && $('btnClearProxyCfg').addEventListener('click', clearProxyReqConfig);
-            $('btnTestProxyReq') && $('btnTestProxyReq').addEventListener('click', testProxyRequest);
-            
-            // 页面加载时自动加载配置
-            loadProxyReqConfig();
-            
-            // 暴露到全局，方便调试
-            window._loadProxyReqConfig = loadProxyReqConfig;
-            window._saveProxyReqConfig = saveProxyReqConfig;
-            window._clearProxyReqConfig = clearProxyReqConfig;
             
             // ===== God Group quick debug buttons =====
             $('btnDebugMax') && $('btnDebugMax').addEventListener('click', () => runDebugCmd('/max'));
@@ -5499,64 +6078,79 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             $('btnQuickRestart') && $('btnQuickRestart').addEventListener('click', async () => {
                 if (!await sketchConfirm('确定要重新开始吗？\n将生成一个死亡结局，然后以当前角色设定从头开始游戏。\n\n当前游戏进度将丢失！')) return;
                 $('settingsModal').style.display = 'none';
-                busy = true;
-                $('btnSend').disabled = true;
-                $('inputText').classList.add('busy');
-                const c = gch();
-                const s = gst();
-                // Generate death narration
-                const deathCauses = [
-                    '你倒在了血泊中，视线逐渐模糊……最后的意识里，你听到了远处传来的嘶吼声。',
-                    '伤口感染让你高烧不退，你在一个寒冷的夜晚永远闭上了眼睛。',
-                    '你被丧尸群包围，拼尽全力也无法杀出重围……',
-                    '饥渴和疲惫终于压垮了你，你在睡梦中安静地离开了这个世界。',
-                    '失温让你的身体逐渐僵硬，最后的温暖是手中紧握的照片。',
-                    '你在探索中踏空坠落，意识消散前只听到风声呼啸。',
-                    '一次错误的判断让你陷入了绝境，你没能活着走出来。',
-                    '你在与掠夺者的对峙中倒下，对方的脚步声渐渐远去……'
-                ];
-                const deathText = deathCauses[Math.floor(Math.random() * deathCauses.length)];
-                apb({ ty: 'narration', tx: deathText }, 0);
-                apb({ ty: 'system', tx: '【游戏结束】' + (c.cn || '幸存者') + ' 的故事到此结束。存活了 ' + (gclk().day || 1) + ' 天。' }, 0);
-                addLogEntry('system', '角色死亡，存活' + (gclk().day || 1) + '天');
-                playSfx('danger');
-                // Wait for the death narration to display
-                await new Promise(r => setTimeout(r, 2000));
-                // Save character and sandbox (preserve them)
-                const savedChr = JSON.parse(JSON.stringify(c));
-                const savedSbx = JSON.parse(JSON.stringify(gsbx()));
-                const savedClk = JSON.parse(JSON.stringify(gclk()));
-                // Reset game state but keep character
-                ccb();
-                hist = [];
-                // Reset state with default DSTA but rebuild from character items
-                const baseState = JSON.parse(JSON.stringify(DSTA));
-                const itemsStr = savedChr.it || DCHR.it;
-                const { inv, equip } = buildInvAndEquipFromItems(itemsStr);
-                baseState.inv = inv;
-                baseState.equip = equip;
-                sst(baseState);
-                svh([]);
-                // Restore character (keep _charCreated flag)
-                sch(savedChr);
-                // Restore sandbox but reset clock day to 1
-                sbx = savedSbx; ssbx(sbx);
-                const newClk = JSON.parse(JSON.stringify(savedClk));
-                newClk.day = 1; newClk.elapsedSec = 6 * 3600; // Start at 6:00 AM
-                sclk(newClk);
-                stopIdle();
-                upui();
-                // Start new game
-                apb({ ty: 'chapter', tx: savedChr.days + ' | ' + savedChr.dn }, 0);
-                apb({ ty: 'narration', tx: '新的一周开始了。你醒来在' + savedChr.sp + '，仿佛一切重新来过……' }, 0);
-                tst('已重新开始游戏');
-                playSfx('levelup');
-                busy = false;
-                $('btnSend').disabled = false;
-                $('inputText').classList.remove('busy');
-                // Initialize stats via AI
-                if (cfg().key) aiInitStats();
-                scb();
+                try {
+                    busy = true;
+                    $('btnSend').disabled = true;
+                    $('inputText').classList.add('busy');
+                    const c = gch();
+                    const s = gst();
+                    // Generate death narration
+                    const deathCauses = [
+                        '你倒在了血泊中，视线逐渐模糊……最后的意识里，你听到了远处传来的嘶吼声。',
+                        '伤口感染让你高烧不退，你在一个寒冷的夜晚永远闭上了眼睛。',
+                        '你被丧尸群包围，拼尽全力也无法杀出重围……',
+                        '饥渴和疲惫终于压垮了你，你在睡梦中安静地离开了这个世界。',
+                        '失温让你的身体逐渐僵硬，最后的温暖是手中紧握的照片。',
+                        '你在探索中踏空坠落，意识消散前只听到风声呼啸。',
+                        '一次错误的判断让你陷入了绝境，你没能活着走出来。',
+                        '你在与掠夺者的对峙中倒下，对方的脚步声渐渐远去……'
+                    ];
+                    const deathText = deathCauses[Math.floor(Math.random() * deathCauses.length)];
+                    apb({ ty: 'narration', tx: deathText }, 0);
+                    apb({ ty: 'system', tx: '【游戏结束】' + (c.cn || '幸存者') + ' 的故事到此结束。存活了 ' + (gclk().day || 1) + ' 天。' }, 0);
+                    addLogEntry('system', '角色死亡，存活' + (gclk().day || 1) + '天');
+                    playSfx('danger');
+                    // Wait for the death narration to display
+                    await new Promise(r => setTimeout(r, 2000));
+                    // Save character and sandbox (preserve them)
+                    const savedChr = JSON.parse(JSON.stringify(c));
+                    const savedSbx = JSON.parse(JSON.stringify(gsbx()));
+                    const savedClk = JSON.parse(JSON.stringify(gclk()));
+                    // Reset game state but keep character
+                    ccb();
+                    hist = [];
+                    // 区分跨存档永久数据 vs 单局数据：永久保留、单局清空
+                    // 永久保留: unlockedAchievements(成就), cfg配置, 角色设定(ch保留)
+                    // 单局清理: 关键记忆, 日志书签, NPC遭遇记录, 沙盘npcRel局部状态, heacCount/nightSurvived
+                    try { keyMemories.length = 0; localStorage.removeItem('vn_keyMemories'); } catch(e) {}
+                    try { logBookmarks.length = 0; localStorage.removeItem('vn_logBookmarks'); } catch(e) {}
+                    // Reset state with default DSTA but rebuild from character items
+                    const baseState = JSON.parse(JSON.stringify(DSTA));
+                    // 清理状态中累计计数（避免跨局继承）
+                    try {
+                        delete baseState.healCount;
+                        delete baseState.nightSurvived;
+                        delete baseState.deathTriggered;
+                        delete baseState.deathShown;
+                    } catch(e) {}
+                    const itemsStr = savedChr.it || DCHR.it;
+                    const { inv, equip } = buildInvAndEquipFromItems(itemsStr);
+                    baseState.inv = inv;
+                    baseState.equip = equip;
+                    sst(baseState);
+                    svh([]);
+                    // Restore character (keep _charCreated flag)
+                    sch(savedChr);
+                    // Restore sandbox but reset clock day to 1
+                    sbx = savedSbx; ssbx(sbx);
+                    const newClk = JSON.parse(JSON.stringify(savedClk));
+                    newClk.day = 1; newClk.elapsedSec = 6 * 3600; // Start at 6:00 AM
+                    sclk(newClk);
+                    stopIdle();
+                    upui();
+                    // Start new game
+                    apb({ ty: 'chapter', tx: savedChr.days + ' | ' + savedChr.dn }, 0);
+                    apb({ ty: 'narration', tx: '新的一周开始了。你醒来在' + savedChr.sp + '，仿佛一切重新来过……' }, 0);
+                    tst('已重新开始游戏');
+                    playSfx('levelup');
+                    // Initialize stats via AI
+                    if (cfg().key) aiInitStats();
+                    scb();
+                } finally {
+                    busy = false;
+                    $('btnSend').disabled = false;
+                    $('inputText').classList.remove('busy');
+                }
             });
             $('btnPromptHelp').addEventListener('click', () => { $('promptHelpModal').style.display = 'flex'; });
             $('btnClosePromptHelp').addEventListener('click', () => { $('promptHelpModal').style.display = 'none'; });
@@ -5625,6 +6219,14 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     hist = JSON.parse(JSON.stringify(undo.hi));
                     const prevSt = JSON.parse(JSON.stringify(undo.st));
                     sst(prevSt);
+                    if (undo.ch) sch(JSON.parse(JSON.stringify(undo.ch)));
+                    if (undo.clk) sclk(JSON.parse(JSON.stringify(undo.clk)));
+                    if (undo.sbx) { sbx = mergeSbx(JSON.parse(JSON.stringify(undo.sbx))); ssbx(sbx); }
+                    if (undo.ach) {
+                        unlockedAchievements = new Set(undo.ach);
+                        try { localStorage.setItem(ACH_KEY, JSON.stringify([...unlockedAchievements])); } catch(e) {}
+                        if (typeof renderAchievements === 'function') renderAchievements();
+                    }
                     // Remove all chat bubbles added since the undo point (player + all AI bubbles)
                     const ca = $('chatArea');
                     if (ca && undo.bubbleCount != null) {
@@ -5650,6 +6252,17 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 const lastUserTx = hist[lastUserIdx].content;
                 const isIdle = lastUserTx.startsWith('[自主] ');
                 const origTx = isIdle ? lastUserTx.slice(5) : lastUserTx;
+                // 先恢复 undo 快照中的状态（防止上个AI回复的物品/属性残留）
+                if (undo && undo.st) {
+                    sst(JSON.parse(JSON.stringify(undo.st)));
+                    if (undo.ch) sch(JSON.parse(JSON.stringify(undo.ch)));
+                    if (undo.clk) sclk(JSON.parse(JSON.stringify(undo.clk)));
+                    if (undo.sbx) { sbx = mergeSbx(JSON.parse(JSON.stringify(undo.sbx))); ssbx(sbx); }
+                    if (undo.ach) {
+                        unlockedAchievements = new Set(undo.ach);
+                        try { localStorage.setItem(ACH_KEY, JSON.stringify([...unlockedAchievements])); } catch(e) {}
+                    }
+                }
                 // Remove last user message AND all AI responses after it from hist
                 // (hin() will re-add the user message)
                 hist.splice(lastUserIdx, hist.length - lastUserIdx);
@@ -5925,10 +6538,12 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     rd.onload = async () => {
                         try {
                             const d = JSON.parse(rd.result);
-                            if (!d.character || !d.state) throw new Error('无效备份文件');
+                            const sn = { hi: d.history || d.hi, st: d.state || d.st, ch: d.character || d.ch, clk: d.clock || d.clk, sbx: d.sandbox || d.sbx, cfg: d.config || d.cfg };
+                            const r = validateSaveData(sn, true);
+                            if (!r.valid) throw new Error('存档校验失败：' + r.errs.join('; '));
                             // Cross-player detection
                             const curChr = gch();
-                            const bkChr = d.character || {};
+                            const bkChr = r.recovered.ch || {};
                             const bkName = bkChr.cn || bkChr.characterName || '未知角色';
                             const curName = curChr.cn || curChr.characterName || '当前角色';
                             const isCrossPlayer = (bkName !== curName);
@@ -5937,12 +6552,16 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             }
                             if (!await sketchConfirm('导入备份将覆盖当前所有数据，确定继续？')) return;
                             if (d.saveSlots) ssv(d.saveSlots);
-                            if (d.history) hist = d.history;
-                            if (d.state) sst(d.state);
-                            if (d.character) sch(d.character);
-                            if (d.clock) sclk(d.clock);
-                            if (d.sandbox) { sbx = mergeSbx(d.sandbox); ssbx(sbx); }
-                            if (d.config) { const nc = { ...cfg(), ...d.config }; scf(nc); }
+                            hist = r.recovered.hi.slice();
+                            sst(r.recovered.st);
+                            sch(r.recovered.ch);
+                            sclk(r.recovered.clk);
+                            if (r.recovered.sbx) { sbx = mergeSbx(r.recovered.sbx); ssbx(sbx); }
+                            if (r.recovered.cfg) { const nc = { ...cfg(), ...r.recovered.cfg }; scf(nc); }
+                            if (r.errs.length > 0) {
+                                snotify('warn', '存档导入', '已自动修复 ' + r.errs.length + ' 处字段缺失');
+                                tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
+                            }
                             rbt();
                             upui();
                             $('saveModal').style.display = 'none';
@@ -5967,20 +6586,24 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         e.stopPropagation();
                         if (!sn) return;
                         stopIdle();
-                        hist = JSON.parse(JSON.stringify(sn.hi));
-                        sst(migrateSta(JSON.parse(JSON.stringify(sn.st))));
-                        if (sn.ch) sch(migrateChr(JSON.parse(JSON.stringify(sn.ch))));
-                        if (sn.clk) sclk(JSON.parse(JSON.stringify(sn.clk)));
-                        if (sn.sbx) { sbx = mergeSbx(JSON.parse(JSON.stringify(sn.sbx))); ssbx(sbx); }
-                        if (sn.cfg) {
-                            // Merge save config but NEVER let empty save values overwrite existing key
+                        const r = validateSaveData(sn, false);
+                        hist = r.recovered.hi.slice();
+                        sst(r.recovered.st);
+                        sch(r.recovered.ch);
+                        sclk(r.recovered.clk);
+                        if (r.recovered.sbx) { sbx = mergeSbx(r.recovered.sbx); ssbx(sbx); }
+                        if (r.recovered.cfg) {
                             const curCfg = cfg();
-                            const merged = { ...curCfg, ...sn.cfg };
+                            const merged = { ...curCfg, ...r.recovered.cfg };
                             if (!merged.key && curCfg.key) merged.key = curCfg.key;
-                            if (sn.cfg.key === '' || sn.cfg.key === null || sn.cfg.key === undefined) {
+                            if (r.recovered.cfg.key === '' || r.recovered.cfg.key === null || r.recovered.cfg.key === undefined) {
                                 merged.key = curCfg.key;
                             }
                             scf(migrateCfg(merged));
+                        }
+                        if (r.errs.length > 0) {
+                            snotify('warn', '存档导入', '已自动修复 ' + r.errs.length + ' 处字段缺失');
+                            tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
                         }
                         rbt();
                         upui();
@@ -6329,17 +6952,22 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         clueSb.classList.add('open');
                     }
                     const s = gst();
-                    const clueCount = (s.clues && s.clues.length) ? s.clues.length : 0;
+                    const rawClues = (s.clues && s.clues.length) ? s.clues.slice() : [];
+                    const clueCount = rawClues.length;
                     if (clueCount === 0) {
-                        tst('暂无线索，去探索世界发现更多真相吧');
+                        // 无线索：仅底部提示，不发送到AI也不写日志
+                        tst('目前没有线索，去探索世界发现更多真相吧');
                     } else {
-                        tst('已展开 ' + clueCount + ' 条线索便签');
-                    }
-                    // Send clue context to AI for narrative review and potential updates
-                    if (!busy && !idleLocked) {
-                        const clues = (s.clues || []).slice(-5).join('；');
-                        const reviewMsg = '回顾当前线索：' + (clues || '暂无') + '。请结合之前的剧情，梳理这些线索的关联和可能的含义，如有新的发现请添加线索标签。';
-                        hin(reviewMsg);
+                        // 有线索：输出到系统日志，不经过玩家气泡/AI叙事流
+                        const sortedClues = rawClues
+                            .map(c => (typeof c === 'string' ? { text: c, priority: 2 } : c))
+                            .sort((a, b) => (a.priority || 2) - (b.priority || 2));
+                        const pLabel = { 1: '[高]', 2: '[中]', 3: '[低]' };
+                        const logBody = sortedClues
+                            .map((c, i) => (i + 1) + '. ' + (pLabel[c.priority || 2] || '[中]') + ' ' + (c.text || String(c)))
+                            .join('\n');
+                        addLogEntry('clue', '【线索回顾】共' + clueCount + '条线索\n' + logBody);
+                        tst('已汇总 ' + clueCount + ' 条线索，详见系统日志（侧边栏面板）');
                     }
                 }
                 else if (!busy && !idleLocked) hin(b.dataset.action);
@@ -6413,10 +7041,61 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             });
 
             // Stop idle when page unload
-            window.addEventListener('beforeunload', () => { stopIdle(); });
+            window.addEventListener('beforeunload', () => {
+                stopIdle();
+                // 最后一次强制保存所有关键状态（防止异步save未完成）
+                try {
+                    if (hist && hist.length) svh(hist);
+                    if (sta) sst(sta);
+                    if (chr) sch(chr);
+                    if (clk) sclk(clk);
+                    if (typeof gsv === 'function' && typeof ssv === 'function') {
+                        // 同步auto-save slot
+                        try {
+                            const cs = gsv() || {};
+                            const cc = cfg();
+                            let cleanCfg = {};
+                            for (const [k, v] of Object.entries(cc)) {
+                                if (typeof v === 'string' && /api.*key|sk-/i.test(k) && (!v || v.length < 4)) continue;
+                                try { cleanCfg[k] = JSON.parse(JSON.stringify(v)); } catch { cleanCfg[k] = v; }
+                            }
+                            cs['auto'] = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), cfg: cleanCfg, tm: Date.now() };
+                            ssv(cs);
+                        } catch(e) {}
+                    }
+                } catch(e) {}
+            });
+
+            window.addEventListener('error', function(ev) {
+                try {
+                    if (typeof busy !== 'undefined' && busy) {
+                        busy = false;
+                        if ($('btnSend')) $('btnSend').disabled = idleLocked || false;
+                        if ($('inputText')) $('inputText').classList.remove('busy');
+                    }
+                    if (typeof snotifyEndBatch === 'function') snotifyEndBatch();
+                    if (typeof snotify === 'function') snotify('danger', '运行时错误', (ev.message || '未知错误').slice(0, 40));
+                } catch(e) {}
+                console.warn('[GlobalError]', ev.message, 'at', ev.filename, ev.lineno);
+            }, true);
 
             // ===== Init =====
             (function() {
+                if (!document.getElementById('emojiFallbackStyle_inline')) {
+                    const st3 = document.createElement('style');
+                    st3.id = 'emojiFallbackStyle_inline';
+                    st3.textContent = [
+                        '.emoji-icon { display:inline-block; min-width:1.1em; text-align:center; font-style:normal; }',
+                        '@supports not (font-variant-emoji: text) {',
+                        '  .emoji-icon { font-family: "Segoe UI Emoji","Noto Color Emoji","Apple Color Emoji",sans-serif; }',
+                        '}',
+                        '.equip-slot__icon, .slot-sel-grid .equip-slot__icon {',
+                        '  display:inline-block; width:1.1em; text-align:center; margin-right:2px;',
+                        '  font-family:"Segoe UI Emoji","Noto Color Emoji","Apple Color Emoji",sans-serif;',
+                        '}'
+                    ].join('\n');
+                    document.head.appendChild(st3);
+                }
                 ath(localStorage.getItem(K.THM) || 'light');
                 afs(cfg().fsz);
                 // CRITICAL: Snapshot the API key from localStorage BEFORE any save-loading might interfere
@@ -6482,34 +7161,29 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 }
                 let loadedFromSave = false;
                 if (autoData && autoData.hi && autoData.hi.length) {
-                    hist = JSON.parse(JSON.stringify(autoData.hi));
-                    if (autoData.st) { const merged = { ...DSTA, ...autoData.st }; sst(JSON.parse(JSON.stringify(merged))); }
-                    if (autoData.ch) { const merged = { ...DCHR, ...autoData.ch }; sch(JSON.parse(JSON.stringify(merged))); }
-                    if (autoData.clk) { const merged = { ...DCLK, ...autoData.clk }; sclk(JSON.parse(JSON.stringify(merged))); }
-                    if (autoData.sbx) { sbx = mergeSbx(JSON.parse(JSON.stringify(autoData.sbx))); ssbx(sbx); }
-                    if (autoData.cfg) {
-                        // Merge save config: ALWAYS preserve current (localStorage) values when they exist.
-                        // Saved cfg is only used to fill in missing fields. This prevents the API key
-                        // from being overwritten when the save has been written with an empty key value
-                        // (e.g. from a legacy auto-save or a save created before user configured API).
+                    const r = validateSaveData(autoData, false);
+                    hist = r.recovered.hi.slice();
+                    sst(r.recovered.st);
+                    sch(r.recovered.ch);
+                    sclk(r.recovered.clk);
+                    if (r.recovered.sbx) { sbx = mergeSbx(r.recovered.sbx); ssbx(sbx); }
+                    if (r.recovered.cfg) {
                         const curCfg = cfg();
                         const merged = { ...curCfg };
-                        Object.keys(autoData.cfg).forEach(k => {
-                            const sv = autoData.cfg[k];
+                        Object.keys(r.recovered.cfg).forEach(k => {
+                            const sv = r.recovered.cfg[k];
                             const cv = curCfg[k];
-                            // Skip empty / invalid values in the save (defensive against legacy data)
                             if (sv === '' || sv === null || sv === undefined) return;
-                            // If the current value is also empty, adopt the saved value
                             if (cv === '' || cv === null || cv === undefined) {
                                 merged[k] = sv;
                             }
-                            // Otherwise keep the current value — it is more recent / actively configured
                         });
-                        // Extra safety: NEVER clear the API key during merge
                         if (!merged.key && curCfg.key) merged.key = curCfg.key;
-                        // ULTIMATE fallback: restore from the snapshot taken at page load
                         if (!merged.key && _persistedKey) merged.key = _persistedKey;
                         scf(merged);
+                    }
+                    if (r.errs.length > 0) {
+                        tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
                     }
                     loadedFromSave = true;
                 }
@@ -6624,6 +7298,18 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         }
                     } catch {}
                 });
+                // 启动恢复: 刷新页面前未消费的通知队列
+                try {
+                    const raw = sessionStorage.getItem('vn_notifyQueue');
+                    if (raw) {
+                        const arr = JSON.parse(raw);
+                        if (Array.isArray(arr) && arr.length) {
+                            notifyQueue = notifyQueue.concat(arr.filter(x => x && x.type));
+                            if (notifyQueue.length && !notifyBusy) processNotifyQueue();
+                            sessionStorage.removeItem('vn_notifyQueue');
+                        }
+                    }
+                } catch(e) {}
             })();
         })();
     (function() {
@@ -7198,159 +7884,9 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             }
         }
 
-        // ===== 5. NPC 交互深度 =====
-        const NPC_DATA = {
-            '老张': { 
-                trust: 30, affinity: 50, personality: '谨慎内敛', occupation: '退役军人', 
-                age: 58, gender: '男', health: '左腿有旧伤，阴雨天会疼',
-                dialogue: { 
-                    low: '他斜眼扫了你一下，指节轻轻叩着膝头的旧步枪，半晌才吐出一句："有事快说，我没工夫闲聊。"', 
-                    mid: '沉默地点燃一支烟，深吸一口后缓缓开口："你这人……还不算讨厌。有什么打算，说说看。"', 
-                    high: '粗糙的手掌重重拍在你肩上，眼中闪过一丝难得的柔软："丫头/小子，我这条老命不值钱，但你要是敢丢下我……我做鬼也不放过你。"' 
-                },
-                gifts: ['老白干', '军粮压缩饼干', '陈年香烟'], unlockLevel: 60, 
-                backstory: '参加过两次边境冲突的侦察连老兵，左腿在一次伏击中被炸伤留下残疾。退役后在郊区开了个修车铺，老伴走得早，唯一的儿子在外地当兵至今音讯全无。腰间总别着一把磨得发亮的军刺，说是老班长留的。' 
-            },
-            '莉莉': { 
-                trust: 40, affinity: 60, personality: '外柔内刚', occupation: 'ICU护士', 
-                age: 29, gender: '女', health: '轻度贫血，长期睡眠不足',
-                dialogue: { 
-                    low: '她正低头整理药箱，听见脚步声抬起头，嘴角扯出一个疲惫却礼貌的弧度："你好，需要处理伤口吗？我这里还有些碘伏。"', 
-                    mid: '见你走近，她放下了手里的注射器，指尖在白大褂下摆无意识地绞了两下："你又来了……今天带了什么消息吗？外面的情况……有没有好一点？"', 
-                    high: '眼眶红了红，却倔强地别过脸去擦了擦，再转回来时已经带着笑意，声音却有些哽咽："说好的，我们都要活下去。等这一切结束……我请你喝我最拿手的珍珠奶茶。"' 
-                },
-                gifts: ['医用棉片', '维生素片', '手工曲奇'], unlockLevel: 70, 
-                backstory: '市立医院ICU的资深护士，从业七年，见过太多生死。灾难爆发的那个夜晚她正在值大夜班，眼睁睁看着同事和病人一个个倒下变异，最后只带着一个急救箱从消防通道逃了出来。左手腕上一直戴着一条已经褪色的粉色手绳，那是她刚上小学的女儿给她编的。' 
-            },
-            '陈默': { 
-                trust: 50, affinity: 70, personality: '寡言深情', occupation: '航空航天工程师', 
-                age: 44, gender: '男', health: '高血压，需长期服药',
-                dialogue: { 
-                    low: '他头也不抬地拧着螺丝，焊枪的蓝光照在脸上忽明忽暗，只有喉咙里发出一声短促的："嗯。"算是打过招呼。', 
-                    mid: '放下了手中的电烙铁，从抽屉里摸出一张泛黄的照片看了一眼又迅速收好，声音低沉："你上次提的那个发电装置……我画了草图。要看看吗？"', 
-                    high: '沉默了很久，才将一个用布层层包裹的小盒子递到你手里，里面是一个做工精致的八音盒："丫丫……我女儿，她最喜欢这个旋律。你替我……好好收着。"' 
-                },
-                gifts: ['精密螺丝刀套装', '万用表', '进口锂电池'], unlockLevel: 80, 
-                backstory: '国家级研究所的骨干工程师，曾参与多项载人航天项目。灾难爆发时他正在外地开研讨会，等他赶回家时，只在废墟里找到了女儿最喜欢的兔子玩偶和妻子的结婚戒指。从此把自己关在废弃工厂里没日没夜地做东西，说是要给女儿造一个"不会被怪物破坏的家"。' 
-            },
-            '苏梅': { 
-                trust: 20, affinity: 35, personality: '敏感多疑', occupation: '高级财务经理', 
-                age: 36, gender: '女', health: '神经性胃炎，营养不良',
-                dialogue: { 
-                    low: '她立刻后退两步，手本能地摸向身后藏着的美工刀，眼神锐利得像刀子："别靠近。你再走一步，别怪我不客气。"', 
-                    mid: '确认你没有威胁后，她的肩膀稍稍放松了一些，但手指仍紧紧攥着包带："……你想要什么？物资的话，只接受以物易物，我不相信口头承诺。"', 
-                    high: '她犹豫了很久，才从贴身口袋里摸出一张皱巴巴的全家福，指尖轻轻摩挲着照片上男人和孩子的脸，声音低得像呢喃："我以前……不信任何人。但你不一样。答应我，别让我后悔。"' 
-                },
-                gifts: ['真丝丝巾', '未拆封香水', '银行卡包'], unlockLevel: 75, 
-                backstory: '四大会计师事务所出身，三十岁就当上了某上市公司财务总监。灾难前一周刚把一笔巨额资金转到海外账户准备全家移民，结果第二天世界就变了。逃跑时被"幸存者"抢劫，所有值钱的东西都被拿走，只剩下丈夫送她的订婚戒指藏在鞋底。从此不再相信任何人，尤其是男人。' 
-            },
-            '大刘': { 
-                trust: 35, affinity: 55, personality: '外粗内细', occupation: '重案组刑警', 
-                age: 41, gender: '男', health: '右肩中过枪，阴天会酸',
-                dialogue: { 
-                    low: '蒲扇大的手按住了腰间的枪套，浓眉拧成一团，上上下下地打量你："你这脸生得很啊……哪个区混的？老老实实说，别跟老子耍花腔。"', 
-                    mid: '豪爽地一巴掌拍在你背上，差点把你拍个趔趄，另一只手递过来一罐还没开的啤酒："哈哈！对老子胃口！走，喝两杯去！有什么事，酒桌上说！"', 
-                    high: '眼眶通红却死撑着不肯掉眼泪，举起酒碗跟你重重一碰，酒水洒了一身："兄弟！这辈子认你了！以后你的事就是老子的事！谁敢动你，我先崩了他！"' 
-                },
-                gifts: ['陈年老白干', '酱牛肉', '自卷旱烟'], unlockLevel: 65, 
-                backstory: '从警十八年的老刑警，破过上百起大案要案，手上的枪比他自己的儿子还亲。妻子在他蹲点抓逃犯时难产去世，孩子没能保住。从此把警队当家，把搭档当兄弟，却在一次行动中亲手击毙了叛变的搭档，心里留下了一道坎，申请调去了档案室直到退休。' 
-            },
-            '王金贵': { 
-                trust: 10, affinity: 20, personality: '精明市侩', occupation: '连锁超市老板', 
-                age: 52, gender: '男', health: '糖尿病，需注射胰岛素',
-                dialogue: { 
-                    low: '小眼睛滴溜溜地在你身上扫，算盘珠子在他手里噼里啪啦响个不停："买东西就挑，不买走人。小店小本经营，概不赊账，只收硬通货——烟、酒、药、子弹。"', 
-                    mid: '见你是回头客，脸上终于挤出了几分真心实意的笑，压低声音凑过来："看你是个实在人，老哥我给你透个底——昨天刚到一批好货，搁别人我都不拿出来。价格嘛……好说。"', 
-                    high: '难得地叹了口气，从柜台底下摸出两瓶好酒扔给你，不再提钱的事："钱是王八蛋，没了再赚。这年头……能找个说得上话的人不容易。以后有难处，尽管来找老哥。"' 
-                },
-                gifts: ['进口巧克力', '古巴雪茄', '精装白酒'], unlockLevel: 72, 
-                backstory: '从摆地摊卖袜子起家，三十年做到全市拥有十二家连锁超市的"王半城"。这辈子什么都不信，除了钱。灾难爆发时躲在超市地下冷库里，靠着满仓物资活了下来，却眼睁睁看着糖尿病的老伴因为胰岛素被抢而死。从此把每一件物资都看得比命重，但夜深人静时总对着老伴的照片自言自语。' 
-            },
-            '林晓芳': { 
-                trust: 25, affinity: 48, personality: '倔强不服输', occupation: '临床医学院学生', 
-                age: 22, gender: '女', health: '轻微哮喘，需随身携带气雾剂',
-                dialogue: { 
-                    low: '她紧紧抱着怀里的医学课本，后背贴着墙角，像只受惊的小猫，声音却刻意装得很镇定："我……我没什么值钱的东西。你要找食物的话，去别的地方吧。"', 
-                    mid: '发现你没有恶意，她怯生生地从包里摸出一颗橘子糖递过来，脸颊微红："那个……谢谢你上次帮我赶走那些人。这是我最后一颗糖了，很甜的。"', 
-                    high: '鼓起勇气拉住你的衣角，眼眶里闪着泪光却强忍着不掉下来："学长/学姐……我爸妈和老师都不在了。我只剩你了。以后我什么都听你的，你……你别丢下我好不好？"' 
-                },
-                gifts: ['手写医学笔记', '水果硬糖', '毛绒钥匙扣'], unlockLevel: 60, 
-                backstory: '医科大学临床专业大三学生，刚上完系统解剖学就赶上了灾难。从小是温室里长大的乖乖女，父母都是中学老师，灾难当天为了让她逃跑而双双遇害。她怀里至今抱着那本系统解剖学课本，说那是爸爸送她的十八岁生日礼物，不能丢。虽然看起来很柔弱，但为了活下去，什么都愿意学。' 
-            },
-            '陈志远': { 
-                trust: 48, affinity: 52, personality: '理性克制', occupation: '心脏外科主任', 
-                age: 50, gender: '男', health: '慢性冠心病',
-                dialogue: { 
-                    low: '他头也不抬地继续缝合着伤口，手术刀在手里稳得像天平，只扔下一句："外伤去那边等，心脏问题的话，先把病历给我。没病历的话，先说症状。"', 
-                    mid: '摘下手术手套扔进医疗废物桶，用消毒水反复洗了三遍手，才在你对面坐下，语气缓和了些："你的气色比上次好多了。看来上次开的药起作用了。说说看，最近饮食怎么样？"', 
-                    high: '罕见地摘下了金丝眼镜，用白大褂下摆擦了擦镜片，声音里带着一丝不易察觉的颤抖："我这双手……救过三千多条人命，却救不了自己的妻子和儿子。你能活着……很好。替他们，也替我，好好活下去。"' 
-                },
-                gifts: ['进口支架', '白蛋白', '专业手术器械'], unlockLevel: 78, 
-                backstory: '国内顶尖的心外科专家，曾主刀过三千多台心脏手术，号称"陈一刀"。灾难发生时正在做一台紧急手术，整台手术团队只有他和一个护士活了下来。妻子是同院的儿科医生，为了保护住院的孩子被丧尸围攻牺牲；儿子当时正读高三，失联至今。他活下来的唯一信念，就是找到儿子，或者……确认他的下落。' 
-            },
-            '铁头': { 
-                trust: 5, affinity: 15, personality: '残暴多疑', occupation: '掠夺者首领', 
-                age: 34, gender: '男', health: '浑身旧伤，右耳少了一块',
-                dialogue: { 
-                    low: '手里的开山刀一下下剁着旁边的木桌，木屑飞溅，三角眼里透着凶光："你他妈哪根葱？敢闯老子的地盘？留条胳膊就滚，不然——"', 
-                    mid: '吐了口带血的浓痰，把刀扛在肩上，语气稍微收敛了些："上次的事……算你狠。这次带了什么孝敬老子？要是够分量，咱以前的账就一笔勾销。"', 
-                    high: '突然仰天大笑，上前用力揽住你的肩膀，力气大得像要把骨头捏碎："哈哈哈哈！好！够狠够黑！我铁头这辈子没服过谁，你是第一个！以后咱兄弟俩联手，这一片的地盘……一人一半！"' 
-                },
-                gifts: ['走私金条', '散装白酒', '外国香烟'], unlockLevel: 90, 
-                backstory: '原名赵铁柱，从小在农村被欺负大，十五岁就捅了人跑到城里混社会。从工地小工做到小包工头，后来越走越歪，拉起了一支二十几号人的队伍靠收保护费过活。灾难爆发当天他就觉得"天助我也"，第一个冲进超市打砸抢，手上沾了至少五十条幸存者的血。唯一的软肋是他乡下的老娘，他把老娘藏在一个谁也不知道的地方。' 
-            },
-            '赵寡妇': {
-                trust: 18, affinity: 28, personality: '泼辣精明', occupation: '夜市小吃摊主',
-                age: 45, gender: '女', health: '腰间盘突出',
-                dialogue: {
-                    low: '她手里的大炒勺往铁锅上"哐当"一砸，横眉竖眼："看啥看？想吃东西就掏钱，没钱就滚蛋，别耽误老娘做生意！"',
-                    mid: '见你出手大方，她脸上的横肉松了松，抄起勺子盛了满满一碗："哎哟大兄弟/妹子，早说嘛！来，尝尝大姐我这手艺，正宗川菜，包你吃了还想！"',
-                    high: '深夜收摊时，她悄悄塞给你一个还热乎的肉包子，眼眶有些发红："好久没见着你这么实在的人了……这世道，好人不多了。以后到大姐这儿，管够。"'
-                },
-                gifts: ['老干妈辣酱', '腌腊肉', '手工包子'], unlockLevel: 68,
-                backstory: '男人十年前在工地摔死了，她一个人拉扯大了一儿一女，在夜市摆了十年的炒饭摊，什么样的地痞流氓都见过。儿子去年刚考上大学去了外地，女儿才读初中，灾难发生时被她藏进了下水道。她每天冒着危险出去找食物，就为了让女儿能多长一寸肉。'
-            },
-            '阿彬': {
-                trust: 12, affinity: 22, personality: '机灵油滑', occupation: '街头小偷',
-                age: 19, gender: '男', health: '营养不良，瘦得像猴子',
-                dialogue: {
-                    low: '他像条泥鳅一样从你身边溜过去，转眼就消失在巷子里，只留下一句远远飘来的："嘿！谢了啊大哥/大姐，你的钱包我先借两天用用！"',
-                    mid: '他挠着后脑勺从垃圾桶后面钻出来，脸上带着讨好的笑，手里还攥着你上次丢的打火机："嘿嘿……哥/姐，我把东西还给你，你别报警……不是，你别打我行不行？我知道哪儿有藏的物资，我带你去！"',
-                    high: '他突然跪在你面前，"咚咚咚"磕了三个响头，脸上全是泪："哥/姐！我长这么大，从来没人对我这么好过！我这条命以后就是你的！上刀山下油锅，我阿彬要是皱一下眉头，我就是你孙子！"'
-                },
-                gifts: ['偷来的打火机', '半包好烟', '捡到的金项链'], unlockLevel: 62,
-                backstory: '生下来就没见过爹妈，在福利院待到十二岁就跑出来混社会了，偷鸡摸狗什么都干过，就是没干过正经事。最擅长的就是摸钱包和钻狗洞，整个旧城旮旮旯旯就没有他找不到的路。看起来油滑不靠谱，其实心里比谁都明白，谁对他好，他能记一辈子。'
-            },
-            '周老师': {
-                trust: 42, affinity: 62, personality: '温文尔雅', occupation: '退休历史教授',
-                age: 68, gender: '男', health: '腿脚不便，需拄拐杖',
-                dialogue: {
-                    low: '他缓缓抬起头，老花镜滑到了鼻尖上，上下打量了你许久才慢悠悠开口："年轻人，找老朽有何贵干？若是想要书，架子上的……但请自取，不要伤了书页。"',
-                    mid: '他放下了手中的线装书，给你倒了一杯粗茶，手指在泛黄的书页上轻轻划过："这些书……我守了一辈子。若是你能让它们……传下去，就都拿去吧。"',
-                    high: '他从怀里取出一个用绸子包了三层的小匣子，郑重地交到你手里，里面是一枚校徽和一本手写的诗稿："这是我毕生的心血。老朽这把年纪怕是活不长了，这些……就托付给你了。"'
-                },
-                gifts: ['古籍善本', '文房四宝', '陈年普洱'], unlockLevel: 72,
-                backstory: '某知名大学历史系教授，专攻宋史，退休后著书立说，一生桃李满天下。老伴走得早，儿子定居国外，他一个人守着一屋子的古籍过日子。灾难爆发后，别的什么都没拿，就推着一辆小推车，把他最珍贵的三万册书一本一本搬到了废弃的图书馆里，说"书在，人在"。'
-            }
-        };
-
-        const NPC_RELATIONSHIPS = [
-            { from: '老张', to: '大刘', type: '忘年交', level: 75 },
-            { from: '莉莉', to: '陈志远', type: '师徒', level: 85 },
-            { from: '陈默', to: '老张', type: '前同事', level: 45 },
-            { from: '大刘', to: '陈默', type: '酒友', level: 55 },
-            { from: '林晓芳', to: '陈志远', type: '师生', level: 80 },
-            { from: '林晓芳', to: '莉莉', type: '闺蜜', level: 70 },
-            { from: '王金贵', to: '铁头', type: '暗中交易', level: 35 },
-            { from: '大刘', to: '铁头', type: '死对头', level: 5 },
-            { from: '苏梅', to: '王金贵', type: '债主', level: 25 },
-            { from: '赵寡妇', to: '王金贵', type: '邻居', level: 40 },
-            { from: '阿彬', to: '赵寡妇', type: '接济关系', level: 60 },
-            { from: '周老师', to: '林晓芳', type: '隔代亲', level: 55 },
-            { from: '陈志远', to: '周老师', type: '旧识', level: 48 },
-            { from: '陈默', to: '阿彬', type: '师徒', level: 62 },
-            { from: '苏梅', to: '莉莉', type: '室友', level: 30 }
-        ];
+        // ===== 5. NPC 交互深度（数据已迁移至 js/npc_data.js） =====
+        const NPC_DATA = window.NPC_DATA || {};
+        const NPC_RELATIONSHIPS = window.NPC_RELATIONSHIPS || [];
 
         function addNpcRelationship(name, trustDelta) {
             if (!NPC_DATA[name]) return;
@@ -7577,6 +8113,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             logEntries.push({ type: type, text: text, chapter: chapterId || 0, time: Date.now() });
             if (logEntries.length > 500) logEntries.shift();
         }
+        window.addLogEntry = addLogEntry;
         function addBookmark(text, note) {
             logBookmarks.push({ id: Date.now(), text: text, note: note || '', time: Date.now() });
             if (logBookmarks.length > 30) logBookmarks.shift();
@@ -7861,20 +8398,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
         }
 
         // ===== 9. 成就系统 =====
-        const ACHIEVEMENTS = [
-            { id: 'first_blood', name: '初露锋芒', desc: '首次击倒敌人', icon: '⚔️', check: () => { const s = gst(); return s.totalKills >= 1; } },
-            { id: 'survivor_3', name: '三日幸存者', desc: '存活3天', icon: '🌅', check: () => { const c = gclk(); return c.day >= 3; } },
-            { id: 'survivor_7', name: '一周幸存者', desc: '存活7天', icon: '🏆', check: () => { const c = gclk(); return c.day >= 7; } },
-            { id: 'survivor_30', name: '月度幸存者', desc: '存活30天', icon: '👑', check: () => { const c = gclk(); return c.day >= 30; } },
-            { id: 'first_craft', name: '手艺初成', desc: '首次成功合成', icon: '🔨', check: () => { const s = gst(); return (s.crafts || 0) >= 1; } },
-            { id: 'craft_master', name: '制造大师', desc: '累计合成10件物品', icon: '⚒️', check: () => { const s = gst(); return (s.crafts || 0) >= 10; } },
-            { id: 'collector', name: '收藏家', desc: '收集20种不同物品', icon: '📦', check: () => { const s = gst(); return new Set((s.inv || []).map(i => i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim())).size >= 20; } },
-            { id: 'explorer', name: '探索者', desc: '解锁10个地点', icon: '🗺️', check: () => { const s = gst(); return (s.mapUnlock || []).length >= 10; } },
-            { id: 'peacemaker', name: '调解者', desc: '建立2个以上NPC的信任关系', icon: '🤝', check: () => { const count = Object.values(NPC_DATA).filter(n => n.trust >= 50).length; return count >= 2; } },
-            { id: 'badass', name: '狠角色', desc: '击杀10名敌人', icon: '💀', check: () => { const s = gst(); return (s.totalKills || 0) >= 10; } },
-            { id: 'hardcore', name: '硬核玩家', desc: '存活且从未感染', icon: '🔥', check: () => { const s = gst(); return (s.infection || 0) === 0 && gclk().day >= 5; } },
-            { id: 'gear_head', name: '装备达人', desc: '同时装备4件物品', icon: '🛡️', check: () => { const s = gst(); const eq = s.equip; if (!eq) return false; return Object.values(eq).filter(v => v && v.trim()).length >= 4; } }
-        ];
+        // 成就数据已迁移至 js/achievements.js
+        const ACHIEVEMENTS = window.ACHIEVEMENTS || [];
         const ACH_KEY = 'vn_achievements';
         const unlockedAchievements = new Set();
         // 从localStorage加载已解锁成就，避免刷新后重复弹出
@@ -7925,6 +8450,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             eventDisplayLog.unshift({ type, text, time: fmtTime(clk.elapsedSec) + ' D' + (clk.day || 1) });
             if (eventDisplayLog.length > 50) eventDisplayLog.pop();
         }
+        window.logEvent = logEvent;
         // 渲染事件面板
         function renderEventsPanel() {
             const list = $('eventsList');
@@ -7946,37 +8472,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
         setInterval(checkAchievements, 15000);
 
         // ===== 突发事件系统 =====
-        const EVENT_TRIGGERS = {
-            onLowHealth: (s) => {
-                if (s.hp < 30 && Math.random() < 0.3) {
-                    snotify('status', '警告', '生命值偏低！');
-                    logEvent('warning', '生命值偏低！');
-                    addLogEntry('event', '事件：生命危机');
-                }
-            },
-            onLowHunger: (s) => {
-                if (s.hunger < 20 && Math.random() < 0.4) {
-                    snotify('status', '警告', '饥饿难耐！');
-                    logEvent('warning', '饥饿难耐！');
-                    addLogEntry('event', '事件：严重饥饿');
-                }
-            },
-            onNightfall: (clk) => {
-                if (clk && clk.elapsedSec && (clk.elapsedSec % 86400 > 64800) && (clk.elapsedSec % 86400 < 72000)) {
-                    if (Math.random() < 0.15) {
-                        snotify('info', '夜晚', '夜幕降临，注意安全');
-                        logEvent('info', '夜幕降临，注意安全');
-                    }
-                }
-            },
-            onZombieThreat: (s) => {
-                if (s.hp < 50 && s.infection > 30 && Math.random() < 0.2) {
-                    snotify('danger', '威胁', '尸群正在逼近！');
-                    logEvent('danger', '尸群正在逼近！');
-                    addLogEntry('event', '事件：尸群逼近');
-                }
-            }
-        };
+        // 事件触发器数据已迁移至 js/events.js
+        const EVENT_TRIGGERS = window.EVENT_TRIGGERS || {};
 
         function checkRandomEvents() {
             const s = gst();
@@ -8509,9 +9006,17 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
         let eventTimer = null, npcTimer = null;
         // Reset log counter at the start of each AI turn (called by hin())
         window._resetPaiLog = function() { lastLoggedBubbleCount = 0; };
+        // TurnId 机制：防止 AI 随机事件/ NPC 相遇跨回合触发
+        let _currentTurnId = 0;
+        window._paiSetTurn = function(tid) { _currentTurnId = tid; };
+        window._paiGetTurn = function() { return _currentTurnId; };
+        window._paiClearEventTimers = function() {
+            if (eventTimer) { clearTimeout(eventTimer); eventTimer = null; }
+            if (npcTimer) { clearTimeout(npcTimer); npcTimer = null; }
+        };
         if (origPai) {
-            window.pai = function(raw) {
-                const bubbles = origPai(raw);
+            window.pai = function(raw, silent) {
+                const bubbles = origPai(raw, silent);
                 if (bubbles && bubbles.length) {
                     // Only log NEW bubbles (avoids duplicate logging during streaming mode
                     // where pai() is called repeatedly with growing `raw`)
@@ -8524,17 +9029,19 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     lastLoggedBubbleCount = bubbles.length;
                     // Debounce random event & NPC encounter triggers so streaming mode
                     // (which calls pai() many times) only fires them once per AI turn.
-                    if (eventTimer) clearTimeout(eventTimer);
+                    let _lastEventTurnId = window._paiGetTurn();
+                    clearTimeout(eventTimer);
                     eventTimer = setTimeout(() => {
-                        if (Math.random() < 0.3) triggerRandomEvent();
+                        if (window._paiGetTurn() !== _lastEventTurnId || Math.random() >= 0.3) return;
+                        triggerRandomEvent();
                         eventTimer = null;
                     }, 2000);
-                    if (npcTimer) clearTimeout(npcTimer);
+                    const _lastNpcTurnId = window._paiGetTurn();
+                    clearTimeout(npcTimer);
                     npcTimer = setTimeout(() => {
-                        if (Math.random() < 0.15) {
-                            const enc = triggerNpcEncounter();
-                            if (enc) addLogEntry('npc_encounter', '遇到' + enc.name);
-                        }
+                        if (window._paiGetTurn() !== _lastNpcTurnId || Math.random() >= 0.15) return;
+                        const enc = triggerNpcEncounter();
+                        if (enc) addLogEntry('npc_encounter', '遇到' + enc.name);
                         npcTimer = null;
                     }, 2500);
                 }
@@ -8583,121 +9090,3 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
 
     })();
 
-// ===== 代理请求配置持久化（独立localStorage） =====
-const PROXY_CFG_KEY = 'dz_proxy_req_cfg';
-
-function showProxyCfgStatus(message, type = 'success') {
-    const statusEl = document.getElementById('proxyCfgStatus');
-    if (!statusEl) return;
-    statusEl.textContent = message;
-    statusEl.style.display = 'block';
-    statusEl.style.color = type === 'error' ? 'var(--color-danger)' : 
-                          type === 'info' ? 'var(--ink-light)' : 'var(--color-success)';
-    setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-}
-
-function loadProxyReqConfig() {
-    try {
-        const saved = localStorage.getItem(PROXY_CFG_KEY);
-        if (!saved) return;
-        const config = JSON.parse(saved);
-        if (config.targetUrl !== undefined) { const el = document.getElementById('proxyTargetUrl'); if (el) el.value = config.targetUrl; }
-        if (config.method !== undefined) { const el = document.getElementById('proxyMethod'); if (el) el.value = config.method; }
-        if (config.body !== undefined) { const el = document.getElementById('proxyBody'); if (el) el.value = config.body; }
-        if (config.headers !== undefined) { const el = document.getElementById('proxyHeaders'); if (el) el.value = config.headers; }
-        showProxyCfgStatus('✓ 已加载历史配置', 'info');
-    } catch (e) {
-        console.warn('加载代理请求配置失败:', e.message);
-        try { localStorage.removeItem(PROXY_CFG_KEY); } catch {}
-    }
-}
-
-function saveProxyReqConfig() {
-    try {
-        const config = {
-            targetUrl: (document.getElementById('proxyTargetUrl')?.value.trim()) || '',
-            method: (document.getElementById('proxyMethod')?.value) || 'POST',
-            body: (document.getElementById('proxyBody')?.value.trim()) || '',
-            headers: (document.getElementById('proxyHeaders')?.value.trim()) || ''
-        };
-        if (config.body) { try { JSON.parse(config.body); } catch { showProxyCfgStatus('⚠ 请求Body不是有效的JSON格式', 'error'); return; } }
-        if (config.headers) { try { JSON.parse(config.headers); } catch { showProxyCfgStatus('⚠ 请求头不是有效的JSON格式', 'error'); return; } }
-        localStorage.setItem(PROXY_CFG_KEY, JSON.stringify(config));
-        showProxyCfgStatus('✓ 配置已保存', 'success');
-    } catch (e) {
-        console.error('保存代理请求配置失败:', e.message);
-        showProxyCfgStatus('保存失败: ' + e.message, 'error');
-    }
-}
-
-function clearProxyReqConfig() {
-    try {
-        localStorage.removeItem(PROXY_CFG_KEY);
-        const els = ['proxyTargetUrl', 'proxyBody', 'proxyHeaders'];
-        els.forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-        const methodEl = document.getElementById('proxyMethod'); if (methodEl) methodEl.value = 'POST';
-        showProxyCfgStatus('✓ 配置已清空', 'info');
-    } catch (e) {
-        console.error('清空代理请求配置失败:', e.message);
-        showProxyCfgStatus('清空失败: ' + e.message, 'error');
-    }
-}
-
-async function testProxyRequest() {
-    const targetUrl = document.getElementById('proxyTargetUrl')?.value.trim() || '';
-    if (!targetUrl) { showProxyCfgStatus('⚠ 请先填写目标接口地址', 'error'); return; }
-    const method = document.getElementById('proxyMethod')?.value || 'POST';
-    const bodyStr = document.getElementById('proxyBody')?.value.trim() || '';
-    const headersStr = document.getElementById('proxyHeaders')?.value.trim() || '';
-    
-    let bodyObj = null;
-    let headersObj = {};
-    
-    if (bodyStr) { try { bodyObj = JSON.parse(bodyStr); } catch { showProxyCfgStatus('⚠ 请求Body不是有效的JSON格式', 'error'); return; } }
-    if (headersStr) { try { headersObj = JSON.parse(headersStr); } catch { showProxyCfgStatus('⚠ 请求头不是有效的JSON格式', 'error'); return; } }
-    
-    showProxyCfgStatus('⏳ 正在发送测试请求...', 'info');
-    try {
-        const cfgFn = typeof window.cfg === 'function' ? window.cfg : null;
-        const cfg = cfgFn ? cfgFn() : { useProxy: false };
-        let response;
-        if (cfg.useProxy && cfg.proxyUrl) {
-            response = await window._sendProxyRequest(targetUrl, bodyObj || {}, cfg.key || 'test', null, false);
-        } else {
-            response = await fetch(targetUrl, {
-                method: method,
-                headers: { 'Content-Type': 'application/json', ...headersObj },
-                body: method === 'POST' && bodyObj ? JSON.stringify(bodyObj) : undefined
-            });
-        }
-        if (response.ok) { showProxyCfgStatus('✓ 测试请求成功 (HTTP ' + response.status + ')', 'success'); }
-        else {
-            let msg = '⚠ 请求失败 (HTTP ' + response.status + ')';
-            if (response.status === 401) msg = '⚠ 请求失败：认证失败，请检查API密钥';
-            else if (response.status === 403) msg = '⚠ 请求失败：访问被拒绝';
-            else if (response.status === 404) msg = '⚠ 请求失败：目标接口不存在';
-            else if (response.status === 429) msg = '⚠ 请求失败：请求过于频繁';
-            else if (response.status >= 500) msg = '⚠ 请求失败：目标服务器暂时不可用';
-            showProxyCfgStatus(msg, 'error');
-        }
-    } catch (e) {
-        showProxyCfgStatus('✗ 请求异常: ' + e.message, 'error');
-    }
-}
-
-// 暴露到全局
-window._loadProxyReqConfig = loadProxyReqConfig;
-window._saveProxyReqConfig = saveProxyReqConfig;
-window._clearProxyReqConfig = clearProxyReqConfig;
-window._testProxyRequest = testProxyRequest;
-
-// 绑定按钮事件
-document.addEventListener('DOMContentLoaded', () => {
-    const saveBtn = document.getElementById('btnSaveProxyCfg');
-    const clearBtn = document.getElementById('btnClearProxyCfg');
-    const testBtn = document.getElementById('btnTestProxyReq');
-    if (saveBtn) saveBtn.addEventListener('click', saveProxyReqConfig);
-    if (clearBtn) clearBtn.addEventListener('click', clearProxyReqConfig);
-    if (testBtn) testBtn.addEventListener('click', testProxyRequest);
-    loadProxyReqConfig();
-});
