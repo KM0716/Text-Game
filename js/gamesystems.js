@@ -20,7 +20,9 @@
     'hin','abold','migrateSta','migrateChr','migrateCfg','mergeSbx','ssbx','gsbx','ldh','ssv',
     'gsv','gsp','spBar','mentalityLabel','itemEmoji','fmtTime','dayPhase','seasonFromDay',
     'randWeather','randTemp','aiInitStats','fillCharModal','_getHist','_setHist','_getSbx','_setSbx',
-    'hasHover','initAutoBGM','bgmAutoSwitch','launchTutorial','toggleSfx'
+    'hasHover','initAutoBGM','bgmAutoSwitch','launchTutorial','toggleSfx',
+    'startClock','validateSaveData','hasCustomCharacter','buildItemTooltipHTML',
+    '_resetPaiLog','_paiSetTurn','_paiGetTurn','_paiClearEventTimers'
   ];
   fnDefaults.forEach(k => {
     if (typeof window[k] !== 'function') {
@@ -1667,9 +1669,17 @@
         let eventTimer = null, npcTimer = null;
         // Reset log counter at the start of each AI turn (called by hin())
         window._resetPaiLog = function() { lastLoggedBubbleCount = 0; };
+        // TurnId 机制：防止 AI 随机事件/ NPC 相遇跨回合触发
+        let _currentTurnId = 0;
+        window._paiSetTurn = function(tid) { _currentTurnId = tid; };
+        window._paiGetTurn = function() { return _currentTurnId; };
+        window._paiClearEventTimers = function() {
+            if (eventTimer) { clearTimeout(eventTimer); eventTimer = null; }
+            if (npcTimer) { clearTimeout(npcTimer); npcTimer = null; }
+        };
         if (origPai) {
-            window.pai = function(raw) {
-                const bubbles = origPai(raw);
+            window.pai = function(raw, silent) {
+                const bubbles = origPai(raw, silent);
                 if (bubbles && bubbles.length) {
                     // Only log NEW bubbles (avoids duplicate logging during streaming mode
                     // where pai() is called repeatedly with growing `raw`)
@@ -1682,17 +1692,25 @@
                     lastLoggedBubbleCount = bubbles.length;
                     // Debounce random event & NPC encounter triggers so streaming mode
                     // (which calls pai() many times) only fires them once per AI turn.
-                    if (eventTimer) clearTimeout(eventTimer);
+                    let _lastEventTurnId = window._paiGetTurn();
+                    clearTimeout(eventTimer);
                     eventTimer = setTimeout(() => {
-                        if (Math.random() < 0.3) triggerRandomEvent();
+                        if (window._paiGetTurn() !== _lastEventTurnId || Math.random() >= 0.3) {
+                            eventTimer = null;
+                            return;
+                        }
+                        triggerRandomEvent();
                         eventTimer = null;
                     }, 2000);
-                    if (npcTimer) clearTimeout(npcTimer);
+                    const _lastNpcTurnId = window._paiGetTurn();
+                    clearTimeout(npcTimer);
                     npcTimer = setTimeout(() => {
-                        if (Math.random() < 0.15) {
-                            const enc = triggerNpcEncounter();
-                            if (enc) addLogEntry('npc_encounter', '遇到' + enc.name);
+                        if (window._paiGetTurn() !== _lastNpcTurnId || Math.random() >= 0.15) {
+                            npcTimer = null;
+                            return;
                         }
+                        const enc = triggerNpcEncounter();
+                        if (enc) addLogEntry('npc_encounter', '遇到' + enc.name);
                         npcTimer = null;
                     }, 2500);
                 }
