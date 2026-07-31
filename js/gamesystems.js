@@ -63,8 +63,18 @@
         // Helpers needed by playSfx override and status effect system
         const playSfx = window.playSfx, playTone = window.playTone, snotify = window.snotify, tst = window.tst;
         const esc = window.esc, escAttr = window.escAttr;
-        const initAutoBGM = window.initAutoBGM, bgmAutoSwitch = window.bgmAutoSwitch;
-        const launchTutorial = window.launchTutorial, toggleSfx = window.toggleSfx;
+        const _bgmInit = () => { if (typeof window.bgmInit === 'function') window.bgmInit(); };
+        const _bgmPlay = (f) => { if (typeof window.bgmPlay === 'function') window.bgmPlay(f); };
+        const _bgmPlayCategory = (c, r) => { if (typeof window.bgmPlayCategory === 'function') window.bgmPlayCategory(c, r); };
+        const _bgmStop = () => { if (typeof window.bgmStop === 'function') window.bgmStop(); };
+        const _bgmToggle = () => { if (typeof window.bgmToggle === 'function') window.bgmToggle(); };
+        const _bgmSetVol = (v) => { if (typeof window.bgmSetVol === 'function') window.bgmSetVol(v); };
+        const initAutoBGM = () => { if (typeof window.initAutoBGM === 'function') window.initAutoBGM(); };
+        const bgmAutoSwitch = (ctx) => { if (typeof window.bgmAutoSwitch === 'function') window.bgmAutoSwitch(ctx); };
+        const _bgmQuickPick = (c) => { if (typeof window.bgmQuickPick === 'function') window.bgmQuickPick(c); };
+        const _bgmOpenPicker = () => { if (typeof window.bgmOpenPicker === 'function') window.bgmOpenPicker(); };
+        const launchTutorial = () => { if (typeof window.launchTutorial === 'function') window.launchTutorial(); };
+        const toggleSfx = () => { if (typeof window.toggleSfx === 'function') window.toggleSfx(); };
         const ABILITIES = window.ABILITIES, NORMAL_SKILLS = window.NORMAL_SKILLS;
         const STATUS_EFFECTS = window.STATUS_EFFECTS, WEAPON_DATA = window.WEAPON_DATA;
         const CRAFT_RECIPES = window.CRAFT_RECIPES, RANDOM_EVENTS = window.RANDOM_EVENTS;

@@ -18,24 +18,30 @@
             const SUB_ICONS = (window.SUB_ICONS != null) ? window.SUB_ICONS : {};
             const ITEM_EMOJI = (window.ITEM_EMOJI != null) ? window.ITEM_EMOJI : {};
             const ITEM_PRESETS = (window.ITEM_PRESETS != null) ? window.ITEM_PRESETS : {};
-            // audio.js 暴露的
-            const playSfx = (typeof window.playSfx === 'function') ? window.playSfx : function(){};
-            const playTone = (typeof window.playTone === 'function') ? window.playTone : function(){};
-            const tst = (typeof window.tst === 'function') ? window.tst : function(){};
-            const esc = (typeof window.esc === 'function') ? window.esc : function(s){ return String(s==null?'':s); };
-            const escAttr = (typeof window.escAttr === 'function') ? window.escAttr : function(s){ return String(s==null?'':s); };
-            const scb = (typeof window.scb === 'function') ? window.scb : function(){};
-            const sketchConfirm = (typeof window.sketchConfirm === 'function') ? window.sketchConfirm : function(){ return Promise.resolve(false); };
-            const sketchPrompt = (typeof window.sketchPrompt === 'function') ? window.sketchPrompt : function(){ return Promise.resolve(''); };
-            const bgmToggle = (typeof window.bgmToggle === 'function') ? window.bgmToggle : function(){};
-            const bgmQuickPick = (typeof window.bgmQuickPick === 'function') ? window.bgmQuickPick : function(){};
-            const bgmOpenPicker = (typeof window.bgmOpenPicker === 'function') ? window.bgmOpenPicker : function(){};
-            const bgmAutoSwitch = (typeof window.bgmAutoSwitch === 'function') ? window.bgmAutoSwitch : function(){};
-            const initAutoBGM = (typeof window.initAutoBGM === 'function') ? window.initAutoBGM : function(){};
-            const toggleSfx = (typeof window.toggleSfx === 'function') ? window.toggleSfx : function(){};
-            const launchTutorial = (typeof window.launchTutorial === 'function') ? window.launchTutorial : function(){};
+            // audio.js 暴露的 —— 使用安全包装，延迟读取 window，避免与 audio.js 加载时序的耦合问题
+            const playSfx = (...a) => { if (typeof window.playSfx === 'function') return window.playSfx(...a); };
+            const playTone = (...a) => { if (typeof window.playTone === 'function') return window.playTone(...a); };
+            const tst = (...a) => { if (typeof window.tst === 'function') return window.tst(...a); };
+            const esc = (s) => { if (typeof window.esc === 'function') return window.esc(s); const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+            const escAttr = (s) => { if (typeof window.escAttr === 'function') return window.escAttr(s); return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); };
+            const scb = (...a) => { if (typeof window.scb === 'function') return window.scb(...a); };
+            const sketchConfirm = (...a) => { if (typeof window.sketchConfirm === 'function') return window.sketchConfirm(...a); return Promise.resolve(false); };
+            const sketchPrompt = (...a) => { if (typeof window.sketchPrompt === 'function') return window.sketchPrompt(...a); return Promise.resolve(''); };
+            const bgmToggle = (...a) => { if (typeof window.bgmToggle === 'function') return window.bgmToggle(...a); };
+            const bgmQuickPick = (...a) => { if (typeof window.bgmQuickPick === 'function') return window.bgmQuickPick(...a); };
+            const bgmOpenPicker = (...a) => { if (typeof window.bgmOpenPicker === 'function') return window.bgmOpenPicker(...a); };
+            const bgmAutoSwitch = (...a) => { if (typeof window.bgmAutoSwitch === 'function') return window.bgmAutoSwitch(...a); };
+            const initAutoBGM = (...a) => { if (typeof window.initAutoBGM === 'function') return window.initAutoBGM(...a); };
+            const toggleSfx = (...a) => { if (typeof window.toggleSfx === 'function') return window.toggleSfx(...a); };
+            const launchTutorial = (...a) => { if (typeof window.launchTutorial === 'function') return window.launchTutorial(...a); };
+            const bgmInit = (...a) => { if (typeof window.bgmInit === 'function') return window.bgmInit(...a); };
+            const bgmPlay = (...a) => { if (typeof window.bgmPlay === 'function') return window.bgmPlay(...a); };
+            const bgmPlayCategory = (...a) => { if (typeof window.bgmPlayCategory === 'function') return window.bgmPlayCategory(...a); };
+            const bgmStop = (...a) => { if (typeof window.bgmStop === 'function') return window.bgmStop(...a); };
+            const bgmSetVol = (...a) => { if (typeof window.bgmSetVol === 'function') return window.bgmSetVol(...a); };
             // sfxEnabled / BGM 在 audio.js 中维护，window.sfxEnabled 暴露的是其同步引用
-            const sfxEnabled = 'sfxEnabled' in window ? window.sfxEnabled : (localStorage && localStorage.getItem('vn_sfx') !== '0');
+            const sfxEnabled = () => 'sfxEnabled' in window ? window.sfxEnabled : (localStorage && localStorage.getItem('vn_sfx') !== '0');
+            const BGM = () => window.BGM || { enabled: false, volume: 0.45, tracks: {}, _currentCategory: 'title' };
             // 注：hasHover 在下方 L462 正式定义（window.matchMedia 更严格版本），此处避免重复声明
 
 
@@ -5197,11 +5203,12 @@
                 if (p.md.length) $('apiModel').value = p.md[0];
             });
             $('btnTheme').addEventListener('click', () => { cycleTheme(); });
-            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled ? '🔊 音效' : '🔇 音效'; });
-            $('btnSfx').textContent = sfxEnabled ? '🔊 音效' : '🔇 音效';
+            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled() ? '🔊 音效' : '🔇 音效'; });
+            $('btnSfx').textContent = sfxEnabled() ? '🔊 音效' : '🔇 音效';
             $('btnBgm').addEventListener('click', () => { bgmToggle(); });
-            $('btnBgm').textContent = BGM.enabled ? '🎵 音乐' : '🔇 音乐';
-            $('btnBgm').title = BGM.enabled ? '背景音乐（开启）' : '背景音乐（已关闭）';
+            const _bgm = BGM();
+            $('btnBgm').textContent = _bgm.enabled ? '🎵 音乐' : '🔇 音乐';
+            $('btnBgm').title = _bgm.enabled ? '背景音乐（开启）' : '背景音乐（已关闭）';
             // ===== 导航栏「更多」收纳菜单 =====
             (function initNavMore() {
                 const btn = $('btnNavMore');
@@ -6189,7 +6196,7 @@
                 // 状态
                 hasHover
             });
-            window.BGM = window.BGM || BGM; // audio.js 已定义，兜底
+            window.BGM = window.BGM || BGM(); // audio.js 已定义，兜底
             window.snotify = snotify; // 侧边通知（在这个文件定义）
             window._triggerRandomEvent = () => triggerRandomEvent();
             window._checkSeasonalEvent = () => checkSeasonalEvent();
@@ -6379,15 +6386,17 @@
                     setTimeout(() => launchTutorial(), 800);
                 }
                 // ===== BGM: 首次用户交互后启动，遵循浏览器自动播放策略 =====
-                if (BGM.enabled) {
+                const _bgmState = BGM();
+                if (_bgmState.enabled) {
                     const startBgmOnce = () => {
                         document.removeEventListener('click', startBgmOnce);
                         document.removeEventListener('keydown', startBgmOnce);
                         document.removeEventListener('touchstart', startBgmOnce);
                         bgmInit();
                         // 游戏初始默认营地背景音
-                        BGM._currentCategory = 'camp';
-                        BGM._currentFile = 'bgm_camp1.mp3';
+                        const __bgm = BGM();
+                        __bgm._currentCategory = 'camp';
+                        __bgm._currentFile = 'bgm_camp1.mp3';
                         bgmPlay('bgm_camp1.mp3');
                         const _s = gst(), _c = gch(), _clk = gclk();
                         bgmAutoSwitch({
