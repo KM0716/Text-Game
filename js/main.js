@@ -1259,6 +1259,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 'clue-add': 'SE/写线索.wav',
                 'drink': 'SE/喝水.wav',
                 'use-water': 'SE/喝水.wav',
+                'death': 'SE/突发事件.wav',
                 'open-profile': 'SE/打开个人.wav',
                 'char-open': 'SE/打开个人.wav',
                 'open-clue': 'SE/打开线索.wav',
@@ -1367,6 +1368,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     case 'status': playTone(700, 0.08, 'sine', 0.25); break;
                     case 'danger_alarm': playTone(180, 0.3, 'sawtooth', 0.5); setTimeout(() => playTone(220, 0.2, 'sawtooth', 0.4), 150); setTimeout(() => playTone(180, 0.3, 'sawtooth', 0.5), 350); break;
                     case 'ending': playTone(400, 0.3, 'sine', 0.4); setTimeout(() => playTone(300, 0.4, 'sine', 0.35), 200); setTimeout(() => playTone(200, 0.6, 'sine', 0.3), 500); break;
+                    case 'death': playTone(220, 0.4, 'sawtooth', 0.5); setTimeout(() => playTone(160, 0.5, 'sawtooth', 0.4), 200); setTimeout(() => playTone(110, 0.8, 'sawtooth', 0.45), 500); break;
                 }
             }
             // ===== BGM System =====
@@ -2091,7 +2093,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 html = html.replace(/【([^】]+)】/g, '<strong class="auto-bold">$1</strong>');
                 // 保护已存在的 auto-bold 和 item-ref 标签避免嵌套
                 const protectedPlaceholders = [];
-                html = html.replace(/<(strong class="auto-bold"|span class="item-ref[^"]*)>([\s\S]*?)<\/(strong|span)>/g, (m, tagStart, inner, tagEnd) => {
+                // 使用 [^>]* 捕获完整的标签属性部分（包括 data-item-info 等所有属性）
+                html = html.replace(/<(strong class="auto-bold"|span class="item-ref[^>]*)>([\s\S]*?)<\/(strong|span)>/g, (m, tagStart, inner, tagEnd) => {
                     const idx = protectedPlaceholders.length;
                     const tagName = tagStart.indexOf('strong') === 0 ? 'strong' : 'span';
                     protectedPlaceholders.push({ tagName: tagName, tagAttr: tagStart, inner: inner });
@@ -2126,16 +2129,13 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     }
                     return '<span class="item-ref">' + esc(name) + '</span>';
                 });
-                // 还原保护的标签
+                // 还原保护的标签：tagAttr 包含完整的标签名+所有属性，直接拼接即可
                 html = html.replace(/\|\|PROT(\d+)\|\|/g, (m, idx) => {
                     const n = parseInt(idx);
                     const p = protectedPlaceholders[n];
                     if (!p) return m;
-                    if (p.tagName === 'strong') {
-                        return '<strong class="auto-bold">' + p.inner + '</strong>';
-                    } else {
-                        return '<span class="' + p.tagAttr + '">' + p.inner + '</span>';
-                    }
+                    // tagAttr 已经是完整的 "strong class=..." 或 "span class=... data-item-info=..."
+                    return '<' + p.tagAttr + '>' + p.inner + '</' + p.tagName + '>';
                 });
                 return html;
             }
@@ -3187,7 +3187,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             el.style.margin = '0';
                             setTimeout(() => { el.style.display = 'none'; }, 400);
                             // Send the choice as player action
-                            const inp = $('msgInput');
+                            const inp = $('inputText');
                             if (inp) { inp.value = opt; }
                             const sendBtn = $('btnSend');
                             if (sendBtn) { sendBtn.click(); }
