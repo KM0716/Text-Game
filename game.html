@@ -59,20 +59,43 @@
                 <span class="status-item" style="cursor:pointer;" id="stTempDisplay"><span class="st-label">气温</span><span id="stTemp">--</span>°C</span>
             </div>
             <div class="header-actions">
-                <button class="btn-header" id="btnProfile">个人</button>
-                <button class="btn-header" id="btnBackpack">背包</button>
-                <button class="btn-header" id="btnEquipment">装备</button>
-                <button class="btn-header" id="btnSidePanel">面板</button>
-                <button class="btn-header" id="btnSave">存档</button>
-                <button class="btn-header" id="btnLoad">读档</button>
-                <button class="btn-header" id="btnSettings">设置</button>
-                <button class="btn-header accent" id="btnNewGame">开局</button>
-                <button class="btn-header" id="btnTheme">浅色</button>
-                <button class="btn-header" id="btnSfx" title="音效开关">🔊</button>
-                <button class="btn-header" id="btnBgm" title="背景音乐">🎵</button>
-                <button class="btn-header" id="btnAchievements" title="成就">成就</button>
-                <button class="btn-header" id="btnEvents" title="突发事件">事件</button>
-                <button class="btn-header" id="btnIdle">挂机</button>
+                <div class="nav-group nav-primary">
+                    <button class="btn-header" id="btnProfile">👤 个人</button>
+                    <button class="btn-header" id="btnBackpack">🎒 背包</button>
+                    <button class="btn-header" id="btnEquipment">⚔️ 装备</button>
+                    <button class="btn-header" id="btnSidePanel">📊 面板</button>
+                </div>
+                <div class="nav-group nav-secondary">
+                    <button class="btn-header" id="btnSave">💾 存档</button>
+                    <button class="btn-header" id="btnLoad">📂 读档</button>
+                    <button class="btn-header accent" id="btnNewGame">🎮 开局</button>
+                </div>
+                <div class="nav-group nav-more-wrap">
+                    <button class="btn-header nav-more-toggle" id="btnNavMore" title="更多功能">☰ 更多</button>
+                    <div class="nav-more-menu" id="navMoreMenu">
+                        <div class="nav-menu-section">
+                            <div class="nav-menu-title">系统设置</div>
+                            <div class="nav-menu-row">
+                                <button class="btn-header" id="btnSettings">⚙️ 设置</button>
+                                <button class="btn-header" id="btnTheme">🎨 浅色</button>
+                            </div>
+                            <div class="nav-menu-row">
+                                <button class="btn-header" id="btnSfx" title="音效开关">🔊 音效</button>
+                                <button class="btn-header" id="btnBgm" title="背景音乐">🎵 音乐</button>
+                            </div>
+                        </div>
+                        <div class="nav-menu-section">
+                            <div class="nav-menu-title">进度与记录</div>
+                            <div class="nav-menu-row">
+                                <button class="btn-header" id="btnAchievements" title="成就">🏆 成就</button>
+                                <button class="btn-header" id="btnEvents" title="突发事件">⚡ 事件</button>
+                            </div>
+                            <div class="nav-menu-row">
+                                <button class="btn-header" id="btnIdle">💤 挂机</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </header>
         <div class="chat-area" id="chatArea">
