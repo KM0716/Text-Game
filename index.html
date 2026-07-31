@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, viewport-fit=cover">
+    <title>末日文字模拟器</title>
+    <meta name="description" content="一款基于 AI 的末日生存文字冒险游戏，角色设定、世界沙盒、战斗与探索。">
+    <meta name="keywords" content="末日, 生存, 文字游戏, AI, 沙盒">
+    <meta property="og:title" content="末日文字模拟器">
+    <meta property="og:description" content="基于 AI 的末日生存文字冒险游戏">
+    <meta property="og:type" content="website">
+    <meta name="theme-color" content="#8b4513">
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E📜%3C/text%3E%3C/svg%3E">
+    <meta http-equiv="refresh" content="0; url=game.html">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            background: #f5f0e6;
+            font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+            color: #8b4513;
+        }
+        .loader {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            text-align: center;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            border: 4px solid #c0b090;
+            border-top-color: #8b4513;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-bottom: 16px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loader h1 { font-size: 1.4rem; margin: 0 0 8px; letter-spacing: 2px; }
+        .loader p { color: #6b5e4e; font-size: 0.9rem; margin: 0; }
+        .loader a { color: #8b4513; text-decoration: underline; }
+    </style>
+    <script>
+        // 立即跳转到游戏主页面，使用 location.replace 不留历史记录
+        (function () {
+            try {
+                // 使用 encodeURIComponent 处理中文文件名
+                var target = 'game.html' + window.location.search + window.location.hash;
+                window.location.replace(target);
+            } catch(e) {
+                window.location.href = 'game.html';
+            }
+        })();
+    </script>
+</head>
+<body>
+    <div class="loader" id="loader">
+        <div class="spinner"></div>
+        <h1>末日文字模拟器</h1>
+        <p>正在进入世界…</p>
+        <p style="margin-top:16px;">如果页面没有自动跳转，请 <a href="game.html">点击这里</a></p>
+    </div>
+</body>
+</html>
