@@ -106,6 +106,45 @@
             // ===== Default Prompt Template =====
             const DPROMPT = `【末日生存GM】纯文字模拟，无选项引导。你是游戏主持人(GM)，根据玩家行动推进剧情。追求写实逼真沉浸式体验。
 
+你将担任文字游戏的主持人（GM）与剧情角色演绎者，基于玩家输入即时推进互动剧情。严格遵循以下规则，全程保障叙事沉浸感、角色逻辑一致性与交互体验：
+
+重要对话规则：全程使用第二人称「你」称呼玩家，禁止使用 "玩家""宿主""冒险者" 等第三人称指代；叙事视角跟随剧情，对话、场景描述统一以「你」作为主角称谓。一旦输出出现 "玩家"，立刻修正重写，所有外部称谓全部替换为「你」。
+
+## 一、视角与信息边界
+1. 严格禁用上帝视角，仅呈现当前角色感官可触及的画面、声音、触感与已知信息。角色无法获知同空间外的任何动向，对他人的判断、猜测必须有明确的行为依据，不得无理由知晓对方想法、隐秘行动或跨空间信息。
+2. 单轮交互固定单一核心视角，不得随意跳转；跨场景切换必须通过角色移动、环境变化、时间流逝自然过渡，禁止无征兆切视角造成叙事混乱。
+
+## 二、角色演绎准则
+1. 严守角色人设、境界与身份定位，行为、对话、处事逻辑完全贴合设定，杜绝OOC。角色行为动机清晰，情绪转变有情节铺垫，不得出现无理由情绪波动与断崖式性格转变。
+2. 所有角色情绪均通过动作、微表情、感官细节体现，禁用直白空洞的情绪概括；避免无意义的高冷面瘫寡言设定，角色反应有迹可循，情感表达细腻真实。
+3. 配角出场自然，行为逻辑贴合自身身份立场，不做无脑工具人；多人同场时，需同步呈现至少2-3名角色的神态、动作与即时反应，体现人物间的互动反差与关系张力。
+
+## 三、对话与互动要求
+1. 每句对话必须搭配对应语气、神态、肢体动作中的至少两种，禁止纯台词输出；通过眼神变化、小动作、语气停顿传递潜台词，清晰区分说话主体，避免指代模糊。
+2. 不同角色的措辞、语气、思维逻辑有明确区分，完全贴合身份性格；禁止短句蹦字式敷衍回复，对话有态度、有情绪、有交互，每句台词均服务于剧情或人物塑造。
+3. 存在亲密关系的角色互动需体现自然的黏糊感，加入下意识的肢体小动作，展现情绪反差与双向互动细节；多人互动需体现角色间的肢体接触与情绪碰撞。
+4. 禁止问答式流水账对话，删除无意义闲聊，避免同质化、凑字数的无效表达。
+
+## 四、叙事与语言规则
+1. 语言自然流畅，摒弃生硬书面化表达，去除AI典型口癖；禁用机械衔接词与空泛无效副词，以动作细节替代抽象描述。
+2. 规避句式呆板重复，长短句结合，灵活调整语序，禁止连续三句以上结构完全对称的句式，还原真人书写质感。
+3. 场景描写融入多感官细节，贴合世界观设定，与人物行动、情绪深度融合，不写与剧情人物无关的环境内容；场景转换通过人物行动自然过渡。
+4. 每轮剧情必须推进主线、输出有效新信息，禁止同义重复、车轱辘话与原地打转；合理设计矛盾与悬念，情节逐层递进，节奏快慢交替。
+5. 杜绝形容词堆砌与生硬修辞，所有描写服务于情节与人物，不写虚浮华丽的无效辞藻。
+
+## 五、基础排版规范
+1. 剧情正文采用纯文本连续叙事，不得添加括号注释与场外补充说明。
+2. 段落长度贴合叙事节奏，避免超长无停顿段落与碎句式短段落，合理分段优化阅读体验。
+3. 人物连续动作自然衔接，省略重复主语，禁止一句一动作的机械流水账写法；动作符合生理逻辑与行为动机，不写夸张无意义的多余动作。
+4. 人物外貌、穿着描写融入动作场景，完整连贯不碎片化，贴合角色身份性格，不做孤立的外貌堆砌。
+
+## 六、输出格式强制规范
+每轮交互必须严格按照「剧情正文→互动选项」的固定顺序输出，清晰分隔，不得打乱顺序、遗漏模块或混排内容。
+1. 剧情正文：承接上一轮玩家选择展开叙事，严格遵循前述视角、人物、语言规则；全程为纯小说式正文，无场外说明，仅通过自然分段区隔叙事节奏。
+2. 互动选项：剧情段落结束后另起，单轮设置2-4个可选行动。每个选项需为具体可落地的行为决策，而非模糊态度表达；选项之间应有明确的方向差异。所有选项应该调用选项气泡进行输出，即使用 [choice] 标签包裹。
+3. 属性面板：选项结束后单独呈现当前角色的核心状态面板，仅展示角色已获知、已拥有的内容，不得泄露未解锁剧情与隐藏信息。
+本规则全程生效，所有交互均需严格执行，确保剧情逻辑自洽、角色立体鲜活、沉浸感充足。
+
 【世界设定】
 灾难：{{dn}} | 时间：{{days}} | 游戏时刻：{{gameTime}}
 ⚠️ 以上游戏时刻由系统时钟生成，你必须以此为准。叙事中如需推进时间，使用 [时间:+Xh] 标签，禁止自行编造具体钟点。
@@ -122,7 +161,15 @@
 危险等级：{{danger}}
 幸存概率：{{survival}}
 
-【沙盒参数（10大分类）】
+【沙盒参数（10大分类）— 参考优先级：仅次于玩家信息与世界设定】
+以上沙盒参数定义了世界的运行规则，你在叙事中必须严格遵守这些设定：
+- 昼夜流速、天气频率、丧尸密度等直接影响环境描写和事件触发
+- 物资刷新率决定搜索物资的丰富程度（无/极少/较少/适中/丰富/极丰富）
+- 丧尸移速、力量、感染途径决定战斗难度和受伤后果
+- 饥渴/疲劳消耗速度影响角色状态衰减节奏
+- 伦理底线和暴力程度决定叙事描写的尺度
+- 睡眠突发事件、幸存者遭遇率等影响随机事件的发生
+当沙盒参数与默认假设冲突时，以沙盒参数为准。
 {{sandboxInfo}}
 
 【角色设定】
@@ -154,7 +201,25 @@
 【游戏规则】
 难度：{{diff}}（{{diffdesc}}）{{god}}
 写实生存：饱腹/口渴/疲劳/体温/伤势/负重/噪音均生效。死亡即结束。
-物品和人名使用【】标注以便加粗显示。
+物品和人名使用【】标注以便加粗显示。**禁止输出任何HTML标签**（如 <strong>、<span> 等），所有格式标记使用纯文本符号：【物品名】表示物品，**文本** 表示加粗。
+
+**物品使用规则**：
+- 防水布袋、布袋、背包等属于容器类物品，不是水资源，不能用于饮用水
+- 水、食物、药品等消耗品使用后应标记消耗数量
+- 武器使用后应标记弹药消耗或耐久度变化
+
+**死亡触发规则**：
+- 当角色血量降到0或以下时，必须触发死亡结局
+- 严重失血（血量<20%）、感染恶化、极端天气等都可能导致死亡
+- 不得规避死亡判定，死亡是生存游戏的核心机制
+
+**物品分类指引**：
+- 容器类：背包、布袋、腰包、口袋等（用于存放物品，非消耗品）
+- 水资源：矿泉水、瓶装水、水壶等（可饮用补充口渴）
+- 食物类：饼干、罐头、面包等（补充饱腹度）
+- 医疗类：绷带、药品等（治疗伤口）
+- 武器类：刀、枪、棍等（用于战斗）
+- 工具类：扳手、手电筒等（功能性使用）
 
 【行为规范 — AI必须遵守】
 1. 禁止生成超现实/作弊行为：玩家不应拥有瞬移、无敌、凭空创造物品、控制所有NPC等超能力。如果玩家尝试此类行为，你应以"不可能做到"为由拒绝，并描述合理的限制条件（如：你无法凭空造出物资，需要去搜索或交易）。
@@ -449,37 +514,64 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             }
             // Parse item effect string (e.g. '饱腹+30 口渴+10') and apply changes to state
             function applyItemEffect(itemName) {
-                const info = getItemInfo(itemName);
-                if (!info || !info.effect) return null;
                 const s = gst();
-                const results = [];
-                const parts = info.effect.split(/\s+/);
-                const statMap = {
-                    '饱腹': 'hunger', '口渴': 'thirst', '疲劳': 'fatigue',
-                    '体温': 'bodyTemp', '精神': 'spirit', '欢愉': 'joy',
-                    '血量': 'hp', '伤势': 'injury'
-                };
-                parts.forEach(part => {
-                    const m = part.match(/^(.+?)([+-])(\d+(?:\.\d+)?)$/);
-                    if (!m) return;
-                    const label = m[1];
-                    const sign = m[2];
-                    const val = parseFloat(m[3]);
-                    const key = statMap[label];
-                    if (!key) return;
-                    const cur = s[key];
-                    if (cur === undefined || cur === null) return;
-                    const delta = sign === '+' ? val : -val;
-                    const min = (key === 'bodyTemp') ? 30 : (key === 'hp') ? 0 : 0;
-                    const max = (key === 'bodyTemp') ? 45 : (key === 'hp') ? (s.maxHp || 100) : 100;
-                    s[key] = Math.max(min, Math.min(max, (typeof cur === 'number' ? cur : 0) + delta));
-                    results.push(label + sign + val);
-                });
-                if (results.length > 0) {
+                if (!s) return [];
+                const itemInfo = getItemInfo(itemName);
+                const effects = [];
+                // First try effect-based approach (existing mechanism)
+                if (itemInfo && itemInfo.effect) {
+                    const results = [];
+                    const parts = itemInfo.effect.split(/\s+/);
+                    const statMap = {
+                        '饱腹': 'hunger', '口渴': 'thirst', '疲劳': 'fatigue',
+                        '体温': 'bodyTemp', '精神': 'spirit', '欢愉': 'joy',
+                        '血量': 'hp', '伤势': 'injury'
+                    };
+                    parts.forEach(part => {
+                        const m = part.match(/^(.+?)([+-])(\d+(?:\.\d+)?)$/);
+                        if (!m) return;
+                        const label = m[1];
+                        const sign = m[2];
+                        const val = parseFloat(m[3]);
+                        const key = statMap[label];
+                        if (!key) return;
+                        const cur = s[key];
+                        if (cur === undefined || cur === null) return;
+                        const delta = sign === '+' ? val : -val;
+                        const min = (key === 'bodyTemp') ? 30 : (key === 'hp') ? 0 : 0;
+                        const max = (key === 'bodyTemp') ? 45 : (key === 'hp') ? (s.maxHp || 100) : 100;
+                        s[key] = Math.max(min, Math.min(max, (typeof cur === 'number' ? cur : 0) + delta));
+                        results.push(label + sign + val);
+                    });
+                    if (results.length > 0) {
+                        sst(s);
+                        upui();
+                        return results;
+                    }
+                }
+                // Fallback: category-based effect mapping
+                if (itemInfo && itemInfo.category) {
+                    const cat = itemInfo.category;
+                    const sub = itemInfo.subCategory;
+                    if (cat === 'consumable' && sub === 'food') {
+                        s.hunger = Math.min(100, (s.hunger || 50) + 30);
+                        effects.push('饱腹+30');
+                    } else if (cat === 'consumable' && (sub === 'water' || sub === 'drink')) {
+                        s.thirst = Math.min(100, (s.thirst || 50) + 30);
+                        effects.push('口渴+30');
+                    } else if (cat === 'consumable' && sub === 'medical') {
+                        s.hp = Math.min(s.maxHp || 100, (s.hp || 50) + 20);
+                        s.injury = '无';
+                        effects.push('生命+20');
+                    } else if (cat === 'equip' && sub === 'weapon') {
+                        effects.push('武器已装备');
+                    }
+                }
+                if (effects.length > 0) {
                     sst(s);
                     upui();
                 }
-                return results;
+                return effects;
             }
             const ITEM_PRESETS = {
                 '压缩饼干': { category: 'consumable', subCategory: 'food', effect: '饱腹+30', type: 'usable', desc: '高能量压缩饼干，保质期长' },
@@ -671,7 +763,12 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 '鱼竿': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '简易钓鱼竿' },
                 '熏肉架': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '制作腊肉，保存肉类' },
                 '雨水收集器': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '雨天收集干净雨水' },
-                '简易滤水器': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '过滤污水获得饮用水' }
+                '简易滤水器': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '过滤污水获得饮用水' },
+                '防水布袋': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '防水布料制成的收纳袋，可存放物品' },
+                '密封袋': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '密封塑料袋，可防潮收纳' },
+                '水壶': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '金属水壶，可装水但本身不是水' },
+                '水瓶': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '空水瓶容器，可装水' },
+                '水袋': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '装水用的软质水袋' }
             };
             // Smart item matching: exact > longest substring > substring with word boundary
             function getItemInfo(itemName) {
@@ -725,6 +822,63 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         }
                     }
                 }
+                // 5. Try semantic classification for unknown items
+                const semantic = classifyItemSemantic(name) || (normalized !== name ? classifyItemSemantic(normalized) : null);
+                if (semantic) {
+                    return {
+                        category: semantic.category,
+                        subCategory: semantic.subCategory,
+                        type: semantic.type,
+                        desc: '（自动分类：' + semantic.category + ' - ' + semantic.subCategory + '）'
+                    };
+                }
+                return null;
+            }
+            // Semantic item classification - properly categorize items by actual usage
+            function classifyItemSemantic(itemName) {
+                const name = (itemName || '').trim();
+                if (!name) return { category: 'misc', subCategory: 'other', type: 'unknown' };
+                
+                // Container keywords - these are containers, not consumables
+                const containerKeywords = ['袋', '背包', '包', '箱', '盒', '罐', '瓶', '壶', '桶', '囊', '储物', '收纳', '防水', '钱包', '腰包', '口袋'];
+                // Water consumable keywords - actually drinkable water
+                const waterKeywords = ['饮用水', '瓶装水', '矿泉水', '纯净水', '桶装水', '净水', '清水', '活水'];
+                // Food keywords
+                const foodKeywords = ['饼干', '面包', '罐头', '午餐肉', '沙丁鱼', '巧克力', '能量棒', '火腿', '香肠', '方便面', '压缩饼干', '口粮'];
+                // Medical keywords
+                const medicalKeywords = ['绷带', '药品', '抗生素', '止痛药', '消炎药', '退烧药', '酒精', '碘伏', '消毒', '口罩', '创可贴', '急救'];
+                
+                // Special handling for "water" containing items
+                // Check if it's actually water (drinkable) vs container/water-resistant
+                const isActuallyWater = waterKeywords.some(kw => name.includes(kw));
+                const isContainer = containerKeywords.some(kw => name.includes(kw));
+                
+                // "防水布袋" is a container, not water
+                if (name.includes('防水') || (name.includes('水') && isContainer)) {
+                    return { category: 'tool', subCategory: 'container', type: 'equippable' };
+                }
+                
+                // Check for actual water consumables
+                if (isActuallyWater) {
+                    return { category: 'consumable', subCategory: 'water', type: 'usable' };
+                }
+                
+                // Check for containers
+                if (isContainer && !name.includes('水')) {
+                    return { category: 'tool', subCategory: 'container', type: 'equippable' };
+                }
+                
+                // Check for food
+                if (foodKeywords.some(kw => name.includes(kw))) {
+                    return { category: 'consumable', subCategory: 'food', type: 'usable' };
+                }
+                
+                // Check for medical
+                if (medicalKeywords.some(kw => name.includes(kw))) {
+                    return { category: 'consumable', subCategory: 'medical', type: 'usable' };
+                }
+                
+                // Default: return null to let existing logic handle
                 return null;
             }
             // Check if text fragment could be a real item name (not a measurement or number)
@@ -1157,14 +1311,16 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (!list.length) return;
                 BGM._currentCategory = cat;
                 let file;
-                if (random) {
+                if (random && list.length > 1) {
+                    // Only randomize on first play, then loop the same track
                     file = list[Math.floor(Math.random() * list.length)];
                 } else {
-                    // 同一分类下尽量选不同的
-                    const last = BGM.current;
-                    const pool = list.length > 1 && last ? list.filter(f => f !== last) : list;
-                    file = pool[Math.floor(Math.random() * pool.length)];
+                    // Use first track of the category for looping
+                    file = BGM._currentFile && list.includes(BGM._currentFile) 
+                        ? BGM._currentFile 
+                        : list[0];
                 }
+                BGM._currentFile = file;
                 bgmPlay(file);
             }
             function bgmStop() {
@@ -1181,6 +1337,21 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 BGM.volume = Math.max(0, Math.min(1, v));
                 localStorage.setItem('vn_bgm_vol', BGM.volume);
                 if (BGM.audio) BGM.audio.volume = BGM.volume;
+            }
+            // Auto-play BGM on game load (requires user interaction to start audio context)
+            function initAutoBGM() {
+                if (!BGM.enabled) return;
+                // Try to unlock audio on first user interaction
+                const unlockAudio = () => {
+                    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+                    bgmPlayCategory('title', true);
+                    document.removeEventListener('click', unlockAudio);
+                    document.removeEventListener('touchstart', unlockAudio);
+                    document.removeEventListener('keydown', unlockAudio);
+                };
+                document.addEventListener('click', unlockAudio);
+                document.addEventListener('touchstart', unlockAudio);
+                document.addEventListener('keydown', unlockAudio);
             }
             // 根据位置/季节/天气/心情自动切换BGM
             function bgmAutoSwitch(context) {
@@ -1469,8 +1640,47 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 }
                 return Math.round(t * 10) / 10;
             }
+            // 检查上一个角色的死亡地点彩蛋
+            function checkDeathEasterEgg() {
+                try {
+                    const deathInfo = localStorage.getItem('dz_death_info');
+                    if (!deathInfo) return;
+                    const info = JSON.parse(deathInfo);
+                    // Only trigger if within 30 days of previous death
+                    const curDay = gclk().day || 1;
+                    const s = gst();
+                    if (!s || !s.location) return;
+                    // Check if player is at or near the death location
+                    if (s.location.includes(info.location) || info.location.includes(s.location)) {
+                        // Player found the previous character's remains
+                        const easterEggMsg = '你在' + info.location + '发现了一具尸体——看穿着和装备，似乎是前不久在这里遇难的幸存者。' +
+                            '尸体旁边散落着一些物品，身上有' + (info.reason || '致命伤') + '的痕迹。' +
+                            '从遗物来看，此人存活了' + info.day + '天，击杀了' + info.kills + '个敌人。';
+                        // Add to narrative
+                        setTimeout(() => {
+                            apb({ ty: 'narration', tx: easterEggMsg }, 0);
+                            // Give player some leftover items
+                            const s2 = gst();
+                            if (s2 && s2.inv) {
+                                const leftoverItems = ['破损的背包', '半瓶水', '生锈的匕首', '几发子弹', '一张沾血的纸条'];
+                                const found = leftoverItems[Math.floor(Math.random() * leftoverItems.length)];
+                                s2.inv.push(found);
+                                sst(s2);
+                                snotify('add', '发现遗物', found);
+                            }
+                            // Clear death info so it doesn't trigger again
+                            localStorage.removeItem('dz_death_info');
+                        }, 3000);
+                    }
+                } catch(e) {}
+            }
             function startClock() {
                 if (clockTimer) clearInterval(clockTimer);
+                // Check for death location easter egg (one-time)
+                if (!window._deathEggChecked) {
+                    window._deathEggChecked = true;
+                    setTimeout(() => checkDeathEasterEgg(), 5000);
+                }
                 clockTimer = setInterval(() => {
                     const c = gclk();
                     const isRealTime = (c.dayLenSec === 86400);
@@ -1495,9 +1705,12 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         }
                         c.elapsedSec = newElapsed;
                     } else {
-                        // Standard accelerated time
-                        const advance = 86400 / (c.dayLenSec || 86400);
+                        // Standard accelerated time — dayLenSec 控制游戏一天对应多少现实秒
+                        // 例如 dayLenSec=1200 表示现实20分钟=游戏24小时，每秒推进72秒游戏时间
+                        const dayLen = c.dayLenSec || 86400;
+                        const advance = 86400 / dayLen;
                         c.elapsedSec += advance;
+                        // 跨天处理
                         if (c.elapsedSec >= 86400) {
                             c.elapsedSec -= 86400;
                             c.day = (c.day || 1) + 1;
@@ -1507,6 +1720,21 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                             }
                             c.temp = randTemp(season, c.temp);
                             c.season = season;
+                            // 新一天触发：饥饿/口渴额外衰减（模拟夜间消耗）
+                            const s = gst();
+                            if (s) {
+                                s.hunger = Math.max(0, (s.hunger ?? 50) - 3);
+                                s.thirst = Math.max(0, (s.thirst ?? 50) - 4);
+                                sst(s);
+                            }
+                        }
+                        // 夜间危险提示（夜晚时段且每隔一段时间）
+                        const curH = Math.floor(c.elapsedSec / 3600);
+                        if (curH >= 20 && curH < 22 && prevHour < 20 && prevHour >= 18) {
+                            // 刚进入夜晚时提示
+                            if (Math.random() < 0.3) {
+                                snotify('status', '夜晚降临', '夜间丧尸更活跃，注意安全');
+                            }
                         }
                     }
 
@@ -1696,6 +1924,13 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             }
             function abold(text) {
                 let html = esc(text);
+                // 容错处理：如果AI错误地输出了HTML标签（如 <strong class="auto-bold">text</strong>），
+                // esc() 会将其转义为 &lt;strong class="auto-bold"&gt;text&lt;/strong&gt;
+                // 这里将转义的strong标签重新转换回实际的HTML元素
+                html = html.replace(/&lt;strong\s+class=&quot;auto-bold&quot;&gt;([\s\S]*?)&lt;\/strong&gt;/g, '<strong class="auto-bold">$1</strong>');
+                // 也处理可能的其他HTML标签
+                html = html.replace(/&lt;span\s+class=&quot;item-ref[^&]*&quot;&gt;([\s\S]*?)&lt;\/span&gt;/g, '<span class="item-ref">$1</span>');
+                
                 html = html.replace(/\*\*([^*]+)\*\*/g, '<strong class="auto-bold">$1</strong>');
                 const s = gst(), c = gch();
                 const names = [];
@@ -1839,7 +2074,25 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 const cont = $('clueNoteContent');
                 if (!cont) return;
                 const s = gst();
-                const clues = (s && s.clues && s.clues.length) ? s.clues.slice().reverse() : [];
+                // Process clues with priority
+                let clues = [];
+                if (s && s.clues && s.clues.length) {
+                    clues = s.clues.map((c, i) => {
+                        if (typeof c === 'string') {
+                            return { text: c, priority: 2, id: 'clue_' + i + '_' + Date.now() };
+                        }
+                        return { 
+                            text: c.text || c.content || c, 
+                            priority: c.priority || 2, 
+                            id: c.id || ('clue_' + i + '_' + Date.now())
+                        };
+                    });
+                    // Sort by priority (1=high, 3=low), then by time (newest first)
+                    clues.sort((a, b) => {
+                        if (a.priority !== b.priority) return a.priority - b.priority;
+                        return 0;
+                    });
+                }
                 // Update clue count in header
                 const header = $('clueSidebar') ? $('clueSidebar').querySelector('.clue-sidebar-header span') : null;
                 if (header) {
@@ -1861,9 +2114,110 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 }
                 cont.innerHTML = clues.map((c, i) => {
                     const idx = clues.length - i;
-                    const cleanText = esc(c).replace(/\n/g, '<br>');
-                    return '<div class="clue-note-item"><span style="font-weight:bold;margin-right:4px;color:#b58b5a;">#' + idx + '</span>' + cleanText + '</div>';
+                    const cleanText = typeof c === 'string' ? c : c.text;
+                    const priority = typeof c === 'string' ? 2 : (c.priority || 2);
+                    const pClass = 'p' + priority;
+                    const actions = '<div class="clue-actions">' +
+                        '<span data-act="edit" data-id="' + (c.id || '') + '">✎ 编辑</span>' +
+                        '<span data-act="del" data-id="' + (c.id || '') + '">✕ 删除</span>' +
+                        '</div>';
+                    return '<div class="clue-note-item" data-id="' + (c.id || '') + '">' + 
+                        '<span class="clue-priority ' + pClass + '" data-priority="' + priority + '" title="点击切换优先级">' + priority + '</span>' +
+                        '<span style="font-weight:bold;margin-right:4px;color:#b58b5a;">#' + idx + '</span>' + 
+                        esc(cleanText) + 
+                        actions +
+                        '</div>';
                 }).join('');
+
+                // Add action buttons area below clues
+                const actionDiv = document.createElement('div');
+                actionDiv.className = 'clue-sidebar-actions';
+                actionDiv.innerHTML = '<button id="btnAddClue">+ 添加线索</button><button id="btnSortClue">自动排序</button>';
+                cont.appendChild(actionDiv);
+
+                // Bind event delegation for clue interactions
+                cont.querySelectorAll('.clue-note-item').forEach(item => {
+                    const priSpan = item.querySelector('.clue-priority');
+                    priSpan.onclick = () => {
+                        const curPri = parseInt(priSpan.dataset.priority);
+                        const newPri = curPri >= 3 ? 1 : curPri + 1;
+                        const s = gst();
+                        if (s && s.clues) {
+                            const itemId = item.dataset.id;
+                            const clueObj = s.clues.find(c => (typeof c === 'object' && c.id === itemId));
+                            if (clueObj) {
+                                clueObj.priority = newPri;
+                                sst(s);
+                                renderClueSidebar();
+                            }
+                        }
+                    };
+                    item.querySelectorAll('.clue-actions span').forEach(btn => {
+                        btn.onclick = () => {
+                            const act = btn.dataset.act;
+                            const itemId = btn.dataset.id;
+                            const s = gst();
+                            if (!s || !s.clues) return;
+                            if (act === 'del') {
+                                s.clues = s.clues.filter(c => {
+                                    if (typeof c === 'string') return false;
+                                    return c.id !== itemId;
+                                });
+                                sst(s);
+                                renderClueSidebar();
+                                playSfx('drop');
+                            } else if (act === 'edit') {
+                                const clueObj = s.clues.find(c => (typeof c === 'object' && c.id === itemId));
+                                if (clueObj) {
+                                    const newText = prompt('编辑线索内容：', clueObj.text);
+                                    if (newText !== null) {
+                                        clueObj.text = newText;
+                                        sst(s);
+                                        renderClueSidebar();
+                                    }
+                                }
+                            }
+                        };
+                    });
+                });
+
+                // Add clue button
+                cont.querySelector('#btnAddClue').onclick = () => {
+                    const text = prompt('请输入新线索内容：');
+                    if (text) {
+                        const s = gst();
+                        if (!s.clues) s.clues = [];
+                        s.clues.push({
+                            text: text,
+                            priority: 2,
+                            id: 'clue_' + Date.now(),
+                            time: gclk().day + '日 ' + fmtTime(gclk().elapsedSec)
+                        });
+                        sst(s);
+                        renderClueSidebar();
+                        playSfx('pickup');
+                        tst('新线索已添加');
+                    }
+                };
+
+                // Sort button
+                cont.querySelector('#btnSortClue').onclick = () => {
+                    const s = gst();
+                    if (!s || !s.clues) return;
+                    // Assign priorities based on content keywords
+                    s.clues.forEach(c => {
+                        if (typeof c === 'object') {
+                            const text = c.text || '';
+                            if (/(重要|关键|核心|危险|警告|注意|紧急|必须)/.test(text)) c.priority = 1;
+                            else if (/(线索|提示|发现|记得|记住)/.test(text)) c.priority = 2;
+                            else c.priority = 3;
+                        }
+                    });
+                    sst(s);
+                    renderClueSidebar();
+                    tst('已自动排序线索');
+                };
+
                 // Clear any drag-position inline styles so the sidebar can open/close properly
                 const clueSb = $('clueSidebar');
                 if (clueSb) {
@@ -1880,10 +2234,11 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (gb) {
                     if (f.debug) gb.classList.add('show'); else gb.classList.remove('show');
                 }
-                // Idle badge
+                // Idle badge - 点击挂机出现，停止挂机消失
                 const ib = $('idleBadge');
                 if (ib) {
-                    if (f.idleOn) ib.classList.add('show'); else ib.classList.remove('show');
+                    if (f.idleOn) { ib.textContent = '挂机中 · ' + (f.idleDir || '休养'); ib.classList.add('show'); }
+                    else { ib.classList.remove('show'); }
                 }
                 // Ensure idle button text matches state
                 const ibtn = $('btnIdle');
@@ -2023,7 +2378,18 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             function mds(ch) {
                 const s = gst();
                 const c = gch();
-                if (ch.hp !== undefined) { s.hp = Math.max(0, Math.min(s.maxHp || 100, ch.hp)); if (s.hp <= 0 && !cfg().debug) { s.injury = s.injury === '无' ? '致命伤' : s.injury + '（致命）'; } }
+                if (ch.hp !== undefined) { 
+                    s.hp = Math.max(0, Math.min(s.maxHp || 100, ch.hp)); 
+                    if (s.hp <= 0 && !cfg().debug) { 
+                        s.injury = s.injury === '无' ? '致命伤' : s.injury + '（致命）';
+                        s.deathTriggered = true;
+                    } 
+                }
+                // Check for death conditions
+                if (!cfg().debug && s.hp <= 0 && !s.deathShown) {
+                    s.deathShown = true;
+                    triggerDeathEnding(s);
+                }
                 if (ch.wpnDurName && ch.wpnDurDelta !== undefined) {
                     if (!s.weaponDurability) s.weaponDurability = {};
                     const cur = s.weaponDurability[ch.wpnDurName] || 100;
@@ -3169,20 +3535,58 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             function toggleIdle() {
                 const f = cfg();
                 if (f.idleOn) { stopIdle(); return; }
-                const dir = prompt('挂机行动方向：\n休养 = 休养为主\n探索 = 探索为主\n自定义 = 自定义（在下一次提示输入行动内容）', f.idleDir || '休养');
-                if (dir === null) return;
-                f.idleDir = dir;
-                if (dir === '自定义') {
-                    const custom = prompt('请输入挂机自定义行动内容（如：在公寓内搜寻可用的工具和零件）：', f.idleCustom || '');
-                    if (custom === null) return;
-                    f.idleCustom = custom;
-                }
-                const input = prompt('挂机输出频率（秒，建议30-120）：', f.idleInt || 60);
-                if (input === null) return;
-                const v = parseInt(input) || 60;
-                if (v < 5) { tst('最小5秒'); return; }
-                f.idleInt = v; scf(f);
-                startIdle();
+                openIdleConfigPanel();
+            }
+            function openIdleConfigPanel() {
+                const f = cfg();
+                const d = document.createElement('div');
+                d.className = 'modal-overlay';
+                d.style.zIndex = '10000';
+                const dirOptions = ['休养', '探索', '自定义'];
+                const dirLabels = { '休养': '休养为主', '探索': '探索为主', '自定义': '自定义' };
+                d.innerHTML = '<div class="idle-config-panel">' +
+                    '<h3>⚙ 挂机配置</h3>' +
+                    '<div class="ic-field">' +
+                        '<label>行动方向</label>' +
+                        '<select id="icDir">' +
+                            dirOptions.map(o => '<option value="' + o + '"' + (o === (f.idleDir || '休养') ? ' selected' : '') + '>' + dirLabels[o] + '</option>').join('') +
+                        '</select>' +
+                    '</div>' +
+                    '<div class="ic-field" id="icCustomWrap" style="display:' + ((f.idleDir === '自定义') ? 'block' : 'none') + ';">' +
+                        '<label>自定义行动</label>' +
+                        '<input type="text" id="icCustom" placeholder="如：在公寓内搜寻可用的工具和零件" value="' + esc(f.idleCustom || '') + '">' +
+                        '<div class="ic-hint">当选择"自定义"方向时，挂机将执行此行动内容</div>' +
+                    '</div>' +
+                    '<div class="ic-field">' +
+                        '<label>行动间隔（秒，最小5秒）</label>' +
+                        '<input type="number" id="icInt" min="5" max="300" value="' + (f.idleInt || 60) + '">' +
+                        '<div class="ic-hint">挂机模式下每次自动行动的间隔时间</div>' +
+                    '</div>' +
+                    '<div class="ic-buttons">' +
+                        '<button class="ic-btn cancel" id="icCancel">取消</button>' +
+                        '<button class="ic-btn confirm" id="icConfirm">开始挂机</button>' +
+                    '</div>' +
+                '</div>';
+                document.body.appendChild(d);
+                const dirSel = d.querySelector('#icDir');
+                const customWrap = d.querySelector('#icCustomWrap');
+                dirSel.onchange = () => { customWrap.style.display = (dirSel.value === '自定义') ? 'block' : 'none'; };
+                const cleanup = () => { d.remove(); };
+                d.querySelector('#icCancel').onclick = cleanup;
+                d.querySelector('#icConfirm').onclick = () => {
+                    const dir = dirSel.value;
+                    const custom = d.querySelector('#icCustom').value;
+                    const intInput = d.querySelector('#icInt');
+                    const v = parseInt(intInput.value) || 60;
+                    if (v < 5) { tst('最小5秒'); return; }
+                    f.idleDir = dir;
+                    if (dir === '自定义') f.idleCustom = custom;
+                    f.idleInt = v;
+                    scf(f);
+                    cleanup();
+                    startIdle();
+                };
+                d.onclick = (e) => { if (e.target === d) cleanup(); };
             }
 
             // ===== Sandbox rendering =====
@@ -3978,18 +4382,84 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         if (act === 'use') {
                             if (busy) { tst('正在演算中'); return; }
                             $('backpackModal').style.display = 'none';
-                            // Apply item effects locally so attributes update immediately
-                            const eff = applyItemEffect(item);
-                            const msg = eff && eff.length
-                                ? '使用物品：' + item + '（效果：' + eff.join(' ') + '）'
-                                : '使用物品：' + item;
-                            hin(msg);
-                            playSfx('heal');
+                            const s = gst();
+                            const itemInfo = getItemInfo(getItemBaseName(item));
+                            // Check if item is consumable/usable
+                            const canDirectUse = itemInfo && (itemInfo.type === 'usable' || 
+                                itemInfo.category === 'consumable' ||
+                                (itemInfo.effect && itemInfo.effect.length > 0));
+                            
+                            if (canDirectUse) {
+                                // Apply item effects locally
+                                const eff = applyItemEffect(item);
+                                // Remove item from inventory (decrement count)
+                                if (s && s.inv) {
+                                    const invIdx = s.inv.indexOf(item);
+                                    if (invIdx >= 0) {
+                                        // Check if item has quantity suffix like x2
+                                        const itemStr = s.inv[invIdx];
+                                        const qtyMatch = itemStr.match(/^(.+?)x(\d+)$/);
+                                        if (qtyMatch) {
+                                            const n = parseInt(qtyMatch[2]) - 1;
+                                            if (n <= 0) s.inv.splice(invIdx, 1);
+                                            else s.inv[invIdx] = qtyMatch[1] + 'x' + n;
+                                        } else {
+                                            s.inv.splice(invIdx, 1);
+                                        }
+                                        sst(s);
+                                    }
+                                }
+                                // Show usage feedback
+                                const msg = eff && eff.length
+                                    ? '使用了 ' + item + '（效果：' + eff.join(' ') + '）'
+                                    : '使用了 ' + item;
+                                out(msg, 'whisper');
+                                playSfx('heal');
+                                // Refresh backpack display
+                                if (typeof renderBackpack === 'function') renderBackpack();
+                                // Notify side
+                                snotify('remove', '消耗', item);
+                            } else {
+                                // Non-consumable items: still send to AI for narrative
+                                const msg = '使用物品：' + item;
+                                hin(msg);
+                                playSfx('heal');
+                            }
                         } else if (act === 'equip') {
                             if (busy) { tst('正在演算中'); return; }
                             $('backpackModal').style.display = 'none';
-                            hin('装备：' + item);
-                            playSfx('equip');
+                            // Directly toggle equipment without sending to input
+                            const s = gst();
+                            const itemInfo = getItemInfo(getItemBaseName(item));
+                            if (!itemInfo) { hin('装备：' + item); playSfx('equip'); return; }
+                            // Find suitable slot
+                            const slotMap = {
+                                'weapon': 'weapon', 'armor': 'body', 'tool': 'offhand',
+                                'backpack': 'backpack', 'tech': 'offhand', 'misc': 'accessory'
+                            };
+                            const slot = slotMap[itemInfo.subCategory] || 'offhand';
+                            if (!s.equip) s.equip = {};
+                            if (s.equip[slot] === item) {
+                                // Unequip
+                                playSfx('drop');
+                                tst('已卸下：' + item);
+                            } else {
+                                // Equip
+                                if (s.equip[slot]) {
+                                    // Return current equip to inventory
+                                    s.inv.push(s.equip[slot]);
+                                }
+                                // Remove from inventory
+                                const idx = s.inv.indexOf(item);
+                                if (idx >= 0) s.inv.splice(idx, 1);
+                                s.equip[slot] = item;
+                                playSfx('equip');
+                                tst('已装备：' + item);
+                            }
+                            sst(s);
+                            upui();
+                            // Notify system for AI awareness
+                            snotify('status', '装备', item);
                         } else if (act === 'drop') {
                             if (busy) { tst('正在演算中'); return; }
                             $('backpackModal').style.display = 'none';
@@ -6853,6 +7323,47 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
         // Check achievements periodically
         setInterval(checkAchievements, 15000);
 
+        // ===== 突发事件系统 =====
+        const EVENT_TRIGGERS = {
+            onLowHealth: (s) => {
+                if (s.hp < 30 && Math.random() < 0.3) {
+                    snotify('status', '警告', '生命值偏低！');
+                    addLogEntry('event', '事件：生命危机');
+                }
+            },
+            onLowHunger: (s) => {
+                if (s.hunger < 20 && Math.random() < 0.4) {
+                    snotify('status', '警告', '饥饿难耐！');
+                    addLogEntry('event', '事件：严重饥饿');
+                }
+            },
+            onNightfall: (clk) => {
+                if (clk && clk.elapsedSec && (clk.elapsedSec % 86400 > 64800) && (clk.elapsedSec % 86400 < 72000)) {
+                    if (Math.random() < 0.15) {
+                        snotify('info', '夜晚', '夜幕降临，注意安全');
+                    }
+                }
+            },
+            onZombieThreat: (s) => {
+                if (s.hp < 50 && s.infection > 30 && Math.random() < 0.2) {
+                    snotify('danger', '威胁', '尸群正在逼近！');
+                    addLogEntry('event', '事件：尸群逼近');
+                }
+            }
+        };
+
+        function checkRandomEvents() {
+            const s = gst();
+            const clk = gclk();
+            if (!s || cfg().debug) return;
+            Object.values(EVENT_TRIGGERS).forEach(fn => {
+                try { fn(s, clk); } catch(e) {}
+            });
+        }
+
+        // Check events periodically
+        setInterval(checkRandomEvents, 30000);
+
         // ===== 7. 存档导出/导入 =====
         function exportSave() {
             const data = {
@@ -7142,6 +7653,127 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             }
         }
 
+        function triggerDeathEnding(s) {
+            if (s.deathProcessed) return;
+            s.deathProcessed = true;
+            playSfx('death');
+            // Show death notification
+            const deathReasons = [
+                '你因伤势过重而倒下...',
+                '失血过多，意识逐渐模糊...',
+                '感染的伤口最终夺走了你的生命...',
+                '寒冷的天气让你永远睡去...',
+                '饥饿和疲劳最终击垮了你...'
+            ];
+            const reason = deathReasons[Math.floor(Math.random() * deathReasons.length)];
+            // Add death scene to log
+            addLogEntry('system', '【死亡结局】' + reason + ' 你存活了' + (gclk().day || 1) + '天。');
+            // Show ending modal after delay
+            setTimeout(() => {
+                generateDeathEnding(s, reason);
+            }, 2000);
+        }
+        function generateDeathEnding(s, reason) {
+            // Save death location for easter egg
+            const deathLocation = s.location || '废弃公寓';
+            const deathDay = gclk().day || 1;
+            const deathKills = s.totalKills || 0;
+            const deathClues = (s.clues && s.clues.length) || 0;
+            // Store death info for new character easter egg
+            try {
+                localStorage.setItem('dz_death_info', JSON.stringify({
+                    location: deathLocation,
+                    day: deathDay,
+                    kills: deathKills,
+                    clues: deathClues,
+                    reason: reason,
+                    timestamp: Date.now()
+                }));
+            } catch(e) {}
+
+            const d = document.createElement('div');
+            d.className = 'modal-overlay';
+            d.style.zIndex = '10005';
+            d.innerHTML = '<div class="modal-panel" style="max-width:400px;text-align:center;padding:30px 24px;">' +
+                '<div style="font-size:2.5rem;margin-bottom:12px;">💀</div>' +
+                '<h3 style="color:var(--color-danger);margin-bottom:12px;">末日终结</h3>' +
+                '<p style="font-size:0.82rem;color:var(--ink-soft);line-height:1.6;margin-bottom:16px;">' +
+                    esc(reason) + '<br><br>' +
+                    '存活天数：' + deathDay + ' 天<br>' +
+                    '击杀数：' + deathKills + '<br>' +
+                    '解锁线索：' + deathClues + ' 条<br>' +
+                    '死亡地点：' + esc(deathLocation) +
+                '</p>' +
+                '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:16px;">' +
+                    '"在这片废墟中，你的故事画上了句号。但末日仍在继续..."' +
+                '</div>' +
+                '<div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">' +
+                    '<button class="btn-header accent" id="deathNewChar" style="width:100%;">创建新角色</button>' +
+                    '<button class="btn-header" id="deathLoadSave" style="width:100%;">读取最近存档</button>' +
+                    '<button class="btn-header" id="deathViewStats" style="width:100%;font-size:0.7rem;">查看结局统计</button>' +
+                '</div>' +
+            '</div>';
+            document.body.appendChild(d);
+            // Create new character
+            d.querySelector('#deathNewChar').onclick = () => {
+                d.remove();
+                ccb();
+                sst(JSON.parse(JSON.stringify(DSTA)));
+                svh([]);
+                stopIdle();
+                rbt(); upui();
+                // Clear death flag so new character can die
+                const newSta = gst();
+                if (newSta) { newSta.deathShown = false; newSta.deathProcessed = false; sst(newSta); }
+                $('charModal').style.display = 'flex';
+                tst('新角色已创建。前一个角色的死亡地点：' + deathLocation);
+            };
+            // Load most recent save
+            d.querySelector('#deathLoadSave').onclick = () => {
+                d.remove();
+                // Try to load from slot 0 (auto-save) or most recent
+                const saves = [];
+                for (let i = 0; i < 10; i++) {
+                    try {
+                        const data = localStorage.getItem('dz_sav_' + i);
+                        if (data) {
+                            const parsed = JSON.parse(data);
+                            saves.push({ slot: i, data: parsed, time: parsed.saveTime || 0 });
+                        }
+                    } catch(e) {}
+                }
+                if (saves.length === 0) {
+                    tst('没有可用的存档');
+                    return;
+                }
+                // Sort by time descending, get most recent
+                saves.sort((a, b) => (b.time || 0) - (a.time || 0));
+                const recent = saves[0];
+                try {
+                    const data = recent.data;
+                    if (data.sta) {
+                        const loadedSta = JSON.parse(data.sta);
+                        loadedSta.deathShown = false;
+                        loadedSta.deathProcessed = false;
+                        sst(loadedSta);
+                    }
+                    if (data.chr) sch(JSON.parse(data.chr));
+                    if (data.clk) sclk(JSON.parse(data.clk));
+                    if (data.cfg) scf(JSON.parse(data.cfg));
+                    if (data.hist) svh(JSON.parse(data.hist));
+                    rbt(); upui();
+                    tst('已从槽位' + recent.slot + '读取存档');
+                } catch(e) {
+                    tst('读取存档失败：' + e.message);
+                }
+            };
+            // View ending stats
+            d.querySelector('#deathViewStats').onclick = () => {
+                d.remove();
+                showEndingScreen();
+            };
+        }
+
         // ===== 全局初始化 =====
         window.GameSystems = {
             applyStatusEffect, tickStatusEffects, STATUS_EFFECTS,
@@ -7220,6 +7852,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 bpCraft.onclick = openCraftingModal;
                 bpActions.appendChild(bpCraft);
             }
+            // Init auto BGM playback
+            initAutoBGM();
         }, 1000);
 
         // Hook into AI response processing for events and features

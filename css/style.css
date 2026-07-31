@@ -1021,7 +1021,7 @@
             word-wrap: break-word;
             white-space: pre-wrap;
         }
-        /* 图钉主体 */
+        /* 鍥鹃拤涓讳綋 */
         .vn-clue::before {
             content: '';
             position: absolute;
@@ -1037,7 +1037,7 @@
               0 2px 4px rgba(199,91,58,0.3);
             filter: url(#light);
         }
-        /* 图钉高光 */
+        /* 鍥鹃拤楂樺厜 */
         .vn-clue::after {
             content: '';
             position: absolute;
@@ -1053,7 +1053,7 @@
         .vn-clue__tape {
             display: none;
         }
-        /* ===== 选项气泡 - 手绘卡片风格 ===== */
+        /* ===== 閫夐」姘旀场 - 鎵嬬粯鍗＄墖椋庢牸 ===== */
         .vn-choice-container {
             display: flex;
             flex-direction: column;
@@ -1117,7 +1117,7 @@
               0 4px 8px rgba(181,139,90,0.08);
         }
         .vn-choice.selected::before {
-            content: '▸ ';
+            content: '鈻?';
             position: absolute;
             left: 10px;
             top: 50%;
@@ -1228,7 +1228,7 @@
             white-space: nowrap;
         }
         .item-ref::before {
-            content: '▸';
+            content: '鈻?;
             color: var(--accent);
             font-weight: bold;
             margin-right: 2px;
@@ -1239,7 +1239,7 @@
             box-shadow: 0 0 6px rgba(212, 168, 74, 0.35);
         }
         .bp-cell.stared::after {
-            content: '★';
+            content: '鈽?;
             position: absolute;
             top: 2px; right: 2px;
             color: #d4a84a;
@@ -1341,7 +1341,7 @@
         .clue-sidebar {
             position: fixed;
             top: 80px;
-            right: -260px; /* 默认隐藏在右侧 */
+            right: -260px; /* 榛樿闅愯棌鍦ㄥ彸渚?*/
             width: 240px;
             max-height: calc(100vh - 120px);
             z-index: 350;
@@ -1349,7 +1349,7 @@
             pointer-events: none;
             display: flex;
             flex-direction: column;
-            /* 手绘图钉风格 */
+            /* 鎵嬬粯鍥鹃拤椋庢牸 */
             background: #fffef7;
             border: 1.5px solid #c5b9a0;
             border-radius: 3px;
@@ -1361,7 +1361,7 @@
         }
         .clue-sidebar.open {
             right: 10px;
-            pointer-events: auto; /* 展开时可交互 */
+            pointer-events: auto; /* 灞曞紑鏃跺彲浜や簰 */
         }
         .clue-sidebar.dragging {
             cursor: grabbing;
@@ -1419,7 +1419,7 @@
             flex-shrink: 0;
             margin-top: 4px;
         }
-        /* 图钉主体 */
+        /* 鍥鹃拤涓讳綋 */
         .clue-sidebar-header::before {
             content: '';
             position: absolute;
@@ -1435,7 +1435,7 @@
               0 2px 4px rgba(199,91,58,0.3);
             filter: url(#light);
         }
-        /* 图钉高光 */
+        /* 鍥鹃拤楂樺厜 */
         .clue-sidebar-header::after {
             content: '';
             position: absolute;
@@ -1542,7 +1542,7 @@
             border-bottom: 1px dotted var(--border-light);
         }
         .sandbox-subgroup h5::before {
-            content: '▼';
+            content: '鈻?;
             display: inline-block;
             margin-right: 4px;
             transition: transform 0.2s;
@@ -2455,7 +2455,7 @@
             0%, 50% { opacity: 1; }
             51%, 100% { opacity: 0; }
         }
-        /* ===== 装备系统 - 手绘风格 ===== */
+        /* ===== 瑁呭绯荤粺 - 鎵嬬粯椋庢牸 ===== */
         .equip-slots {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -2530,7 +2530,7 @@
         .equip-slot--tool { border-left: 3px solid #5ac578; }
         .equip-slot--accessory { border-left: 3px solid #c5a85a; }
         .equip-slot--backpack { border-left: 3px solid #8a6ac5; }
-        /* 装备详情面板 */
+        /* 瑁呭璇︽儏闈㈡澘 */
         .equip-detail {
             margin-top: 14px;
             padding: 14px 16px;
@@ -2593,7 +2593,7 @@
         .equip-btn--danger:hover {
             background: #fde8e8;
         }
-        /* 背包-装备联动区域 */
+        /* 鑳屽寘-瑁呭鑱斿姩鍖哄煙 */
         .equip-backpack-link {
             margin-top: 14px;
             padding: 12px;
@@ -2661,7 +2661,7 @@
             .backpack-modal { max-width: 95vw !important; max-height: 92vh; }
             .bp-cat-bar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
             .bp-cat-btn { white-space: nowrap; }
-            /* 装备系统移动端适配 */
+            /* 瑁呭绯荤粺绉诲姩绔€傞厤 */
             .equip-slots { grid-template-columns: 1fr; gap: 8px; }
             .equip-slot { padding: 10px 12px; min-height: 56px; }
             .vn-choice { font-size: 0.85rem; padding: 0.65rem 1rem; }
@@ -2724,3 +2724,299 @@
             .chat-area { padding: 10px 8px; }
             .side-panel { width: 320px; }
         }
+
+/* 手绘风格挂机配置弹窗 */
+.idle-config-panel {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(-0.5deg);
+    background: var(--bg-paper);
+    border: 2.5px solid var(--ink);
+    border-radius: 8px 12px 6px 14px / 10px 6px 14px 8px;
+    padding: 20px 24px;
+    box-shadow: 4px 5px 0 var(--shadow-dark);
+    z-index: 10001;
+    max-width: 340px;
+    width: 90%;
+    animation: sketch-pop 0.25s ease-out;
+    font-family: var(--font-main);
+}
+.idle-config-panel::before {
+    content: '';
+    position: absolute;
+    top: -8px;
+    left: 30px;
+    width: 80px;
+    height: 20px;
+    background: var(--clue-tape, rgba(255,200,80,0.55));
+    transform: rotate(-3deg);
+    border-radius: 2px;
+    pointer-events: none;
+}
+.idle-config-panel h3 {
+    color: var(--accent);
+    font-size: 1rem;
+    margin-bottom: 14px;
+    padding-bottom: 8px;
+    border-bottom: 2px dashed var(--divider);
+    text-align: center;
+}
+.idle-config-panel .ic-field {
+    margin-bottom: 12px;
+}
+.idle-config-panel .ic-field label {
+    display: block;
+    font-size: 0.76rem;
+    color: var(--ink);
+    font-weight: bold;
+    margin-bottom: 4px;
+}
+.idle-config-panel .ic-field select,
+.idle-config-panel .ic-field input {
+    width: 100%;
+    padding: 8px 10px;
+    font-size: 0.82rem;
+    font-family: var(--font-main);
+    background: var(--input-bg);
+    border: 2px solid var(--border-light);
+    border-radius: 6px 8px 5px 7px / 7px 5px 8px 6px;
+    color: var(--text);
+    outline: none;
+}
+.idle-config-panel .ic-field select:focus,
+.idle-config-panel .ic-field input:focus {
+    border-color: var(--accent);
+}
+.idle-config-panel .ic-field .ic-hint {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-top: 3px;
+}
+.idle-config-panel .ic-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 16px;
+    justify-content: flex-end;
+}
+.idle-config-panel .ic-btn {
+    padding: 8px 18px;
+    font-size: 0.78rem;
+    font-family: var(--font-main);
+    border: 2px solid var(--border);
+    border-radius: 8px 3px 7px 4px;
+    cursor: pointer;
+    transition: all 0.15s;
+}
+.idle-config-panel .ic-btn.cancel {
+    background: var(--button-bg);
+    color: var(--ink);
+}
+.idle-config-panel .ic-btn.confirm {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+}
+.idle-config-panel .ic-btn:hover {
+    transform: translate(-1px, -1px);
+    box-shadow: 2px 2px 0 var(--shadow-dark);
+}
+
+/* 挂机状态指示器优化 */
+.idle-badge {
+    position: fixed;
+    top: 65px;
+    left: 50%;
+    transform: translateX(-50%) rotate(-1deg);
+    background: var(--accent);
+    color: #fff;
+    padding: 4px 14px;
+    font-size: 0.72rem;
+    font-weight: bold;
+    border: 2px solid var(--border);
+    border-radius: 10px 4px 8px 6px;
+    box-shadow: 2px 3px 0 var(--shadow-dark);
+    z-index: 350;
+    opacity: 0;
+    transition: opacity 0.3s;
+    pointer-events: none;
+}
+.idle-badge.show {
+    opacity: 1;
+    animation: idle-pulse 2s ease-in-out infinite;
+}
+
+@keyframes idle-pulse {
+    0%, 100% { box-shadow: 2px 3px 0 var(--shadow-dark); }
+    50% { box-shadow: 2px 3px 10px rgba(139, 69, 19, 0.4); }
+}
+
+@keyframes sketch-pop {
+    from { transform: translate(-50%, -50%) rotate(-0.5deg) scale(0.9); opacity: 0; }
+    to { transform: translate(-50%, -50%) rotate(-0.5deg) scale(1); opacity: 1; }
+}
+
+/* 线索便签优先级排序样式 */
+.clue-note-item {
+    position: relative;
+    padding: 10px 12px 10px 28px;
+    margin-bottom: 8px;
+    background: var(--clue-bg);
+    border: 1.5px solid var(--clue-color);
+    border-radius: 4px;
+    font-size: 0.72rem;
+    color: var(--clue-color);
+    line-height: 1.5;
+    word-break: break-all;
+    transform: rotate(-0.5deg);
+    box-shadow: 1px 2px 0 var(--shadow-dark);
+}
+.clue-note-item:nth-child(even) {
+    transform: rotate(0.3deg);
+    background: var(--bg-paper-alt);
+}
+.clue-note-item .clue-priority {
+    position: absolute;
+    left: 6px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.6rem;
+    font-weight: bold;
+    color: #fff;
+    cursor: pointer;
+    user-select: none;
+}
+.clue-note-item .clue-priority.p1 { background: #c85050; }
+.clue-note-item .clue-priority.p2 { background: #c8a850; }
+.clue-note-item .clue-priority.p3 { background: #5aaa4a; }
+.clue-note-item .clue-actions {
+    display: flex;
+    gap: 4px;
+    margin-top: 6px;
+    font-size: 0.62rem;
+}
+.clue-note-item .clue-actions span {
+    cursor: pointer;
+    color: var(--text-muted);
+    padding: 2px 4px;
+    border-radius: 3px;
+    transition: all 0.15s;
+}
+.clue-note-item .clue-actions span:hover {
+    background: var(--tag-bg);
+    color: var(--accent);
+}
+
+/* 线索便签添加/删除按钮 */
+.clue-sidebar-actions {
+    display: flex;
+    gap: 4px;
+    padding: 8px 10px;
+    border-top: 1.5px dashed var(--divider);
+    background: var(--bg-paper-alt);
+}
+.clue-sidebar-actions button {
+    flex: 1;
+    padding: 6px 8px;
+    font-size: 0.68rem;
+    font-family: var(--font-main);
+    background: var(--button-bg);
+    border: 1.5px solid var(--border-light);
+    border-radius: 6px 3px 5px 4px;
+    cursor: pointer;
+    color: var(--ink);
+    transition: all 0.15s;
+}
+.clue-sidebar-actions button:hover {
+    background: var(--button-hover);
+    border-color: var(--accent);
+}
+
+/* 物品引用美化样式 */
+.item-ref {
+    display: inline-block;
+    padding: 1px 6px;
+    margin: 0 1px;
+    background: linear-gradient(180deg, var(--highlight) 0%, var(--bg-paper-alt) 100%);
+    border: 1px solid var(--highlight-border);
+    border-radius: 3px;
+    font-weight: 600;
+    color: var(--highlight-color);
+    cursor: help;
+    transition: all 0.15s;
+    position: relative;
+}
+.item-ref:hover {
+    background: var(--highlight);
+    transform: translateY(-1px);
+    box-shadow: 1px 2px 0 var(--shadow-dark);
+}
+.item-ref::after {
+    content: attr(data-item-info);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    padding: 6px 10px;
+    background: var(--code-bg);
+    color: var(--code-text);
+    font-size: 0.7rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.2s;
+    z-index: 100;
+    margin-bottom: 4px;
+}
+.item-ref:hover::after {
+    opacity: 1;
+}
+
+/* 输入锁定状态样式 */
+.input-text.idle-locked::placeholder {
+    color: var(--text-muted);
+    font-style: italic;
+}
+
+/* 移动端挂机面板适配 */
+@media (max-width: 480px) {
+    .idle-config-panel {
+        max-width: 300px;
+        padding: 16px 18px;
+    }
+    .idle-config-panel h3 {
+        font-size: 0.9rem;
+    }
+    .idle-badge {
+        top: 58px;
+        font-size: 0.65rem;
+        padding: 3px 10px;
+    }
+    .clue-note-item {
+        padding: 8px 10px 8px 26px;
+        font-size: 0.68rem;
+    }
+}
+
+/* 移动端属性栏优化 */
+@media (max-width: 600px) {
+    .status-bar {
+        gap: 2px;
+        font-size: 0.52rem;
+    }
+    .status-item {
+        padding: 1px 3px;
+        font-size: 0.5rem;
+        border-width: 1px;
+    }
+    .status-item .st-label {
+        font-size: 0.75em;
+    }
+}
