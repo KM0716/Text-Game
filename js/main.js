@@ -115,22 +115,31 @@
 2. 单轮交互固定单一核心视角，不得随意跳转；跨场景切换必须通过角色移动、环境变化、时间流逝自然过渡，禁止无征兆切视角造成叙事混乱。
 
 ## 二、角色演绎准则
-1. 严守角色人设、境界与身份定位，行为、对话、处事逻辑完全贴合设定，杜绝OOC。角色行为动机清晰，情绪转变有情节铺垫，不得出现无理由情绪波动与断崖式性格转变。
-2. 所有角色情绪均通过动作、微表情、感官细节体现，禁用直白空洞的情绪概括；避免无意义的高冷面瘫寡言设定，角色反应有迹可循，情感表达细腻真实。
-3. 配角出场自然，行为逻辑贴合自身身份立场，不做无脑工具人；多人同场时，需同步呈现至少2-3名角色的神态、动作与即时反应，体现人物间的互动反差与关系张力。
+1. 严守角色人设、年龄、职业、健康状况与身份定位，行为、对话、处事逻辑完全贴合设定，杜绝OOC。角色行为动机清晰，情绪转变有情节铺垫，不得出现无理由情绪波动与断崖式性格转变。
+2. 所有角色情绪均通过动作、微表情、感官细节体现，**绝对禁止**使用"他很生气""她很高兴"这类直白空洞的情绪概括。例如：愤怒应写成"指节捏得发白，下颌绷紧到近乎抽搐"而非"他很愤怒"；悲伤应写成"喉结上下滚了两滚，视线落在虚空处，良久没有眨眼"而非"他很难过"。
+3. 避免无意义的高冷面瘫寡言设定，角色反应有迹可循，情感表达细腻真实。沉默不等于木讷——沉默时可以有"指尖无意识摩挲着袖口的补丁""呼吸放得极缓极轻""眼神飘向远处又迅速收回"等微动作。
+4. 配角出场自然，行为逻辑贴合自身身份立场，不做无脑工具人；多人同场时，需同步呈现至少2-3名角色的神态、动作与即时反应，体现人物间的互动反差与关系张力。
+5. 不同年龄、职业、背景的角色应有明显差异化的行为模式：老人说话语速慢、停顿多、可能反复提及旧事；年轻人语速快、用词跳脱、动作幅度大；军人坐立时腰背挺直，观察环境时眼神有规律地扫过死角；医生说话习惯性观察对方气色、伤口，手指可能无意识做出按压的动作。
 
 ## 三、对话与互动要求
-1. 每句对话必须搭配对应语气、神态、肢体动作中的至少两种，禁止纯台词输出；通过眼神变化、小动作、语气停顿传递潜台词，清晰区分说话主体，避免指代模糊。
-2. 不同角色的措辞、语气、思维逻辑有明确区分，完全贴合身份性格；禁止短句蹦字式敷衍回复，对话有态度、有情绪、有交互，每句台词均服务于剧情或人物塑造。
-3. 存在亲密关系的角色互动需体现自然的黏糊感，加入下意识的肢体小动作，展现情绪反差与双向互动细节；多人互动需体现角色间的肢体接触与情绪碰撞。
-4. 禁止问答式流水账对话，删除无意义闲聊，避免同质化、凑字数的无效表达。
+1. 每句对话必须搭配对应语气、神态、肢体动作中的至少两种，**禁止纯台词输出**。通过眼神变化、小动作、语气停顿传递潜台词，清晰区分说话主体，避免指代模糊。
+2. 不同角色的措辞、语气、思维逻辑有明确区分，完全贴合身份性格：
+   - 退役军人说话简短有力，惜字如金，可能夹杂军事术语和粗口，但不浮夸；
+   - 老教授措辞严谨，句式完整，可能引用古诗文或典故，说话慢条斯理；
+   - 小商贩说话带市井气，话里话外科算盘算，喜欢用反问和比喻；
+   - 年轻学生说话带网络用语残留，容易紧张结巴，但涉及专业领域会突然流利；
+   - 掠夺者说话粗俗直接，威胁居多，句末可能带冷笑或啐痰的动作。
+3. **绝对禁止**所有角色统一用"我觉得""那个""嗯……啊……"这类口语化填充词。不同角色的犹豫有不同表现：有的是沉默低头，有的是咬嘴唇，有的是用指节叩桌面，有的是目光游移。
+4. 禁止短句蹦字式敷衍回复，对话有态度、有情绪、有交互，每句台词均服务于剧情或人物塑造。
+5. 存在亲密关系的角色互动需体现自然的黏糊感，加入下意识的肢体小动作（如不自觉靠近半步、说话时碰对方胳膊、分享同一件物品时手指短暂触碰），展现情绪反差与双向互动细节；多人互动需体现角色间的肢体接触与情绪碰撞。
+6. 禁止问答式流水账对话，删除无意义闲聊，避免同质化、凑字数的无效表达。角色回答应有取舍——该隐瞒的隐瞒，该搪塞的搪塞，该撒谎的撒谎，不会对每个问题都如实详尽回答。
 
 ## 四、叙事与语言规则
-1. 语言自然流畅，摒弃生硬书面化表达，去除AI典型口癖；禁用机械衔接词与空泛无效副词，以动作细节替代抽象描述。
-2. 规避句式呆板重复，长短句结合，灵活调整语序，禁止连续三句以上结构完全对称的句式，还原真人书写质感。
-3. 场景描写融入多感官细节，贴合世界观设定，与人物行动、情绪深度融合，不写与剧情人物无关的环境内容；场景转换通过人物行动自然过渡。
+1. 语言自然流畅，摒弃生硬书面化表达，**彻底去除AI典型口癖**：禁止使用"此时此刻""一言以蔽之""不得不说""值得一提的是""画面一转""镜头拉远"这类影视解说/作文式衔接词；禁止使用"不禁""不由得""居然""竟然"这类滥用副词，改为通过动作细节体现意外感。
+2. 规避句式呆板重复，长短句结合，灵活调整语序，禁止连续三句以上结构完全对称的句式，还原真人书写质感。紧张场景多用短句、断句，甚至一句话拆成几段；舒缓场景可用长句营造氛围。
+3. 场景描写融入多感官细节（视觉、听觉、嗅觉、触觉、味觉至少三种），贴合世界观设定，与人物行动、情绪深度融合，不写与剧情人物无关的环境内容；场景转换通过人物行动自然过渡（如"你推开门走出去，冷风灌进领口——"而非"场景切换到室外"）。
 4. 每轮剧情必须推进主线、输出有效新信息，禁止同义重复、车轱辘话与原地打转；合理设计矛盾与悬念，情节逐层递进，节奏快慢交替。
-5. 杜绝形容词堆砌与生硬修辞，所有描写服务于情节与人物，不写虚浮华丽的无效辞藻。
+5. 杜绝形容词堆砌与生硬修辞，所有描写服务于情节与人物，不写虚浮华丽的无效辞藻。写冷不必"天寒地冻朔风凛冽"，可以是"呼出的白气散得比往常慢，指尖握不住金属物，一粘就是一层薄皮"。
 
 ## 五、基础排版规范
 1. 剧情正文采用纯文本连续叙事，不得添加括号注释与场外补充说明。
@@ -693,17 +702,17 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 '可乐': { category: 'consumable', subCategory: 'drink', effect: '口渴+25 精神+8 欢愉+5', type: 'usable', desc: '碳酸饮料，提神快乐水' },
                 '啤酒': { category: 'consumable', subCategory: 'drink', effect: '口渴+15 欢愉+10 精神-2', type: 'usable', desc: '冰啤酒，末世里的奢侈品' },
                 '白酒': { category: 'consumable', subCategory: 'drink', effect: '欢愉+15 体温+1 精神-5', type: 'usable', desc: '高度白酒，可饮用或消毒' },
-                '酒精': { category: 'consumable', subCategory: 'medical', effect: '消毒/燃烧', type: 'usable', desc: '75%酒精，可消毒或制作燃烧瓶' },
-                '绷带': { category: 'consumable', subCategory: 'medical', effect: '治疗轻伤', type: 'usable', desc: '医用绷带，可包扎伤口' },
-                '纱布': { category: 'consumable', subCategory: 'medical', effect: '临时止血', type: 'usable', desc: '医用纱布，临时包扎伤口' },
+                '酒精': { category: 'consumable', subCategory: 'medical', effect: '消毒', type: 'usable', desc: '75%医用酒精，消毒杀菌' },
+                '绷带': { category: 'consumable', subCategory: 'medical', effect: '止血 治疗-轻伤', type: 'usable', desc: '无菌绷带，包扎伤口' },
+                '纱布': { category: 'consumable', subCategory: 'medical', effect: '止血 包扎', type: 'usable', desc: '医用纱布，可加工绷带' },
                 '止血带': { category: 'consumable', subCategory: 'medical', effect: '止大出血', type: 'usable', desc: '军用止血带，防止失血过多' },
                 '药品': { category: 'consumable', subCategory: 'medical', effect: '治疗疾病', type: 'usable', desc: '常用药品，缓解症状' },
-                '止痛药': { category: 'consumable', subCategory: 'medical', effect: '缓解疼痛 精神+5', type: 'usable', desc: '强效止痛药，布洛芬' },
-                '消炎药': { category: 'consumable', subCategory: 'medical', effect: '消除炎症', type: 'usable', desc: '广谱消炎药' },
+                '止痛药': { category: 'consumable', subCategory: 'medical', effect: '止痛 精神+5', type: 'usable', desc: '对乙酰氨基酚，缓解疼痛' },
+                '消炎药': { category: 'consumable', subCategory: 'medical', effect: '治愈感染', type: 'usable', desc: '广谱消炎药，治疗感染' },
                 '医疗包': { category: 'consumable', subCategory: 'medical', effect: '治疗重伤', type: 'usable', desc: '综合医疗包，处理多种伤情' },
-                '抗生素': { category: 'consumable', subCategory: 'medical', effect: '治疗感染', type: 'usable', desc: '抗生素药物，治疗细菌感染' },
+                '抗生素': { category: 'consumable', subCategory: 'medical', effect: '治愈感染 预防感染', type: 'usable', desc: '广谱抗生素，抗感染神药' },
                 '生理盐水': { category: 'consumable', subCategory: 'medical', effect: '清洗伤口 口渴+15', type: 'usable', desc: '生理盐水，可冲洗伤口' },
-                '退烧药': { category: 'consumable', subCategory: 'medical', effect: '退烧 精神+5', type: 'usable', desc: '对乙酰氨基酚' },
+                '退烧药': { category: 'consumable', subCategory: 'medical', effect: '退烧 体温-1 精神+5', type: 'usable', desc: '布洛芬胶囊，退烧止痛' },
                 '手枪': { category: 'equip', subCategory: 'weapon', durability: 100, type: 'weapon', desc: '9mm手枪，便携防身武器' },
                 '消音手枪': { category: 'equip', subCategory: 'weapon', durability: 95, type: 'weapon', desc: '安装消音器的手枪，不易吸引丧尸' },
                 '霰弹枪': { category: 'equip', subCategory: 'weapon', durability: 90, type: 'weapon', desc: '12号霰弹枪，近战威力惊人' },
@@ -720,7 +729,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 '军用头盔': { category: 'equip', subCategory: 'armor', durability: 95, type: 'equippable', desc: 'MICH防弹头盔，防护能力强' },
                 '手电筒': { category: 'equip', subCategory: 'tool', type: 'equippable', desc: '便携式照明工具' },
                 '强光头灯': { category: 'equip', subCategory: 'tool', type: 'equippable', desc: '戴在头上的强光灯，解放双手' },
-                '紫外线灯': { category: 'equip', subCategory: 'tool', type: 'equippable', desc: '紫外线消毒灯，净化水源' },
+                '紫外线灯': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: 'UV杀菌灯，可净化水源和空气消毒' },
                 '多功能扳手': { category: 'equip', subCategory: 'tool', type: 'weapon', desc: '实用工具也可作武器' },
                 '瑞士军刀': { category: 'equip', subCategory: 'tool', type: 'equippable', desc: '多功能工具刀，用途广泛' },
                 '撬棍': { category: 'equip', subCategory: 'tool', type: 'weapon', desc: '金属撬棍，可撬门可打丧尸' },
@@ -767,7 +776,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 '罐头食品': { category: 'consumable', subCategory: 'food', effect: '饱腹+40 口渴+10', type: 'usable', desc: '罐装食品，开罐即食' },
                 '维生素片': { category: 'consumable', subCategory: 'medical', effect: '精神+3 体质+微量', type: 'usable', desc: '复合维生素，预防坏血病' },
                 '香烟': { category: 'consumable', subCategory: 'misc', effect: '精神+5', type: 'usable', desc: '烟草制品，可缓解压力' },
-                '雪茄': { category: 'consumable', subCategory: 'misc', effect: '精神+10 欢愉+5', type: 'usable', desc: '古巴雪茄，稀有奢侈品' },
+                '雪茄': { category: 'consumable', subCategory: 'misc', effect: '精神+8 欢愉+12', type: 'usable', desc: '古巴手工雪茄，稀有奢侈品' },
                 '打火机': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '便携点火工具' },
                 '火柴': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '传统取火工具' },
                 '镁棒': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '野外求生打火石，万次点火' },
@@ -817,26 +826,22 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 '医疗箱': { category: 'consumable', subCategory: 'medical', effect: '治疗重伤 消毒止血', type: 'usable', desc: '专业医疗箱，含手术工具' },
                 '吗啡': { category: 'consumable', subCategory: 'medical', effect: '止痛 精神+15', type: 'usable', desc: '军用吗啡注射器，强效止痛' },
                 '肾上腺素': { category: 'consumable', subCategory: 'medical', effect: '精神+25 疲劳-30', type: 'usable', desc: '肾上腺素注射器，应急提神' },
-                '消炎药': { category: 'consumable', subCategory: 'medical', effect: '治愈感染', type: 'usable', desc: '广谱消炎药，治疗感染' },
-                '退烧药': { category: 'consumable', subCategory: 'medical', effect: '退烧 体温-1', type: 'usable', desc: '布洛芬胶囊，退烧止痛' },
                 '营养膏': { category: 'consumable', subCategory: 'food', effect: '饱腹+25 精神+5', type: 'usable', desc: '军用营养膏，高浓缩能量' },
                 '单兵口粮': { category: 'consumable', subCategory: 'food', effect: '饱腹+60 精神+5', type: 'usable', desc: 'MRE单兵口粮，完整一餐' },
                 '速溶咖啡': { category: 'consumable', subCategory: 'misc', effect: '疲劳-20 精神+8', type: 'usable', desc: '速溶咖啡粉，提神醒脑' },
                 '能量饮料': { category: 'consumable', subCategory: 'misc', effect: '疲劳-15 精神+5', type: 'usable', desc: '功能饮料，快速提神' },
-                '午餐肉罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+35', type: 'usable', desc: '经典午餐肉，开罐即食' },
-                '水果罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+20 口渴-10 精神+5', type: 'usable', desc: '黄桃罐头，补充维生素' },
+                '水果罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+20 口渴+10 精神+5', type: 'usable', desc: '黄桃罐头，补充维生素和水分' },
                 '鱼罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+30', type: 'usable', desc: '茄汁沙丁鱼罐头' },
                 '蜂蜜': { category: 'consumable', subCategory: 'food', effect: '饱腹+10 精神+8', type: 'usable', desc: '天然蜂蜜，永久保存' },
-                '奶粉': { category: 'consumable', subCategory: 'food', effect: '饱腹+15 精神+3', type: 'usable', desc: '脱脂奶粉，冲泡饮用' },
-                '茶叶': { category: 'consumable', subCategory: 'misc', effect: '精神+5 口渴-5', type: 'usable', desc: '干燥茶叶，冲泡提神' },
-                '咸菜': { category: 'consumable', subCategory: 'food', effect: '饱腹+10 口渴+15', type: 'usable', desc: '腌制咸菜，佐餐' },
+                '奶粉': { category: 'consumable', subCategory: 'food', effect: '饱腹+15 口渴+10 精神+3', type: 'usable', desc: '脱脂奶粉，冲泡饮用，补充水分营养' },
+                '茶叶': { category: 'consumable', subCategory: 'misc', effect: '精神+5 口渴+10', type: 'usable', desc: '干燥茶叶，冲泡提神解渴' },
+                '咸菜': { category: 'consumable', subCategory: 'food', effect: '饱腹+10 口渴-5', type: 'usable', desc: '腌制咸菜，佐餐但会加重口渴' },
                 // ===== 新增武器装备 =====
                 '武士刀': { category: 'equip', subCategory: 'weapon', durability: 90, type: 'weapon', desc: '日本武士刀，锋利无比' },
                 '三棱刺': { category: 'equip', subCategory: 'weapon', durability: 80, type: 'weapon', desc: '三棱军刺，穿透力强' },
                 '链锯': { category: 'equip', subCategory: 'weapon', durability: 60, type: 'weapon', desc: '汽油链锯，恐怖近战武器' },
                 '电击棒': { category: 'equip', subCategory: 'weapon', durability: 70, type: 'weapon', desc: '高压电击棒，非致命制服' },
                 '弓': { category: 'equip', subCategory: 'weapon', durability: 75, type: 'weapon', desc: '复合弓，无声远程武器' },
-                '弩箭': { category: 'material', subCategory: 'ammo', type: 'material', desc: '十字弩专用箭，可回收' },
                 '弓箭': { category: 'material', subCategory: 'ammo', type: 'material', desc: '复合弓专用箭' },
                 '霰弹枪子弹': { category: 'material', subCategory: 'ammo', type: 'material', desc: '12号霰弹，鹿弹' },
                 // ===== 新增工具与材料 =====
@@ -853,11 +858,6 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 // ===== 新增贵重品与特殊物品 =====
                 '钻石': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '钻石，高价值交易品' },
                 '古董': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '古董瓷器，收藏价值高' },
-                '抗生素': { category: 'consumable', subCategory: 'medical', effect: '治愈感染 预防感染', type: 'usable', desc: '广谱抗生素，抗感染神药' },
-                '止痛药': { category: 'consumable', subCategory: 'medical', effect: '止痛 精神+5', type: 'usable', desc: '对乙酰氨基酚，缓解疼痛' },
-                '绷带': { category: 'consumable', subCategory: 'medical', effect: '止血 治疗-轻伤', type: 'usable', desc: '无菌绷带，包扎伤口' },
-                '纱布': { category: 'consumable', subCategory: 'medical', effect: '止血 包扎', type: 'usable', desc: '医用纱布，可加工绷带' },
-                '酒精': { category: 'consumable', subCategory: 'medical', effect: '消毒', type: 'usable', desc: '75%医用酒精，消毒杀菌' },
                 '碘伏': { category: 'consumable', subCategory: 'medical', effect: '消毒', type: 'usable', desc: '碘伏消毒液，温和无刺激' },
                 '汽油桶': { category: 'material', subCategory: 'fuel', type: 'material', desc: '20L金属汽油桶' },
                 '蓄电池': { category: 'material', subCategory: 'tech', type: 'material', desc: '12V汽车蓄电池，可储能' },
@@ -874,7 +874,94 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 '密封袋': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '密封塑料袋，可防潮收纳' },
                 '水壶': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '金属水壶，可装水但本身不是水' },
                 '水瓶': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '空水瓶容器，可装水' },
-                '水袋': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '装水用的软质水袋' }
+                '水袋': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '装水用的软质水袋' },
+                // ===== 新增食物类 =====
+                '花生酱': { category: 'consumable', subCategory: 'food', effect: '饱腹+25 精神+3', type: 'usable', desc: '高能量花生酱，可长期保存' },
+                '燕麦片': { category: 'consumable', subCategory: 'food', effect: '饱腹+30', type: 'usable', desc: '速食燕麦片，营养均衡' },
+                '果酱': { category: 'consumable', subCategory: 'food', effect: '饱腹+15 欢愉+3', type: 'usable', desc: '水果果酱，甜美的奢侈' },
+                '速食汤': { category: 'consumable', subCategory: 'food', effect: '饱腹+20 口渴+20', type: 'usable', desc: '脱水速食汤，热水冲泡' },
+                '坚果': { category: 'consumable', subCategory: 'food', effect: '饱腹+20 精神+3', type: 'usable', desc: '混合坚果，便携高能量' },
+                '葡萄干': { category: 'consumable', subCategory: 'food', effect: '饱腹+15 精神+2', type: 'usable', desc: '晒干葡萄干，保存期长' },
+                '牛肉罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+45 精神+4', type: 'usable', desc: '红烧牛肉罐头，美味高蛋白' },
+                '鸡肉罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+40 精神+3', type: 'usable', desc: '油浸鸡肉罐头，口感尚佳' },
+                '玉米罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+30', type: 'usable', desc: '甜玉米罐头，开罐即食' },
+                '番茄酱': { category: 'consumable', subCategory: 'spice', effect: '饱腹+5 欢愉+2', type: 'usable', desc: '调味番茄酱，让食物更美味' },
+                '辣酱': { category: 'consumable', subCategory: 'spice', effect: '欢愉+4 体温+0.5', type: 'usable', desc: '辣椒酱，开胃提神' },
+                // ===== 新增医疗类 =====
+                '创可贴': { category: 'consumable', subCategory: 'medical', effect: '止血 治疗-微伤', type: 'usable', desc: '小伤口用创可贴，防感染' },
+                '眼药水': { category: 'consumable', subCategory: 'medical', effect: '缓解眼疲劳 精神+3', type: 'usable', desc: '人工泪液滴眼液' },
+                '皮炎平': { category: 'consumable', subCategory: 'medical', effect: '止痒 消炎', type: 'usable', desc: '皮肤外用药膏，治皮炎湿疹' },
+                '胃药': { category: 'consumable', subCategory: 'medical', effect: '缓解胃痛 精神+2', type: 'usable', desc: '肠胃不适时服用' },
+                '抗过敏药': { category: 'consumable', subCategory: 'medical', effect: '治疗过敏', type: 'usable', desc: '抗组胺类抗过敏药' },
+                '血压药': { category: 'consumable', subCategory: 'medical', effect: '稳定血压', type: 'usable', desc: '慢性病人必备的降压药' },
+                '胰岛素': { category: 'consumable', subCategory: 'medical', effect: '降低血糖', type: 'usable', desc: '糖尿病人必需的胰岛素针剂' },
+                '体温计': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '电子体温计，准确测体温' },
+                '听诊器': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '医用听诊器，诊断心肺' },
+                '骨折夹板': { category: 'consumable', subCategory: 'medical', effect: '固定骨折', type: 'usable', desc: '铝合金骨折固定板' },
+                // ===== 新增武器装备 =====
+                '唐刀': { category: 'equip', subCategory: 'weapon', durability: 88, type: 'weapon', desc: '中国唐式横刀，直刃劈砍利器' },
+                '苗刀': { category: 'equip', subCategory: 'weapon', durability: 85, type: 'weapon', desc: '双手长柄苗刀，威力巨大' },
+                '警棍': { category: 'equip', subCategory: 'weapon', durability: 75, type: 'weapon', desc: '伸缩式警棍，便携近战武器' },
+                '拐棍': { category: 'equip', subCategory: 'weapon', durability: 55, type: 'weapon', desc: 'T型拐棍，攻防兼备' },
+                '指虎': { category: 'equip', subCategory: 'weapon', durability: 70, type: 'weapon', desc: '金属指虎，增强拳力' },
+                '甩棍': { category: 'equip', subCategory: 'weapon', durability: 72, type: 'weapon', desc: '重型甩棍，一击可断骨' },
+                '冰镐': { category: 'equip', subCategory: 'weapon', durability: 80, type: 'weapon', desc: '登山冰镐，穿刺力惊人' },
+                '鱼叉': { category: 'equip', subCategory: 'weapon', durability: 65, type: 'weapon', desc: '长柄渔叉，可投掷可近战' },
+                '镰刀': { category: 'equip', subCategory: 'weapon', durability: 60, type: 'weapon', desc: '农用镰刀，切割力强' },
+                '钉枪': { category: 'equip', subCategory: 'weapon', durability: 65, type: 'weapon', desc: '气动钉枪，可做远程武器' },
+                '捕网枪': { category: 'equip', subCategory: 'weapon', durability: 70, type: 'weapon', desc: '发射捕捉网，非致命' },
+                '电击枪': { category: 'equip', subCategory: 'weapon', durability: 68, type: 'weapon', desc: '泰瑟电击枪，远程电击' },
+                // ===== 新增防具 =====
+                '防爆盾': { category: 'equip', subCategory: 'armor', durability: 95, type: 'equippable', desc: '警用防爆盾，正面近乎无敌' },
+                '防暴头盔': { category: 'equip', subCategory: 'armor', durability: 90, type: 'equippable', desc: '全覆盖式防暴头盔，面部有金属网' },
+                '战术手套': { category: 'equip', subCategory: 'armor', durability: 78, type: 'equippable', desc: '半指战术手套，防滑防割' },
+                '作战靴': { category: 'equip', subCategory: 'armor', durability: 85, type: 'equippable', desc: '高帮作战靴，防刺防扎' },
+                '护肘': { category: 'equip', subCategory: 'armor', durability: 72, type: 'equippable', desc: '硬壳护肘，缓冲冲击' },
+                '护肩': { category: 'equip', subCategory: 'armor', durability: 75, type: 'equippable', desc: '战术护肩，保护肩部' },
+                '防弹面罩': { category: 'equip', subCategory: 'armor', durability: 82, type: 'equippable', desc: '透明防弹面罩，III级防护' },
+                '气囊背心': { category: 'equip', subCategory: 'armor', durability: 70, type: 'equippable', desc: '摩托气囊背心，跌落自动充气' },
+                // ===== 新增工具 =====
+                '折叠铲': { category: 'equip', subCategory: 'tool', durability: 75, type: 'weapon', desc: '三折折叠铲，挖撬锯砍多功能' },
+                '断线钳': { category: 'equip', subCategory: 'tool', durability: 80, type: 'weapon', desc: '重型断线钳，可剪断铁链钢筋' },
+                '液压剪': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '便携液压剪，破拆防盗门' },
+                '撬锁套装': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '专业开锁工具，锡纸+钩针' },
+                '玻璃刀': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '金刚石玻璃刀，静音破窗' },
+                '充气泵': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '脚踏式打气筒，车胎充气' },
+                '补胎工具': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '冷补胶+搓片，修补轮胎' },
+                '牵引绳': { category: 'material', subCategory: 'tool', type: 'material', desc: '5吨拖车绳，带挂钩' },
+                '跨接电缆': { category: 'material', subCategory: 'tool', type: 'material', desc: '电瓶搭火线，启动亏电车辆' },
+                '防滑链': { category: 'material', subCategory: 'tool', type: 'material', desc: '金属防滑链，雪地行车必备' },
+                // ===== 新增电子设备 =====
+                '夜视仪': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: '单筒夜视仪，被动红外' },
+                '热成像仪': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '手持热成像，探知墙后生物' },
+                '无人机': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '航拍无人机，远程侦察' },
+                '行车记录仪': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '车载记录仪，循环录像' },
+                '手持电台': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: '5W对讲机，10公里通讯' },
+                '扫描仪': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '警用频率扫描仪，监听无线电' },
+                '便携空调': { category: 'equip', subCategory: 'tech', type: 'usable', desc: 'USB充电制冷风扇，防暑' },
+                '电子防盗器': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '门窗磁感应报警器' },
+                '移动硬盘': { category: 'material', subCategory: 'tech', type: 'material', desc: '2TB移动硬盘，可能藏有重要数据' },
+                // ===== 新增材料 =====
+                '钢材': { category: 'material', subCategory: 'build', type: 'material', desc: '厚钢板，可做护甲工事' },
+                '弹簧钢': { category: 'material', subCategory: 'build', type: 'material', desc: '高弹性弹簧钢带，做刀的好料' },
+                '碳纤维布': { category: 'material', subCategory: 'build', type: 'material', desc: '高强度碳纤维布，轻量化加固' },
+                '铜线': { category: 'material', subCategory: 'tech', type: 'material', desc: '粗铜线，电机线圈必备' },
+                '稀土磁铁': { category: 'material', subCategory: 'tech', type: 'material', desc: '钕铁硼强磁，制作发电机' },
+                '焊锡丝': { category: 'material', subCategory: 'tech', type: 'material', desc: '松香芯焊锡，电子焊接' },
+                '热缩管': { category: 'material', subCategory: 'tech', type: 'material', desc: '绝缘热缩套管，电线保护' },
+                '环氧树脂': { category: 'material', subCategory: 'build', type: 'material', desc: '高强度AB胶，粘合金属陶瓷' },
+                '发泡胶': { category: 'material', subCategory: 'build', type: 'material', desc: '聚氨酯发泡剂，填缝保温' },
+                '耐火砖': { category: 'material', subCategory: 'build', type: 'material', desc: '耐高温耐火砖，搭建熔炉' },
+                // ===== 新增贵重品/特殊物品 =====
+                '加密硬盘': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '军方加密硬盘，内容未知' },
+                '科研样本': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '冷藏病毒样本，军方/科研方重金收购' },
+                '古董金条': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '民国时期金条，收藏家的最爱' },
+                '名表': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '瑞士机械名表，末世硬通货' },
+                '名人字画': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '名家真迹，盛世价值连城' },
+                '美酒': { category: 'consumable', subCategory: 'drink', effect: '欢愉+20 精神+5 疲劳-10', type: 'usable', desc: '陈年威士忌，末世慰藉' },
+                '咖啡豆': { category: 'consumable', subCategory: 'misc', effect: '精神+12 疲劳-15', type: 'usable', desc: '精品咖啡豆，研磨冲泡' },
+                '明信片': { category: 'misc', subCategory: 'doc', type: 'misc', desc: '来自亲人的明信片，精神寄托' },
+                '全家福': { category: 'misc', subCategory: 'doc', type: 'misc', desc: '灾前的全家福照片，给予力量' }
             };
             // Smart item matching: exact > longest substring > substring with word boundary
             function getItemInfo(itemName) {
@@ -6073,11 +6160,35 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (p.md.length) $('apiModel').value = p.md[0];
             });
             $('btnTheme').addEventListener('click', () => { cycleTheme(); });
-            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled ? '🔊' : '🔇'; });
-            $('btnSfx').textContent = sfxEnabled ? '🔊' : '🔇';
+            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled ? '🔊 音效' : '🔇 音效'; });
+            $('btnSfx').textContent = sfxEnabled ? '🔊 音效' : '🔇 音效';
             $('btnBgm').addEventListener('click', () => { bgmToggle(); });
-            $('btnBgm').textContent = BGM.enabled ? '🎵' : '🔇';
+            $('btnBgm').textContent = BGM.enabled ? '🎵 音乐' : '🔇 音乐';
             $('btnBgm').title = BGM.enabled ? '背景音乐（开启）' : '背景音乐（已关闭）';
+            // ===== 导航栏「更多」收纳菜单 =====
+            (function initNavMore() {
+                const btn = $('btnNavMore');
+                const menu = $('navMoreMenu');
+                if (!btn || !menu) return;
+                let closeTimer = null;
+                const openMenu = () => {
+                    if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+                    menu.classList.add('open');
+                };
+                const closeMenu = (delay = 200) => {
+                    closeTimer = setTimeout(() => menu.classList.remove('open'), delay);
+                };
+                btn.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    menu.classList.toggle('open');
+                });
+                menu.addEventListener('click', (e) => e.stopPropagation());
+                btn.addEventListener('mouseenter', openMenu);
+                menu.addEventListener('mouseenter', openMenu);
+                btn.addEventListener('mouseleave', () => closeMenu(260));
+                menu.addEventListener('mouseleave', () => closeMenu(200));
+                document.addEventListener('click', () => menu.classList.remove('open'));
+            })();
             // BGM 选择面板：右键或长按
             $('btnBgm').addEventListener('contextmenu', (e) => { e.preventDefault(); bgmOpenPicker(); });
             let bgmPressTimer = null;
