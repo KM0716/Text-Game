@@ -462,43 +462,7 @@
                 <button type="button" class="btn-modal" id="btnSetExportBackup" style="font-size:0.7rem;">导出全部备份</button>
                 <button type="button" class="btn-modal" id="btnSetImportBackup" style="font-size:0.7rem;">选择备份文件导入</button>
             </div>
-            <input type="file" id="inputSetImportBackup" accept=".json" style="display:none;">
             <p id="setImportBackupStatus" class="field-hint" style="margin-top:8px;"></p>
-        </div>
-        <div class="setting-group">
-            <h4>🌐 网络代理（跨域访问）</h4>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:bold;">
-                <input type="checkbox" id="useProxyToggle" style="width:16px;height:16px;">
-                启用代理（解决CORS跨域限制）
-            </label>
-            <p class="field-hint" style="margin-top:4px;">开启后API请求将通过代理服务器转发，适合在GitHub Pages等静态站点环境使用。关闭时直接连接API。</p>
-            <label>代理服务器地址</label>
-            <input id="proxyUrl" placeholder="https://forward-proxy-njswknvuhg.cn-shanghai.fcapp.run/api/proxy">
-            <label>代理密钥</label>
-            <input type="password" id="proxySecret" placeholder="X-Proxy-Secret 密钥">
-        </div>
-        <div class="setting-group" id="proxyRequestGroup">
-            <h4>🔧 代理请求配置</h4>
-            <p class="field-hint">配置通过代理转发的请求参数，便于调试和自定义API调用。配置将自动保存到本地。</p>
-            <label>目标接口地址</label>
-            <input id="proxyTargetUrl" placeholder="https://api.example.com/v1/endpoint">
-            <label>请求方法</label>
-            <select id="proxyMethod">
-                <option value="GET">GET</option>
-                <option value="POST" selected>POST</option>
-            </select>
-            <label>请求Body（JSON格式）</label>
-            <p class="field-hint">POST请求的JSON参数，支持多行编辑</p>
-            <textarea id="proxyBody" rows="4" placeholder='{"key": "value", "model": "gpt-4o"}' style="width:100%;padding:6px 8px;border:1px solid var(--ink-border);border-radius:4px;background:var(--bg);color:var(--ink);font-family:monospace;font-size:0.75rem;resize:vertical;"></textarea>
-            <label>自定义请求头（JSON格式）</label>
-            <p class="field-hint">添加额外的HTTP请求头，如 Authorization、自定义Header等</p>
-            <textarea id="proxyHeaders" rows="3" placeholder='{"Authorization": "Bearer xxx", "X-Custom": "value"}' style="width:100%;padding:6px 8px;border:1px solid var(--ink-border);border-radius:4px;background:var(--bg);color:var(--ink);font-family:monospace;font-size:0.75rem;resize:vertical;"></textarea>
-            <div class="btn-row" style="justify-content:flex-start;gap:6px;margin-top:8px;">
-                <button type="button" class="btn-modal" id="btnSaveProxyCfg" style="font-size:0.7rem;">💾 保存配置</button>
-                <button type="button" class="btn-modal" id="btnClearProxyCfg" style="font-size:0.7rem;color:var(--color-danger);">🗑 清空配置</button>
-                <button type="button" class="btn-modal" id="btnTestProxyReq" style="font-size:0.7rem;">🧪 测试请求</button>
-            </div>
-            <p class="field-hint" id="proxyCfgStatus" style="color:var(--color-success);display:none;margin-top:4px;font-size:0.65rem;"></p>
         </div>
         <div class="setting-group">
             <h4>重新开始</h4>
@@ -650,6 +614,11 @@
     </div>
 
     <!-- ===== 游戏增强系统（合成/战斗/状态/成就/事件/NPC/日志/结局/导入导出/上下文/音效） ===== -->
+    <!-- 数据文件须在 main.js 之前加载，main.js 启动时读取 window 全局 -->
+    <script src="js/npc_data.js"></script>
+    <script src="js/items_data.js"></script>
+    <script src="js/achievements.js"></script>
+    <script src="js/events.js"></script>
     <script src="js/main.js"></script>
 </body>
 </html>

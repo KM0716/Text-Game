@@ -536,6 +536,12 @@
             border: 1.5px solid var(--border-light);
             border-radius: 6px 2px 5px 2px;
             font-size: 0.7rem;
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        .achievement-item:not(.locked):hover {
+            transform: translateY(-1px) rotate(-0.3deg);
+            box-shadow: 0 2px 6px var(--shadow-dark);
         }
         .achievement-item.locked {
             opacity: 0.4;
@@ -562,11 +568,13 @@
             background: var(--tag-bg);
             border-left: 3px solid var(--accent);
             border-radius: 2px 6px 2px 5px;
-            font-size: 0.7rem;
-            color: var(--ink-soft);
+            transition: background 0.2s;
+        }
+        .event-item:hover {
+            background: var(--button-hover);
         }
         .event-item .ev-time {
-            font-size: 0.58rem;
+            font-size: 0.6rem;
             color: var(--text-muted);
             margin-bottom: 2px;
         }
@@ -1819,16 +1827,39 @@
             color: var(--text);
             outline: none;
             margin-bottom: 2px;
-        }
-        .modal-panel textarea {
-            min-height: 48px;
-            resize: vertical;
-            line-height: 1.6;
+            transition: border-color 0.2s, box-shadow 0.2s;
         }
         .modal-panel input:focus,
         .modal-panel select:focus,
         .modal-panel textarea:focus {
             border-color: var(--accent);
+            box-shadow: 0 0 0 2px rgba(139, 69, 19, 0.12);
+        }
+        /* 手绘风格下拉菜单 */
+        .modal-panel select {
+            appearance: none;
+            -webkit-appearance: none;
+            -moz-appearance: none;
+            padding-right: 30px;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4 L6 8 L10 4' stroke='%238b4513' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 8px center;
+            background-size: 12px;
+            cursor: pointer;
+        }
+        .modal-panel select:hover {
+            border-color: var(--accent);
+            background-color: var(--button-hover);
+        }
+        .modal-panel select option {
+            background: var(--bg-paper);
+            color: var(--text);
+            padding: 4px 8px;
+        }
+        .modal-panel textarea {
+            min-height: 48px;
+            resize: vertical;
+            line-height: 1.6;
         }
         .tab-row {
             display: flex;
@@ -2805,6 +2836,26 @@
     border-radius: 6px 8px 5px 7px / 7px 5px 8px 6px;
     color: var(--text);
     outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.idle-config-panel .ic-field select {
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    padding-right: 30px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath d='M2 4 L6 8 L10 4' stroke='%238b4513' stroke-width='2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 8px center;
+    background-size: 12px;
+    cursor: pointer;
+}
+.idle-config-panel .ic-field select:hover {
+    border-color: var(--accent);
+    background-color: var(--button-hover);
+}
+.idle-config-panel .ic-field select option {
+    background: var(--bg-paper);
+    color: var(--text);
 }
 .idle-config-panel .ic-field select:focus,
 .idle-config-panel .ic-field input:focus {
