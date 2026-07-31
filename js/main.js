@@ -140,11 +140,7 @@
                 ep: 'https://api.openai.com/v1/chat/completions', key: '', model: 'gpt-4o',
                 maxT: 2048, temp: 0.7, ctx: 24, tspd: 20, strm: true, fsz: '15px',
                 prompt: DPROMPT, idleInt: 60, idleOn: false, idleDir: '休养', idleCustom: '',
-                worldLock: false, lastSlot: null, debug: false,
-                // 代理配置
-                useProxy: false,
-                proxyUrl: 'https://forward-proxy-njswknvuhg.cn-shanghai.fcapp.run/api/proxy',
-                proxySecret: 'GameProxy_2026Secret_8731'
+                worldLock: false, lastSlot: null, debug: false
             };
             const DSTA = { hunger: 70, thirst: 70, fatigue: 20, bodyTemp: 36.8, injury: '无', enc: 5, hp: 100, maxHp: 100, inv: ['破损背包', '半瓶水', '手电筒', '压缩饼干x2', '绷带x2'], clues: [], status: [], vehicle: '无', mapUnlock: [], mentality: '稳定', spirit: 85, joy: 0, pleasureUnlocked: false, actionBar: [], location: '废弃公寓', traits: ['生存本能', '警觉'],
                 equip: { head: '', body: '', legs: '', feet: '', weapon: '', offhand: '', backpack: '破损背包', accessory: '' },
@@ -614,36 +610,14 @@
             function cfg() { const c = ld(K.CFG, DCFG); if (migrateCfg(c)) scf(c); return c; }
             function scf(c) { sv(K.CFG, c); afs(c.fsz); }
             
-            // 全局代理请求函数（可供欢迎页面测试、游戏主循环等多处调用）
+            // 全局 API 请求函数（欢迎页面测试、游戏主循环共用）：直连模式，纯 localStorage 本地保存密钥
             window._sendProxyRequest = async function(targetUrl, body, apiKey, signal, isStream) {
-                const proxyConf = cfg();
-                if (!proxyConf.useProxy || !proxyConf.proxyUrl) {
-                    // 直连模式
-                    return fetch(targetUrl, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey },
-                        body: JSON.stringify(body),
-                        signal: signal
-                    });
-                }
-                // 代理模式
-                const proxyPayload = {
-                    targetUrl: targetUrl,
+                const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (apiKey || '') };
+                if (isStream) headers['Accept'] = 'text/event-stream';
+                return fetch(targetUrl, {
                     method: 'POST',
-                    body: body,
-                    headers: { 'Authorization': 'Bearer ' + apiKey, 'Content-Type': 'application/json' }
-                };
-                // 如果是流式请求，添加Accept头
-                if (isStream) {
-                    proxyPayload.headers['Accept'] = 'text/event-stream';
-                }
-                return fetch(proxyConf.proxyUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'X-Proxy-Secret': proxyConf.proxySecret || ''
-                    },
-                    body: JSON.stringify(proxyPayload),
+                    headers: headers,
+                    body: JSON.stringify(body),
                     signal: signal
                 });
             };
@@ -4098,10 +4072,22 @@
             $('btnNewGame').addEventListener('click', async () => {
                 if (!cfg().key) {
                     // Show API config first if not set
-                    $('welcomeModal').style.display = 'flex';
                     const c = cfg();
-                    if (c.ep) $('welEndpoint').value = c.ep;
-                    if (c.model) { const sl = $('welModelSelect'); if (sl && [...sl.options].some(o => o.value === c.model)) sl.value = c.model; }
+                    // 无条件回填所有欢迎模态字段（即使用户没填过 key，也会显示 endpoint/preset/model）
+                    if ($('welEndpointPreset')) $('welEndpointPreset').value = c.preset || AP[c.preset] ? c.preset : 'openai';
+                    // 触发一次 welEndpointPreset change 来刷新 welModelSelect 的选项
+                    if ($('welEndpointPreset')) { try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {} }
+                    $('welEndpoint').value = c.ep || '';
+                    const sl = $('welModelSelect');
+                    if (c.model && sl) {
+                        const hasOpt = [...sl.options].some(o => o.value === c.model);
+                        if (hasOpt) sl.value = c.model;
+                        else { $('welModel').value = c.model; sl.style.display='none'; $('welModel').style.display=''; }
+                    } else if (c.model) {
+                        $('welModel').value = c.model;
+                    }
+                    $('welKey').value = c.key || '';
+                    $('welcomeModal').style.display = 'flex';
                     return;
                 }
                 const c = cfg();
@@ -4137,9 +4123,6 @@
                 $('idleCustomWrap').style.display = ($('idleDirection').value === '自定义') ? 'block' : 'none';
                 $('idleDirection').onchange = () => { $('idleCustomWrap').style.display = ($('idleDirection').value === '自定义') ? 'block' : 'none'; };
                 $('godModeToggle').checked = !!c.debug;
-                $('useProxyToggle').checked = !!c.useProxy;
-                $('proxyUrl').value = c.proxyUrl || '';
-                $('proxySecret').value = c.proxySecret || '';
                 $('promptEditor').value = c.prompt || DPROMPT;
                 // Populate debug cheat sheet
                 const dcs = $('debugCheatSheet');
@@ -4185,15 +4168,81 @@
                     idleCustom: $('idleCustom').value || '',
                     worldLock: cfg().worldLock || false,
                     debug: $('godModeToggle').checked,
-                    preset: preset,
-                    useProxy: $('useProxyToggle').checked,
-                    proxyUrl: $('proxyUrl').value || DCFG.proxyUrl,
-                    proxySecret: $('proxySecret').value || DCFG.proxySecret
+                    preset: preset
                 });
                 upui();
                 $('settingsModal').style.display = 'none';
                 tst(cfg().debug ? '⚡ 上帝模式已激活' : '设置已保存');
             });
+            // ========== 设置模态：API 配置区控件 "输入即保存"（不用等「保存设置」按钮） ==========
+            (function bindSettingsAPIInputs() {
+                try {
+                    function saveFromSettings() {
+                        try {
+                            const preset = $('apiEndpointPreset') ? $('apiEndpointPreset').value : cfg().preset;
+                            const oldKey = cfg().key || '';
+                            const newKey = $('apiKey') ? $('apiKey').value : '';
+                            // 保护已有密钥：仅当用户明确输入了非空新密钥时才覆盖
+                            const finalKey = newKey.trim() || oldKey;
+                            const cur = cfg();
+                            scf({
+                                ...cur,
+                                preset: preset,
+                                ep: $('apiEndpoint') ? ($('apiEndpoint').value || DCFG.ep) : cur.ep,
+                                model: $('apiModel') ? ($('apiModel').value || 'gpt-4o') : cur.model,
+                                maxT: $('apiMaxTokens') ? (parseInt($('apiMaxTokens').value, 10) || cur.maxT) : cur.maxT,
+                                temp: $('apiTemperature') ? (parseFloat($('apiTemperature').value) || cur.temp) : cur.temp,
+                                ctx: $('apiContextLen') ? (parseInt($('apiContextLen').value, 10) || cur.ctx) : cur.ctx,
+                                key: finalKey
+                            });
+                        } catch {}
+                    }
+                    // 为 apiEndpointPreset 的 change 事件添加 scf 保存（原代码只更新了 DOM）
+                    const oldPresetEl = document.getElementById('apiEndpointPreset');
+                    if (oldPresetEl) {
+                        oldPresetEl.addEventListener('change', function() {
+                            try {
+                                const p = AP[this.value] || AP.custom;
+                                if (document.getElementById('apiEndpoint')) document.getElementById('apiEndpoint').value = p.ep;
+                                const sl = document.getElementById('apiModelSelect');
+                                if (sl) {
+                                    sl.innerHTML = '';
+                                    if (p.md && p.md.length) {
+                                        p.md.forEach(m => sl.add(new Option(m, m)));
+                                        sl.style.display = '';
+                                        document.getElementById('apiModel').style.display = 'none';
+                                    } else {
+                                        sl.style.display = 'none';
+                                        document.getElementById('apiModel').style.display = '';
+                                    }
+                                }
+                                // 选完预设立刻 scf 保存
+                                saveFromSettings();
+                            } catch {}
+                        });
+                    }
+                    // 为其他 7 个 API 控件绑定 input / change 事件
+                    ['apiKey','apiEndpoint','apiModel','apiMaxTokens','apiTemperature','apiContextLen'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.addEventListener('input', saveFromSettings);
+                    });
+                    const modelSelect = document.getElementById('apiModelSelect');
+                    if (modelSelect) modelSelect.addEventListener('change', saveFromSettings);
+                    // 在设置标题下方加一个小提示
+                    try {
+                        const headerRow = document.getElementById('settingsModalTitle');
+                        if (headerRow && !document.getElementById('apiAutoSaveHint')) {
+                            const hint = document.createElement('div');
+                            hint.id = 'apiAutoSaveHint';
+                            hint.className = 'field-hint';
+                            hint.style.cssText = 'position:absolute;top:8px;right:32px;color:var(--notify-add);font-size:0.62rem;';
+                            hint.textContent = '✓ API配置自动保存到本地，刷新不丢失';
+                            headerRow.parentNode.style.position = 'relative';
+                            headerRow.parentNode.appendChild(hint);
+                        }
+                    } catch {}
+                } catch {}
+            })();
             // ===== Export / Import full backup =====
             $('btnSetExportBackup') && $('btnSetExportBackup').addEventListener('click', () => {
                 const chr = gch();
@@ -4285,193 +4334,7 @@
                 upui();
                 tst($('godModeToggle').checked ? '⚡ 上帝模式已激活：你无所不能、永不死亡' : '上帝模式已关闭');
             });
-            // 代理开关事件监听
-            $('useProxyToggle').addEventListener('change', () => {
-                const cur = cfg();
-                scf({ ...cur, useProxy: $('useProxyToggle').checked });
-                tst($('useProxyToggle').checked ? '🌐 代理模式已启用：请求将通过代理服务器转发' : '🌐 代理模式已关闭：直连API服务器');
-            });
-            $('proxyUrl').addEventListener('change', () => {
-                const cur = cfg();
-                scf({ ...cur, proxyUrl: $('proxyUrl').value || DCFG.proxyUrl });
-            });
-            $('proxySecret').addEventListener('change', () => {
-                const cur = cfg();
-                scf({ ...cur, proxySecret: $('proxySecret').value || DCFG.proxySecret });
-            });
-            
-            // ===== 代理请求配置持久化（独立localStorage） =====
-            const PROXY_CFG_KEY = 'dz_proxy_req_cfg';
-            
-            // 默认代理请求配置
-            const DEFAULT_PROXY_REQ_CFG = {
-                targetUrl: '',
-                method: 'POST',
-                body: '',
-                headers: ''
-            };
-            
-            /**
-             * 显示配置状态提示
-             * @param {string} message - 提示文本
-             * @param {string} type - 类型：success/error/info
-             */
-            function showProxyCfgStatus(message, type = 'success') {
-                const statusEl = $('proxyCfgStatus');
-                if (!statusEl) return;
-                statusEl.textContent = message;
-                statusEl.style.display = 'block';
-                statusEl.style.color = type === 'error' ? 'var(--color-danger)' : 
-                                      type === 'info' ? 'var(--ink-light)' : 'var(--color-success)';
-                setTimeout(() => { statusEl.style.display = 'none'; }, 3000);
-            }
-            
-            /**
-             * 加载代理请求配置（从localStorage）
-             */
-            function loadProxyReqConfig() {
-                try {
-                    const saved = localStorage.getItem(PROXY_CFG_KEY);
-                    if (!saved) return;
-                    const config = JSON.parse(saved);
-                    // 回填输入框
-                    if (config.targetUrl !== undefined && $('proxyTargetUrl')) $('proxyTargetUrl').value = config.targetUrl;
-                    if (config.method !== undefined && $('proxyMethod')) $('proxyMethod').value = config.method;
-                    if (config.body !== undefined && $('proxyBody')) $('proxyBody').value = config.body;
-                    if (config.headers !== undefined && $('proxyHeaders')) $('proxyHeaders').value = config.headers;
-                    showProxyCfgStatus('✓ 已加载历史配置', 'info');
-                } catch (e) {
-                    console.warn('加载代理请求配置失败:', e.message);
-                    // 容错处理：损坏的JSON不阻塞游戏
-                    try { localStorage.removeItem(PROXY_CFG_KEY); } catch {}
-                }
-            }
-            
-            /**
-             * 保存代理请求配置到localStorage
-             */
-            function saveProxyReqConfig() {
-                try {
-                    const config = {
-                        targetUrl: $('proxyTargetUrl') ? $('proxyTargetUrl').value.trim() : '',
-                        method: $('proxyMethod') ? $('proxyMethod').value : 'POST',
-                        body: $('proxyBody') ? $('proxyBody').value.trim() : '',
-                        headers: $('proxyHeaders') ? $('proxyHeaders').value.trim() : ''
-                    };
-                    // 验证JSON格式（如果有body或headers）
-                    if (config.body) {
-                        try { JSON.parse(config.body); } catch {
-                            showProxyCfgStatus('⚠ 请求Body不是有效的JSON格式', 'error');
-                            return;
-                        }
-                    }
-                    if (config.headers) {
-                        try { JSON.parse(config.headers); } catch {
-                            showProxyCfgStatus('⚠ 请求头不是有效的JSON格式', 'error');
-                            return;
-                        }
-                    }
-                    localStorage.setItem(PROXY_CFG_KEY, JSON.stringify(config));
-                    showProxyCfgStatus('✓ 配置已保存', 'success');
-                } catch (e) {
-                    console.error('保存代理请求配置失败:', e.message);
-                    showProxyCfgStatus('保存失败: ' + e.message, 'error');
-                }
-            }
-            
-            /**
-             * 清空代理请求配置
-             */
-            function clearProxyReqConfig() {
-                try {
-                    localStorage.removeItem(PROXY_CFG_KEY);
-                    if ($('proxyTargetUrl')) $('proxyTargetUrl').value = '';
-                    if ($('proxyMethod')) $('proxyMethod').value = 'POST';
-                    if ($('proxyBody')) $('proxyBody').value = '';
-                    if ($('proxyHeaders')) $('proxyHeaders').value = '';
-                    showProxyCfgStatus('✓ 配置已清空', 'info');
-                } catch (e) {
-                    console.error('清空代理请求配置失败:', e.message);
-                    showProxyCfgStatus('清空失败: ' + e.message, 'error');
-                }
-            }
-            
-            /**
-             * 测试代理请求（使用当前配置发送测试请求）
-             */
-            async function testProxyRequest() {
-                const targetUrl = $('proxyTargetUrl') ? $('proxyTargetUrl').value.trim() : '';
-                if (!targetUrl) {
-                    showProxyCfgStatus('⚠ 请先填写目标接口地址', 'error');
-                    return;
-                }
-                const method = $('proxyMethod') ? $('proxyMethod').value : 'POST';
-                const bodyStr = $('proxyBody') ? $('proxyBody').value.trim() : '';
-                const headersStr = $('proxyHeaders') ? $('proxyHeaders').value.trim() : '';
-                
-                let bodyObj = null;
-                let headersObj = {};
-                
-                // 解析Body
-                if (bodyStr) {
-                    try { bodyObj = JSON.parse(bodyStr); } catch {
-                        showProxyCfgStatus('⚠ 请求Body不是有效的JSON格式', 'error');
-                        return;
-                    }
-                }
-                
-                // 解析Headers
-                if (headersStr) {
-                    try { headersObj = JSON.parse(headersStr); } catch {
-                        showProxyCfgStatus('⚠ 请求头不是有效的JSON格式', 'error');
-                        return;
-                    }
-                }
-                
-                showProxyCfgStatus('⏳ 正在发送测试请求...', 'info');
-                try {
-                    const cfg = cfg();
-                    let response;
-                    if (cfg.useProxy && cfg.proxyUrl) {
-                        // 使用代理
-                        response = await window._sendProxyRequest(targetUrl, bodyObj || {}, cfg.key || 'test', null, false);
-                    } else {
-                        // 直连
-                        response = await fetch(targetUrl, {
-                            method: method,
-                            headers: { 'Content-Type': 'application/json', ...headersObj },
-                            body: method === 'POST' && bodyObj ? JSON.stringify(bodyObj) : undefined
-                        });
-                    }
-                    if (response.ok) {
-                        showProxyCfgStatus('✓ 测试请求成功 (HTTP ' + response.status + ')', 'success');
-                    } else {
-                        let msg = '⚠ 请求失败 (HTTP ' + response.status + ')';
-                        if (response.status === 401) msg = '⚠ 请求失败：认证失败，请检查API密钥';
-                        else if (response.status === 403) msg = '⚠ 请求失败：访问被拒绝';
-                        else if (response.status === 404) msg = '⚠ 请求失败：目标接口不存在';
-                        else if (response.status === 429) msg = '⚠ 请求失败：请求过于频繁';
-                        else if (response.status >= 500) msg = '⚠ 请求失败：目标服务器暂时不可用';
-                        showProxyCfgStatus(msg, 'error');
-                    }
-                } catch (e) {
-                    showProxyCfgStatus('✗ 请求异常: ' + e.message, 'error');
-                }
-            }
-            
-            // 绑定按钮事件
-            $('btnSaveProxyCfg') && $('btnSaveProxyCfg').addEventListener('click', saveProxyReqConfig);
-            $('btnClearProxyCfg') && $('btnClearProxyCfg').addEventListener('click', clearProxyReqConfig);
-            $('btnTestProxyReq') && $('btnTestProxyReq').addEventListener('click', testProxyRequest);
-            
-            // 页面加载时自动加载配置
-            loadProxyReqConfig();
-            
-            // 暴露到全局，方便调试
-            window._loadProxyReqConfig = loadProxyReqConfig;
-            window._saveProxyReqConfig = saveProxyReqConfig;
-            window._clearProxyReqConfig = clearProxyReqConfig;
-            
+
             // ===== God Group quick debug buttons =====
             $('btnDebugMax') && $('btnDebugMax').addEventListener('click', () => runDebugCmd('/max'));
             $('btnDebugHeal') && $('btnDebugHeal').addEventListener('click', () => runDebugCmd('/heal'));
@@ -5048,7 +4911,54 @@
                 sl.innerHTML = '';
                 if (p.md.length) { p.md.forEach(m => sl.add(new Option(m, m))); sl.style.display = ''; $('welModel').style.display = 'none'; }
                 else { sl.style.display = 'none'; $('welModel').style.display = ''; }
+                // 选择预设后立即 scf 保存（endpoint/preset/model，保持用户选完就不用重新选）
+                try {
+                    scf({
+                        ...cfg(),
+                        preset: this.value,
+                        ep: $('welEndpoint').value || DCFG.ep,
+                        model: (sl.value && sl.style.display !== 'none') ? sl.value : ($('welModel').value || 'gpt-4o')
+                    });
+                } catch {}
             });
+            // ========== 欢迎模态：所有 API 控件 "输入即保存"（localStorage 持久化），刷新不用重输 ==========
+            (function bindWelcomeInputs() {
+                function saveFromWelcome() {
+                    try {
+                        const sl = $('welModelSelect');
+                        const pickModel = (sl && sl.style.display !== 'none') ? sl.value : $('welModel').value;
+                        const cur = cfg();
+                        // NEVER 清空已有 key（如果用户不小心输入又删了，保护原 key）
+                        const newKey = $('welKey').value;
+                        const finalKey = (newKey && newKey.trim() !== '') ? newKey.trim() : (cur.key || '');
+                        scf({
+                            ...cur,
+                            preset: $('welEndpointPreset') ? $('welEndpointPreset').value : cur.preset,
+                            ep: $('welEndpoint').value || DCFG.ep,
+                            model: pickModel || 'gpt-4o',
+                            key: finalKey
+                        });
+                    } catch {}
+                }
+                const welIds = ['welKey','welEndpoint','welModel'];
+                welIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', saveFromWelcome); });
+                const sel = document.getElementById('welModelSelect'); if (sel) sel.addEventListener('change', saveFromWelcome);
+                // 提示用户已自动保存
+                try {
+                    const savedHint = document.createElement('div');
+                    savedHint.id = 'welSavedHint';
+                    savedHint.className = 'field-hint';
+                    savedHint.style.cssText = 'margin-top:8px;color:var(--notify-add);font-size:0.62rem;text-align:right;display:none;';
+                    savedHint.textContent = '✓ 已自动保存到本地（刷新不丢失）';
+                    const bn = document.getElementById('btnWelcomeNext');
+                    if (bn && bn.parentNode) bn.parentNode.insertBefore(savedHint, bn.nextSibling);
+                    const _origSave = saveFromWelcome;
+                    saveFromWelcome = function(){ _origSave(); if (savedHint){ savedHint.style.display='block'; clearTimeout(saveFromWelcome._t); saveFromWelcome._t = setTimeout(()=>{savedHint.style.display='none';}, 1200);} };
+                    // rebind（因为重写了函数引用）
+                    welIds.forEach(id => { const el = document.getElementById(id); if (el) { el.removeEventListener('input', _origSave); el.addEventListener('input', saveFromWelcome);} });
+                    if (sel) { sel.removeEventListener('change', _origSave); sel.addEventListener('change', saveFromWelcome); }
+                } catch {}
+            })();
             $('btnTestWel').addEventListener('click', async () => {
                 const k = $('welKey').value;
                 if (!k) return tst('缺少密钥');
@@ -5604,11 +5514,22 @@
                 const chrData = gch();
 
                 if (!finalCfg.key) {
-                    // Step 1: No API key - show welcome modal for configuration
-                    if (finalCfg.ep) $('welEndpoint').value = finalCfg.ep;
-                    if (finalCfg.model) { const sl = $('welModelSelect'); if (sl && [...sl.options].some(o => o.value === finalCfg.model)) sl.value = finalCfg.model; }
-                    if (finalCfg.preset && $('welEndpointPreset')) $('welEndpointPreset').value = finalCfg.preset;
-                    if (finalCfg.key) $('welKey').value = finalCfg.key;
+                    // Step 1: No API key - show welcome modal for configuration, UNCONDITIONALLY 回填所有字段
+                    if ($('welEndpointPreset')) {
+                        $('welEndpointPreset').value = finalCfg.preset || 'openai';
+                        // 触发 change 事件以刷新 welModelSelect 选项
+                        try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
+                    }
+                    $('welEndpoint').value = finalCfg.ep || '';
+                    const sl = $('welModelSelect');
+                    if (finalCfg.model && sl) {
+                        const hasOpt = [...sl.options].some(o => o.value === finalCfg.model);
+                        if (hasOpt) sl.value = finalCfg.model;
+                        else { $('welModel').value = finalCfg.model; sl.style.display='none'; $('welModel').style.display=''; }
+                    } else if (finalCfg.model) {
+                        $('welModel').value = finalCfg.model;
+                    }
+                    $('welKey').value = finalCfg.key || '';
                     $('welcomeModal').style.display = 'flex';
                 } else if (loadedFromSave) {
                     // Step 2: Has API key + loaded from save - restore silently

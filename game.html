@@ -489,41 +489,6 @@
             <p id="setImportBackupStatus" class="field-hint" style="margin-top:8px;"></p>
         </div>
         <div class="setting-group">
-            <h4>🌐 网络代理（跨域访问）</h4>
-            <label style="display:flex;align-items:center;gap:8px;font-weight:bold;">
-                <input type="checkbox" id="useProxyToggle" style="width:16px;height:16px;">
-                启用代理（解决CORS跨域限制）
-            </label>
-            <p class="field-hint" style="margin-top:4px;">开启后API请求将通过代理服务器转发，适合在GitHub Pages等静态站点环境使用。关闭时直接连接API。</p>
-            <label>代理服务器地址</label>
-            <input id="proxyUrl" placeholder="https://forward-proxy-njswknvuhg.cn-shanghai.fcapp.run/api/proxy">
-            <label>代理密钥</label>
-            <input type="password" id="proxySecret" placeholder="X-Proxy-Secret 密钥">
-        </div>
-        <div class="setting-group" id="proxyRequestGroup">
-            <h4>🔧 代理请求配置</h4>
-            <p class="field-hint">配置通过代理转发的请求参数，便于调试和自定义API调用。配置将自动保存到本地。</p>
-            <label>目标接口地址</label>
-            <input id="proxyTargetUrl" placeholder="https://api.example.com/v1/endpoint">
-            <label>请求方法</label>
-            <select id="proxyMethod">
-                <option value="GET">GET</option>
-                <option value="POST" selected>POST</option>
-            </select>
-            <label>请求Body（JSON格式）</label>
-            <p class="field-hint">POST请求的JSON参数，支持多行编辑</p>
-            <textarea id="proxyBody" rows="4" placeholder='{"key": "value", "model": "gpt-4o"}' style="width:100%;padding:6px 8px;border:1px solid var(--ink-border);border-radius:4px;background:var(--bg);color:var(--ink);font-family:monospace;font-size:0.75rem;resize:vertical;"></textarea>
-            <label>自定义请求头（JSON格式）</label>
-            <p class="field-hint">添加额外的HTTP请求头，如 Authorization、自定义Header等</p>
-            <textarea id="proxyHeaders" rows="3" placeholder='{"Authorization": "Bearer xxx", "X-Custom": "value"}' style="width:100%;padding:6px 8px;border:1px solid var(--ink-border);border-radius:4px;background:var(--bg);color:var(--ink);font-family:monospace;font-size:0.75rem;resize:vertical;"></textarea>
-            <div class="btn-row" style="justify-content:flex-start;gap:6px;margin-top:8px;">
-                <button type="button" class="btn-modal" id="btnSaveProxyCfg" style="font-size:0.7rem;">💾 保存配置</button>
-                <button type="button" class="btn-modal" id="btnClearProxyCfg" style="font-size:0.7rem;color:var(--color-danger);">🗑 清空配置</button>
-                <button type="button" class="btn-modal" id="btnTestProxyReq" style="font-size:0.7rem;">🧪 测试请求</button>
-            </div>
-            <p class="field-hint" id="proxyCfgStatus" style="color:var(--color-success);display:none;margin-top:4px;font-size:0.65rem;"></p>
-        </div>
-        <div class="setting-group">
             <h4>重新开始</h4>
             <p class="field-hint">生成一个死亡结局后直接从头开始游戏，保留当前角色设定和世界设定不变。</p>
             <div class="btn-row">
@@ -673,7 +638,7 @@
     </div>
 
     <!-- ===== 游戏脚本（按依赖顺序加载） ===== -->
-    <!-- 1. data.js：纯数据常量（DPROMPT/物品/配方/NPC/事件/成就/结局），零依赖 -->
+    <!-- 1. data.js：纯数据常量（DPROMPT/物品/配方/NPC/事件/成就/结局），零依赖，全部 localStorage 本地保存 -->
     <script src="js/data.js"></script>
     <!-- 2. audio.js：音效/BGM/Toast/对话框工具（依赖data.js常量+BGM/SE资源路径） -->
     <script src="js/audio.js"></script>
@@ -681,10 +646,8 @@
          依赖：data.js(常量) + audio.js(工具) + main.js(核心gst/gch/渲染)
          注：内部使用 initDefaults() 做 window 兜底，加载顺序轻微错位也可正常工作 -->
     <script src="js/gamesystems.js"></script>
-    <!-- 4. proxycfg.js：代理请求配置独立模块（按钮绑定DOMContentLoaded） -->
-    <script src="js/proxycfg.js"></script>
-    <!-- 5. main.js：核心IIFE（沙盒配置/存档读写/状态渲染/核心hin()AI对话循环/Init初始化）
-         暴露gst/gch/gsbx/ld/sv/hin/upui等给其他文件使用 -->
+    <!-- 4. main.js：核心IIFE（沙盒配置/存档读写/状态渲染/核心hin()AI对话循环/Init初始化）
+         暴露gst/gch/gsbx/ld/sv/hin/upui等给其他文件使用；API配置自动 localStorage 持久化，刷新不丢失 -->
     <script src="js/main.js"></script>
 </body>
 </html>
