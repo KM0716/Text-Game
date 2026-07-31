@@ -638,6 +638,11 @@
     </div>
 
     <!-- ===== 游戏脚本（按依赖顺序加载） ===== -->
+    <!-- 0. 独立数据模块（物品/NPC/成就/事件常量，零依赖，window全局暴露供main.js启动时读取） -->
+    <script src="js/npc_data.js"></script>
+    <script src="js/items_data.js"></script>
+    <script src="js/achievements.js"></script>
+    <script src="js/events.js"></script>
     <!-- 1. data.js：纯数据常量（DPROMPT/物品/配方/NPC/事件/成就/结局），零依赖，全部 localStorage 本地保存 -->
     <script src="js/data.js"></script>
     <!-- 2. audio.js：音效/BGM/Toast/对话框工具（依赖data.js常量+BGM/SE资源路径） -->
