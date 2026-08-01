@@ -243,7 +243,7 @@ function bgmInit() {
 function bgmPlay(file) {
     if (!BGM.enabled || !file) return;
     bgmInit();
-    if (BGM.current === file && BGM.audio && !BGM.audio.paused) return;
+    if (BGM.current === file && BGM.audio && !BGM.audio.paused) { _refreshBgmBtn(); return; }
     BGM.current = file;
     const cached = BGM._preloadCache[file];
     if (cached) {
@@ -299,6 +299,7 @@ function bgmPlayCategory(cat, random) {
         list.forEach(f => { if (f !== file) _bgmPreload(f); });
     }, 400);
     bgmPlay(file);
+    _refreshBgmBtn();
 }
 
 function bgmStop() {
@@ -319,6 +320,7 @@ function bgmStop() {
                 clearInterval(fadeTimer);
                 try { BGM.audio.pause(); BGM.audio.currentTime = 0; } catch(e) {}
                 if (BGM.audio) BGM.audio.volume = BGM.volume;
+                _refreshBgmBtn();
             }
         }, 26);
     } catch(e) {
@@ -331,18 +333,51 @@ function _safeSnotify(level, tag, msg) {
     else if (typeof window.tst === 'function') { try { window.tst(tag + '：' + msg); } catch(e){} }
 }
 
+// 集中维护：bgm 按钮的文字/title 更新（主按钮 + 选择器 + 保存）
+function _refreshBgmBtn() {
+    const btn = $('btnBgm');
+    if (!btn) return;
+    btn.textContent = BGM.enabled ? '音乐' : '音乐(关)';
+    btn.title = BGM.enabled
+        ? ('背景音乐（开启） · 当前：' + (BGM._currentCategory || 'camp') + (BGM.current ? ' / ' + BGM.current : ''))
+        : '背景音乐（已关闭）';
+    btn.dataset.enabled = BGM.enabled ? '1' : '0';
+    // 同步到选择器（若已打开）
+    const pickTitle = document.querySelector('#bgmPicker h5');
+    if (pickTitle) {
+        const marker = BGM.enabled ? '🎵' : '🔇';
+        pickTitle.innerHTML = marker + ' 背景音乐 <span id="bgmPickerClose" style="cursor:pointer;color:var(--text-muted);">×</span>';
+        const cb = $('bgmPickerClose');
+        if (cb) cb.addEventListener('click', () => { const p = $('bgmPicker'); if (p) p.remove(); });
+    }
+}
+
 function bgmToggle() {
     BGM.enabled = !BGM.enabled;
-    localStorage.setItem('vn_bgm', BGM.enabled ? '1' : '0');
+    try { localStorage.setItem('vn_bgm', BGM.enabled ? '1' : '0'); } catch(_) {}
     if (!BGM.enabled) {
         bgmStop();
-        const btn = $('btnBgm');
-        if (btn) { btn.textContent = '🔇 音乐'; btn.title = '背景音乐（已关闭）'; }
     } else {
-        const btn = $('btnBgm');
-        if (btn) { btn.textContent = '🎵 音乐'; btn.title = '背景音乐（开启）'; }
-        bgmPlayCategory(BGM._currentCategory || 'title');
+        // 开启时若无 audio 实例（首次交互未发生），不直接播放以免被浏览器策略拦截；
+        // 绑定一次性首次交互启动
+        if (!BGM.audio) {
+            const unlockOnce = () => {
+                document.removeEventListener('click', unlockOnce);
+                document.removeEventListener('touchstart', unlockOnce);
+                document.removeEventListener('keydown', unlockOnce);
+                try {
+                    bgmInit();
+                    bgmPlayCategory(BGM._currentCategory || 'camp');
+                } catch(_) {}
+            };
+            document.addEventListener('click', unlockOnce);
+            document.addEventListener('touchstart', unlockOnce);
+            document.addEventListener('keydown', unlockOnce);
+        } else {
+            bgmPlayCategory(BGM._currentCategory || 'camp');
+        }
     }
+    _refreshBgmBtn();
     _safeSnotify('info', 'BGM', BGM.enabled ? '背景音乐已开启' : '背景音乐已关闭');
 }
 
@@ -406,57 +441,83 @@ function bgmAutoSwitch(context) {
 }
 
 function bgmQuickPick(cat) {
-    if (!BGM.enabled) { _safeSnotify('warn', 'BGM', '请先开启背景音乐'); return; }
+    if (!BGM.enabled) {
+        try {
+            // 选曲时若未开启则自动开启（与 picker 行为一致），并依赖首次交互解锁
+            bgmToggle();
+            if (!BGM.enabled) return;
+        } catch(_) { return; }
+    }
     bgmPlayCategory(cat);
     const label = { title: '主菜单', explore: '探索', camp: '营地', combat: '战斗', boss: 'Boss', danger: '危机', sad: '悲伤', hope: '希望', horror: '恐怖', story: '剧情', rain: '雨声', survival: '生存' }[cat] || cat;
     _safeSnotify('info', 'BGM', '播放：' + label);
+    _refreshBgmBtn();
 }
 
 function bgmOpenPicker() {
     if ($('bgmPicker')) { $('bgmPicker').remove(); return; }
+    // 分类按钮：用户不想要 emoji，这里就用纯文字；当前播放分类加 active 色
     const cats = [
-        { key: 'title',    name: '主菜单', icon: '🎬' },
-        { key: 'explore',  name: '探索',   icon: '🧭' },
-        { key: 'camp',     name: '营地',   icon: '🏕' },
-        { key: 'combat',   name: '战斗',   icon: '⚔' },
-        { key: 'boss',     name: 'Boss',   icon: '☠' },
-        { key: 'danger',   name: '危机',   icon: '⚠' },
-        { key: 'sad',      name: '悲伤',   icon: '😢' },
-        { key: 'hope',     name: '希望',   icon: '🌤' },
-        { key: 'horror',   name: '恐怖',   icon: '👁' },
-        { key: 'story',    name: '剧情',   icon: '📖' },
-        { key: 'rain',     name: '雨声',   icon: '🌧' },
-        { key: 'survival', name: '生存',   icon: '🩹' }
+        { key: 'title',    name: '主菜单' },
+        { key: 'explore',  name: '探索' },
+        { key: 'camp',     name: '营地' },
+        { key: 'combat',   name: '战斗' },
+        { key: 'boss',     name: 'Boss' },
+        { key: 'danger',   name: '危机' },
+        { key: 'sad',      name: '悲伤' },
+        { key: 'hope',     name: '希望' },
+        { key: 'horror',   name: '恐怖' },
+        { key: 'story',    name: '剧情' },
+        { key: 'rain',     name: '雨声' },
+        { key: 'survival', name: '生存' }
     ];
     const style = document.createElement('style');
-    style.textContent = '#bgmPicker{position:fixed;z-index:10001;top:54px;right:12px;background:var(--modal-bg);border:1.5px solid var(--ink);border-radius:10px;padding:10px 12px;min-width:220px;max-width:260px;box-shadow:4px 6px 0 rgba(30,25,18,.18);font-size:.78rem;}#bgmPicker h5{margin:0 0 6px;font-size:.8rem;color:var(--accent);display:flex;align-items:center;justify-content:space-between;}#bgmPicker .bgm-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}#bgmPicker .bgm-cat{flex:1;min-width:90px;border:1px solid var(--border-light);border-radius:6px;padding:4px 6px;background:var(--button-bg);cursor:pointer;font-size:.7rem;color:var(--ink);transition:all .15s;}#bgmPicker .bgm-cat:hover{background:var(--button-hover);transform:translateY(-1px);}#bgmPicker .bgm-cat.active{background:var(--accent);color:#fff;border-color:var(--accent);}#bgmPicker .bgm-vol{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:.7rem;color:var(--text-muted);}#bgmPicker input[type=range]{flex:1;accent-color:var(--accent);}';
+    style.textContent = '#bgmPicker{position:fixed;z-index:10001;top:54px;right:12px;background:var(--modal-bg);border:1.5px solid var(--ink);border-radius:10px;padding:10px 12px;min-width:220px;max-width:260px;box-shadow:4px 6px 0 rgba(30,25,18,.18);font-size:.78rem;backdrop-filter: blur(6px);}#bgmPicker h5{margin:0 0 6px;font-size:.82rem;color:var(--accent);display:flex;align-items:center;justify-content:space-between;letter-spacing:.04em;}#bgmPicker .bgm-row{display:grid;grid-template-columns:repeat(3, 1fr);gap:6px;margin-bottom:8px;}#bgmPicker .bgm-cat{border:1.2px solid var(--border-light);border-radius:7px;padding:6px 4px;background:var(--button-bg);cursor:pointer;font-size:.72rem;color:var(--ink);transition:all .14s ease;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;}#bgmPicker .bgm-cat:hover{background:var(--button-hover);transform:translateY(-1px);box-shadow:0 2px 0 rgba(60,40,12,.15);}#bgmPicker .bgm-cat.active{background:var(--accent);color:#fff;border-color:var(--accent);}#bgmPicker .bgm-vol{display:flex;align-items:center;gap:6px;margin-top:2px;padding-top:8px;border-top:1px dashed var(--border-light);font-size:.7rem;color:var(--text-muted);}#bgmPicker input[type=range]{flex:1;accent-color:var(--accent);}#bgmPicker #bgmPickerClose:hover{color:var(--danger);transform:scale(1.1);}';
     document.head.appendChild(style);
     const el = document.createElement('div');
     el.id = 'bgmPicker';
-    const catsHtml = cats.map(c => '<div class="bgm-cat' + (BGM._currentCategory === c.key ? ' active' : '') + '" data-cat="' + c.key + '">' + c.icon + ' ' + c.name + '</div>').join('');
-    el.innerHTML = '<h5>🎵 背景音乐 <span id="bgmPickerClose" style="cursor:pointer;color:var(--text-muted);">×</span></h5>' +
+    const catsHtml = cats.map(c => '<div class="bgm-cat' + (BGM._currentCategory === c.key ? ' active' : '') + '" data-cat="' + c.key + '" title="' + c.name + '">' + c.name + '</div>').join('');
+    const marker = BGM.enabled ? '🎵' : '🔇';
+    el.innerHTML =
+        '<h5>' + marker + ' 背景音乐 <span id="bgmPickerClose" style="cursor:pointer;color:var(--text-muted);">×</span></h5>' +
         '<div class="bgm-row">' + catsHtml + '</div>' +
         '<div class="bgm-vol"><span>音量</span><input type="range" id="bgmVolRange" min="0" max="1" step="0.05" value="' + BGM.volume + '"><span id="bgmVolLabel">' + Math.round(BGM.volume * 100) + '%</span></div>';
     document.body.appendChild(el);
     el.querySelectorAll('.bgm-cat').forEach(btn => {
         btn.addEventListener('click', () => {
             const cat = btn.dataset.cat;
-            if (!BGM.enabled) bgmToggle();
-            bgmPlayCategory(cat);
-            el.querySelectorAll('.bgm-cat').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+            bgmQuickPick(cat);
+            el.querySelectorAll('.bgm-cat').forEach(b => b.classList.toggle('active', b.dataset.cat === BGM._currentCategory));
         });
     });
     const closeBtn = $('bgmPickerClose');
     if (closeBtn) closeBtn.addEventListener('click', () => el.remove());
     const vr = $('bgmVolRange');
     if (vr) {
-        vr.addEventListener('input', e => { bgmSetVol(parseFloat(e.target.value)); const l = $('bgmVolLabel'); if (l) l.textContent = Math.round(BGM.volume * 100) + '%'; });
+        vr.addEventListener('input', e => {
+            bgmSetVol(parseFloat(e.target.value));
+            const l = $('bgmVolLabel');
+            if (l) l.textContent = Math.round(BGM.volume * 100) + '%';
+        });
+    }
+    // 移动端：picker 距离顶栏留出安全距离，不被 notch / header 遮挡
+    if (window.matchMedia && window.matchMedia('(max-width: 680px)').matches) {
+        el.style.top = '58px';
+        el.style.right = '8px';
+        el.style.minWidth = 'unset';
+        el.style.maxWidth = 'unset';
+        el.style.left = '8px';
     }
     setTimeout(() => {
-        document.addEventListener('click', function closePicker(ev) {
-            if (!el.contains(ev.target)) { el.remove(); document.removeEventListener('click', closePicker); }
-        });
+        function closePicker(ev) {
+            if (!el.contains(ev.target) && ev.target !== $('btnBgm')) {
+                el.remove();
+                document.removeEventListener('click', closePicker);
+            }
+        }
+        document.addEventListener('click', closePicker);
     }, 10);
+    _refreshBgmBtn();
 }
 
 // ---------- 新手教程 ----------

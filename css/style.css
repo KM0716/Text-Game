@@ -2909,14 +2909,17 @@
             .traits-quick-row { gap: 4px !important; }
             /* 预设按钮触摸优化 */
             .preset-btn { padding: 6px 10px; min-height: 36px; touch-action: manipulation; }
-            /* ===== 移动端线索气泡适配 ===== */
+            /* ===== 移动端线索气泡适配 =====
+               注意：层级采用和主 JS（mobileLayoutFix_inline）一致的区间：线索按钮 600 / 便签浮层 610，避免把 nav-more 菜单/模态/通知压住
+            */
             .clue-sidebar {
                 width: 82vw !important;
                 max-width: 320px !important;
                 top: 68px !important;
                 right: -92vw !important;
-                max-height: calc(100vh - 130px) !important;
-                z-index: 9998 !important;
+                max-height: calc(100dvh - 130px) !important;
+                z-index: 610 !important;
+                pointer-events: auto !important;
             }
             .clue-sidebar.open {
                 right: 3vw !important;
@@ -2931,19 +2934,32 @@
                 right: 3vw !important;
             }
             .clue-sidebar-toggle {
-                width: 44px !important;
-                height: 44px !important;
-                font-size: 1.1rem !important;
+                /* 宽度高度允许内部 icon+文字自适应，不再固定 44x44 */
+                width: auto !important;
+                min-width: 56px;
+                height: auto !important;
+                padding: 8px 10px !important;
+                display: inline-flex !important;
+                align-items: center !important;
+                gap: 6px;
+                font-size: 0.82rem !important;
                 top: 54px !important;
                 right: 6px !important;
-                z-index: 9997 !important;
-                touch-action: none;
+                z-index: 600 !important;
+                touch-action: manipulation !important;
                 -webkit-tap-highlight-color: transparent;
+                pointer-events: auto !important;
             }
+            .clue-sidebar-toggle .clue-btn-icon { font-size: 1rem; line-height: 1; }
+            .clue-sidebar-toggle .clue-btn-text { font-weight: 700; letter-spacing: .04em; }
             .clue-sidebar-header {
                 font-size: 0.85rem !important;
                 padding: 10px 12px 8px !important;
+                align-items: center !important;
             }
+            .clue-header-title { display: inline-flex; align-items: center; gap: 6px; }
+            .clue-head-icon { font-size: 1rem; line-height: 1; }
+            .clue-head-close { cursor: pointer; font-size: 1.2rem; line-height: 1; padding: 2px 6px !important; border-radius: 4px; pointer-events: auto !important; }
             .clue-note {
                 padding: 8px 10px 10px !important;
             }
@@ -2981,8 +2997,10 @@
                 min-width: 220px !important;
                 top: calc(100% + 6px) !important;
                 right: 2px !important;
-                z-index: 9999 !important;
+                z-index: 900 !important;
+                pointer-events: auto !important;
             }
+            #btnNavMore { pointer-events: auto !important; z-index: 901 !important; position: relative; isolation: isolate; }
             .nav-menu-section {
                 padding: 6px 8px !important;
             }
@@ -3009,15 +3027,16 @@
             .btn-send { min-width: 48px; font-size: 0.75rem; }
             .quick-actions { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
             .btn-quick { white-space: nowrap; flex-shrink: 0; min-height: 38px; }
-            /* 超小屏线索气泡进一步压缩 */
-            .clue-sidebar { width: 88vw !important; max-width: 300px !important; right: -95vw !important; }
+            /* 超小屏线索气泡进一步压缩（维持一致的层级，让 icon+文字可见） */
+            .clue-sidebar { width: 88vw !important; max-width: 300px !important; right: -95vw !important; max-height: calc(100dvh - 96px) !important; z-index: 610 !important; pointer-events: auto !important; }
             .clue-sidebar.open, .clue-sidebar.docked-right { right: 2vw !important; }
             .clue-sidebar.docked-left { left: 2vw !important; }
-            .clue-sidebar-toggle { width: 40px !important; height: 40px !important; top: 56px !important; right: 4px !important; font-size: 1rem !important; }
+            .clue-sidebar-toggle { width: auto !important; min-width: 52px; height: auto !important; padding: 7px 9px !important; top: 56px !important; right: 4px !important; font-size: 0.78rem !important; z-index: 600 !important; pointer-events: auto !important; touch-action: manipulation !important; display: inline-flex !important; align-items: center; gap: 5px; }
+            .clue-sidebar-toggle .clue-btn-icon { font-size: 0.95rem; }
             .clue-sidebar-header { font-size: 0.8rem !important; padding: 8px 10px 6px !important; }
             .clue-note-item { padding: 8px 8px 8px 26px !important; font-size: 0.72rem !important; }
             .clue-sidebar-actions button { font-size: 0.7rem !important; padding: 6px 4px !important; min-height: 36px !important; }
-            .nav-more-menu { min-width: 200px !important; }
+            .nav-more-menu { min-width: 200px !important; z-index: 900 !important; pointer-events: auto !important; }
         }
         /* Tablet optimization */
         @media (min-width: 481px) and (max-width: 840px) {

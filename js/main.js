@@ -5528,12 +5528,14 @@
                 if (p.md.length) $('apiModel').value = p.md[0];
             });
             $('btnTheme').addEventListener('click', () => { cycleTheme(); });
-            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled() ? '音效' : '音效(关)'; });
-            $('btnSfx').textContent = sfxEnabled() ? '音效' : '音效(关)';
-            $('btnBgm').addEventListener('click', () => { bgmToggle(); });
-            const _bgm = BGM();
-            $('btnBgm').textContent = _bgm.enabled ? '音乐' : '音乐(关)';
-            $('btnBgm').title = _bgm.enabled ? '背景音乐（开启）' : '背景音乐（已关闭）';
+            $('btnSfx').addEventListener('click', () => {
+                toggleSfx();
+                const b = $('btnSfx'); if (b) b.textContent = sfxEnabled() ? '音效' : '音效(关)';
+            });
+            (function sfxInitText() { const b = $('btnSfx'); if (b) b.textContent = sfxEnabled() ? '音效' : '音效(关)'; })();
+            // BGM 按钮：文字/title 统一由 audio.js 的 _refreshBgmBtn 维护；初始化立即刷新，避免加载屏结束后显示错误
+            $('btnBgm').addEventListener('click', () => { try { bgmToggle(); } catch(_) {} });
+            try { if (typeof _refreshBgmBtn === 'function') _refreshBgmBtn(); } catch(_) {}
             // ===== 导航栏「更多」收纳菜单 =====
             (function initNavMore() {
                 const btn = $('btnNavMore');
@@ -5577,12 +5579,35 @@
                 document.addEventListener('click', outsideHandler);
                 document.addEventListener('touchend', outsideHandler, { passive: true });
             })();
-            // BGM 选择面板：右键或长按
-            $('btnBgm').addEventListener('contextmenu', (e) => { e.preventDefault(); bgmOpenPicker(); });
-            let bgmPressTimer = null;
-            $('btnBgm').addEventListener('pointerdown', (e) => { bgmPressTimer = setTimeout(() => { bgmOpenPicker(); bgmPressTimer = null; }, 650); });
-            $('btnBgm').addEventListener('pointerup', () => { if (bgmPressTimer) { clearTimeout(bgmPressTimer); bgmPressTimer = null; } });
-            $('btnBgm').addEventListener('pointerleave', () => { if (bgmPressTimer) { clearTimeout(bgmPressTimer); bgmPressTimer = null; } });
+            // BGM 选择面板：右键或长按（620ms）；长按触发后抑制本次 click，避免 toggle + 面板冲突
+            (function bindBgmPressOpen() {
+                const btn = $('btnBgm'); if (!btn) return;
+                let pressTimer = null, longPressed = false;
+                btn.addEventListener('contextmenu', (e) => {
+                    e.preventDefault();
+                    try { bgmOpenPicker(); } catch(_) {}
+                });
+                btn.addEventListener('pointerdown', (e) => {
+                    longPressed = false;
+                    if (e.button != null && e.button !== 0) return; // 右键/触摸板副键单独走 contextmenu
+                    pressTimer = setTimeout(() => {
+                        longPressed = true; pressTimer = null;
+                        try { bgmOpenPicker(); } catch(_) {}
+                    }, 620);
+                });
+                function clearPress() { if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; } }
+                btn.addEventListener('pointerup', clearPress);
+                btn.addEventListener('pointerleave', clearPress);
+                btn.addEventListener('pointercancel', clearPress);
+                // 捕获阶段：长按已触发的，就不再响应本次 click（防止 toggle 与 open picker 同时触发，瞬间显示又消失）
+                btn.addEventListener('click', (e) => {
+                    if (longPressed) {
+                        longPressed = false;
+                        e.stopPropagation();
+                        e.preventDefault();
+                    }
+                }, true);
+            })();
             $('btnIdle').addEventListener('click', toggleIdle);
             $('btnAchievements') && $('btnAchievements').addEventListener('click', () => {
                 const f = window.renderAchievementsPanel; if (f) f();
@@ -6921,29 +6946,49 @@
                     ].join('\n');
                     document.head.appendChild(st3);
                 }
-                // ===== 移动端 UI + 层级修复（防变形、防「更多」被线索按钮遮挡）=====
+                // ===== 移动端 UI + 层级修复（防变形、防「更多」「线索」点击无响应/互相遮挡）=====
                 if (!document.getElementById('mobileLayoutFix_inline')) {
                     const st = document.createElement('style');
                     st.id = 'mobileLayoutFix_inline';
                     st.textContent = [
-                        // 层级基准：确保 header / nav-more 按钮永远在线索浮层之上；线索浮层及其开关位置固定且不盖住重要控件
-                        'header.app-header { position: relative; z-index: 50; }',
-                        '.header-actions { position: relative; z-index: 60; }',
-                        '.nav-more-wrap, #btnNavMore { position: relative; z-index: 80 !important; }',
-                        '.nav-more-menu.open { z-index: 90 !important; }',
-                        '#btnToggleClueSidebar { z-index: 40 !important; }',
-                        '.clue-sidebar { z-index: 70; }',
-                        '.side-panel { z-index: 65; }',
-                        '.modal-overlay, .modal-panel { z-index: 200; }',
-                        '.notify-container { z-index: 300; }',
-                        '#notifyContainer.notify-mobile { z-index: 300; }',
+                        // ============== 层级基准（关键：不要再用 header/app-container 的 relative z-index 压浮层，会导致 fixed 子级被剪切）==============
+                        // header 不设全局 z-index，只让它的弹层（nav-more-menu）高；clue 浮层与更多菜单同阶，用可预测的 z-index
+                        'header.app-header { position: static; z-index: auto; }',
+                        '.header-actions { position: static; z-index: auto; }',
+                        // 更多按钮 + 菜单：设到独立定位，z-index 900 可覆盖 clue
+                        '.nav-more-wrap { position: relative; z-index: auto; }',
+                        '#btnNavMore { position: relative; z-index: 901 !important; isolation: isolate; pointer-events: auto !important; }',
+                        '.nav-more-menu.open { position: fixed !important; z-index: 900 !important; }',
+                        // 线索按钮和浮层：z-index 600/610，独立于 header、不被其剪切；强制 pointer-events: auto
+                        '#btnToggleClueSidebar {',
+                        '  z-index: 600 !important; pointer-events: auto !important;',
+                        '  isolation: isolate; touch-action: manipulation;',
+                        '  -webkit-tap-highlight-color: transparent;',
+                        '}',
+                        '.clue-sidebar { z-index: 610 !important; pointer-events: auto !important; isolation: isolate; }',
+                        // 通知 / 模态 / 侧边面板 更高
+                        '.side-panel { z-index: 800 !important; }',
+                        '.modal-overlay, .modal-panel { z-index: 1200 !important; }',
+                        '.notify-container { z-index: 1500 !important; }',
+                        '#notifyContainer.notify-mobile { z-index: 1500 !important; }',
+                        '#bgmPicker { z-index: 10001 !important; }',
                         // 防止按钮/状态栏在窄屏上溢出或挤扁变形
                         '.header-actions { flex-wrap: wrap; row-gap: 4px; }',
                         '.nav-group { flex-wrap: wrap; }',
                         '.btn-header { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
                         '.status-bar { flex-wrap: wrap; gap: 4px 8px; }',
                         '.status-item { flex: 0 0 auto; min-width: 0; }',
-                        // 响应式：< 680px 顶栏按钮缩短+堆叠，更多按钮放到最右侧且保持可点击
+                        // 线索按钮/标题结构恢复：桌面端保持原来的方形按钮带图标 + 文字
+                        '#btnToggleClueSidebar { width: auto !important; min-width: 56px; height: auto !important; padding: 8px 10px !important; display: inline-flex !important; align-items: center; gap: 6px; flex-direction: row !important; writing-mode: initial !important; font-size: 0.82rem !important; border-radius: 6px !important; }',
+                        '#btnToggleClueSidebar .clue-btn-icon { font-size: 1rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }',
+                        '#btnToggleClueSidebar .clue-btn-text { display: inline; font-weight: 700; letter-spacing: 0.04em; }',
+                        // 线索面板头部独立 icon/文字/关闭结构
+                        '.clue-sidebar-header { align-items: center !important; }',
+                        '.clue-header-title { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; }',
+                        '.clue-head-icon { font-size: 1rem; line-height: 1; }',
+                        '.clue-head-close { cursor: pointer; font-size: 1.2rem; line-height: 1; padding: 2px 6px; border-radius: 4px; transition: all 0.15s; pointer-events: auto !important; }',
+                        '.clue-head-close:hover { background: rgba(199,91,58,0.1); color: #c75b3a; transform: rotate(90deg); }',
+                        // ============== 响应式：< 680px ==============
                         '@media (max-width: 680px) {',
                         '  .header-actions { justify-content: flex-start; gap: 4px; }',
                         '  .nav-group.nav-primary .btn-header,',
@@ -6963,26 +7008,46 @@
                         '  .input-row { gap: 4px; }',
                         '  .input-text { min-height: 36px; padding: 6px 8px; font-size: 0.82rem; }',
                         '  .btn-send { padding: 4px 10px; font-size: 0.78rem; }',
-                        '  /* 线索浮动按钮：移动端默认移到右侧中部，避免覆盖顶部 header/发送按钮 */',
+                        '  /* 更多菜单：移动端贴顶更宽，避免切屏溢出 */',
+                        '  .nav-more-menu.open { top: 52px !important; right: 8px !important; left: 8px !important; width: auto !important; max-width: none !important; }',
+                        '  /* 线索浮动按钮：移动端右侧竖排胶囊，📋图标+文字可见，不盖顶栏按钮/发送区 */',
                         '  #btnToggleClueSidebar {',
                         '    position: fixed !important;',
-                        '    right: 6px !important; top: 50% !important; transform: translateY(-50%) !important;',
+                        '    right: 0 !important; top: 44vh !important; transform: translateY(-50%) !important;',
                         '    bottom: auto !important; left: auto !important;',
-                        '    writing-mode: vertical-rl; padding: 10px 4px; font-size: 0.7rem; border-radius: 8px 0 0 8px;',
-                        '    max-width: 28px; opacity: 0.85;',
+                        '    min-width: 0 !important; width: auto !important; height: auto !important;',
+                        '    padding: 14px 6px 14px 8px !important; border-radius: 10px 0 0 10px !important;',
+                        '    display: inline-flex !important; flex-direction: column !important;',
+                        '    align-items: center !important; justify-content: center !important; gap: 4px !important;',
+                        '    writing-mode: initial !important; font-size: 0.68rem !important;',
+                        '    box-shadow: -2px 3px 10px rgba(60,40,12,0.18) !important;',
+                        '    background: linear-gradient(180deg, #fffef7 0%, #f5e7c0 100%) !important;',
                         '  }',
+                        '  #btnToggleClueSidebar .clue-btn-icon { font-size: 1.2rem; display: block !important; }',
+                        '  #btnToggleClueSidebar .clue-btn-text { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.15em; font-weight: 700; display: block !important; font-size: 0.72rem !important; }',
+                        '  /* 线索便签面板：移动端留足线索按钮 + 安全边距，不被 notch/header 剪切 */',
                         '  .clue-sidebar {',
-                        '    max-width: min(86vw, 320px) !important;',
-                        '    max-height: 80vh !important;',
-                        '    right: 40px !important; left: auto !important;',
+                        '    width: min(82vw, 320px) !important; max-width: 320px !important;',
+                        '    max-height: calc(100dvh - 104px) !important; min-height: 240px;',
+                        '    top: 56px !important; right: 48px !important; left: auto !important;',
+                        '    z-index: 610 !important; pointer-events: auto !important;',
+                        '    filter: drop-shadow(-3px 6px 0 rgba(80,52,20,0.12));',
                         '  }',
+                        '  .clue-sidebar.open { right: 48px !important; }',
+                        '  .clue-sidebar.docked-left { right: auto !important; left: 12px !important; }',
                         '}',
-                        // 超窄屏 (< 400px)：顶栏文字进一步压缩
+                        // ============== 超窄屏 (< 420px)：顶栏文字进一步压缩 ==============
                         '@media (max-width: 420px) {',
                         '  .btn-header { font-size: 0.68rem; padding: 4px 5px; }',
                         '  .code-name { font-size: 0.68rem; }',
                         '  .chat-area { padding: 8px 6px; }',
                         '  .input-text { font-size: 0.78rem; }',
+                        '  .nav-more-menu.open { top: 48px !important; right: 6px !important; left: 6px !important; }',
+                        '  .clue-sidebar {',
+                        '    width: min(84vw, 300px) !important;',
+                        '    max-height: calc(100dvh - 96px) !important;',
+                        '    right: 42px !important;',
+                        '  }',
                         '}'
                     ].join('\n');
                     document.head.appendChild(st);

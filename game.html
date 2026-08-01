@@ -264,12 +264,15 @@
         <!-- Floating clue sidebar (hand-drawn note style) -->
         <div class="clue-sidebar" id="clueSidebar">
             <div class="clue-sidebar-header">
-                <span>线索便签</span>
-                <span style="cursor:pointer;font-size:1rem;" id="btnCloseClueSidebar">×</span>
+                <span class="clue-header-title"><span class="clue-head-icon" aria-hidden="true">📋</span><span class="clue-head-text">线索便签</span></span>
+                <span class="clue-head-close" id="btnCloseClueSidebar" aria-label="关闭线索便签">×</span>
             </div>
             <div class="clue-note" id="clueNoteContent"></div>
         </div>
-        <button class="clue-sidebar-toggle" id="btnToggleClueSidebar" title="展开线索便签">线索</button>
+        <button class="clue-sidebar-toggle" id="btnToggleClueSidebar" title="展开线索便签" aria-label="展开线索便签">
+            <span class="clue-btn-icon" aria-hidden="true">📋</span>
+            <span class="clue-btn-text">线索</span>
+        </button>
         <div class="side-panel" id="sidePanel">
             <!-- Profile view content -->
             <div id="sideProfileView">
