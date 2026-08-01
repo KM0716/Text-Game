@@ -255,7 +255,7 @@
             <div class="quick-actions" style="width:100%;">
                 <div style="display:flex;gap:6px;">
                     <button class="btn-quick" data-action="观察周围环境">观察</button>
-                    <button class="btn-quick" data-action="回顾线索" id="btnClueQuick">线索<span id="clueCountBadge" style="font-size:0.55rem;margin-left:2px;color:var(--accent);"></span></button>
+                    <button class="btn-quick" data-action="回顾线索" id="btnClueQuick">📋<span id="clueCountBadge" style="font-size:0.55rem;margin-left:2px;color:var(--accent);"></span></button>
                     <button class="btn-quick" data-action="查看身体状况">状态</button>
                     <button class="btn-quick" data-action="聆听动静">聆听</button>
                     <button class="btn-quick" data-action="决策建议" id="btnDecision">决策</button>
@@ -281,7 +281,6 @@
         </div>
         <button class="clue-sidebar-toggle" id="btnToggleClueSidebar" title="展开线索便签" aria-label="展开线索便签">
             <span class="clue-btn-icon" aria-hidden="true">📋</span>
-            <span class="clue-btn-text">线索</span>
         </button>
         <div class="side-panel" id="sidePanel">
             <!-- Profile view content -->
@@ -692,7 +691,7 @@
             <div id="equipAbility" style="font-size:0.75rem;"></div>
         </div>
         <div id="equipBackpackLink"></div>
-    </div></div></div>
+    </div></div>
 
     <!-- Save/Load Modals (save modal 合并存档与读档功能) -->
     <div class="modal-overlay" id="saveModal" style="display:none;"><div class="modal-panel"><button class="modal-close" id="modalCloseSave">x</button><h3>存档 / 读档</h3><div id="saveSlots"></div><div class="btn-row"><button class="btn-modal primary" id="btnAutoSave">快速存档</button><button class="btn-modal" id="btnExportBackup">导出备份</button><button class="btn-modal" id="btnImportBackup">导入备份</button></div></div></div>

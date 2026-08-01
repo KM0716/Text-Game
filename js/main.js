@@ -1991,12 +1991,10 @@
                     };
                 }
 
-                // Clear any drag-position inline styles
-                const clueSb = $('clueSidebar');
-                if (clueSb) {
-                    if (clueSb.style.left) clueSb.style.left = '';
-                    if (clueSb.style.top) clueSb.style.top = '';
-                }
+                // NOTE: Do NOT clear inline drag-position left/top/right styles here.
+                // Those styles are set by the drag handler when user repositions the sidebar.
+                // Clearing them on every render (add/sort/edit/delete) causes the
+                // "添加线索和自动排序出现位移" bug.
             }
             // upui 渲染缓存：记录各区块上次渲染出的 HTML/文本，未变化时跳过 innerHTML 重建
             const _upuiCache = {
@@ -2613,19 +2611,12 @@
                     }
                 } else {
                     if (Object.keys(ch).length) (window.mds || mds)(ch);
-                    // Auto-open clue sidebar when new clues are discovered
+                    // Refresh clue sidebar content on clue-related state mutations,
+                    // but NEVER auto-open the sidebar. The sidebar should only open
+                    // when the user explicitly clicks 回顾线索 / toggle button.
+                    // (Fixes "auto-pop without clue review requested" bug on mobile.)
                     if (notes.some(n => n.ty === 'clue')) {
                         renderClueSidebar();
-                        const clueSb = $('clueSidebar');
-                        if (clueSb) {
-                            // Clear drag-position inline styles before opening
-                            if (clueSb.style.left) clueSb.style.left = '';
-                            if (clueSb.style.top) clueSb.style.top = '';
-                            if (clueSb.style.right) clueSb.style.right = '';
-                            if (!clueSb.classList.contains('open')) {
-                                clueSb.classList.add('open');
-                            }
-                        }
                     }
                     notes.forEach((n) => {
                         if (n.ty === 'add') snotify('add', n.label || '', n.val);
@@ -4206,14 +4197,24 @@
                 renderBackpack();
                 const m = $('backpackModal');
                 if (!_bpSearchInited && m) {
-                    const bpHeader = m.querySelector('.bp-header') || m.querySelector('.modal-header');
+                    // 把搜索框放在「分类标签（bp-cat-row）的上方」，即 bpCatRow 之前；
+                    // 位置顺序：标题(h3) → 视图切换条(分类/总览/常用) → 搜索框 → 分类标签(bp-cat-row)
+                    const bpCatRow = m.querySelector('#bpCatRow');
+                    const viewBar = bpCatRow ? bpCatRow.previousElementSibling : null;
                     if (!m.querySelector('#bpSearch')) {
                         const wrap = document.createElement('div');
-                        wrap.style.cssText = 'padding:0 14px 10px;';
-                        wrap.innerHTML = '<input id="bpSearch" type="text" placeholder="🔍 搜索背包物品…" style="width:100%;padding:7px 10px;border:2px solid var(--input-border);border-radius:4px;background:var(--input-bg);color:var(--text);font-family:inherit;font-size:0.78rem;outline:none;">';
-                        const target = bpHeader ? bpHeader.parentNode : m.firstChild;
-                        if (bpHeader && bpHeader.nextSibling) bpHeader.parentNode.insertBefore(wrap, bpHeader.nextSibling);
-                        else if (m.firstChild) m.insertBefore(wrap, m.firstChild.nextSibling ? m.firstChild.nextSibling : m.firstChild);
+                        // 与分类标签行(bp-cat-row) 外边距保持一致，避免额外宽高造成溢出
+                        wrap.style.cssText = 'margin: 0 0 8px 0; padding: 0; box-sizing: border-box;';
+                        // 关键：input 加上 box-sizing:border-box，否则 padding 会让 width:100% 溢出，
+                        // 触发 modal-panel 横向滚动条（用户反馈的"背包界面出现滚动条"）
+                        wrap.innerHTML = '<input id="bpSearch" type="text" placeholder="🔍 搜索背包物品…" style="width:100%;box-sizing:border-box;padding:7px 10px;border:2px solid var(--input-border);border-radius:4px;background:var(--input-bg);color:var(--text);font-family:inherit;font-size:0.78rem;outline:none;">';
+                        if (bpCatRow && bpCatRow.parentNode) {
+                            bpCatRow.parentNode.insertBefore(wrap, bpCatRow);
+                        } else if (viewBar && viewBar.nextSibling) {
+                            viewBar.parentNode.insertBefore(wrap, viewBar.nextSibling);
+                        } else if (m.firstChild) {
+                            m.insertBefore(wrap, m.firstChild.nextSibling ? m.firstChild.nextSibling : m.firstChild);
+                        }
                         const inp = wrap.querySelector('#bpSearch');
                         inp.addEventListener('input', () => { bpPage = 0; renderBackpack(); });
                         inp.addEventListener('focus', () => inp.select());
@@ -5596,19 +5597,44 @@
                 if (!btn || !menu) return;
                 let closeTimer = null;
                 let openState = false;
+                const _isTouchDevice = () => ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+                const _isMobileViewport = () => window.innerWidth <= 840;
+                const _useHover = () => !_isTouchDevice() && !_isMobileViewport();
+
                 const openMenu = () => {
                     if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
+                    // Desktop: use original absolute positioning (CSS-based); Mobile/touch: switch to fixed positioning to avoid header overflow clipping
+                    if (_isTouchDevice() || _isMobileViewport()) {
+                        const r = btn.getBoundingClientRect();
+                        menu.style.position = 'fixed';
+                        menu.style.top = (r.bottom + 2) + 'px';
+                        menu.style.left = '';
+                        menu.style.right = Math.max(2, window.innerWidth - r.right) + 'px';
+                        menu.style.transform = 'none';
+                    } else {
+                        menu.style.position = '';
+                        menu.style.top = '';
+                        menu.style.left = '';
+                        menu.style.right = '';
+                        menu.style.transform = '';
+                    }
                     menu.classList.add('open');
                     openState = true;
                 };
-                const closeMenu = (delay = 200) => {
+                const closeMenu = (delay = 120) => {
+                    if (closeTimer) clearTimeout(closeTimer);
                     closeTimer = setTimeout(() => {
                         menu.classList.remove('open');
                         openState = false;
+                        // Reset inline positioning set by openMenu
+                        menu.style.position = '';
+                        menu.style.top = '';
+                        menu.style.left = '';
+                        menu.style.right = '';
+                        menu.style.transform = '';
                     }, delay);
                 };
-                // 点击按钮切换（桌面用 click，移动端用 pointerup 避免双重触发）
-                const _isMobile = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 480;
+                // 点击按钮切换（桌面支持 hover + click，移动端/触屏仅 click 触发，避免 hover 冲突）
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     e.preventDefault();
@@ -5618,14 +5644,13 @@
                         openMenu();
                     }
                 });
-                // 桌面端：mouseenter/mouseleave 悬浮展开
-                btn.addEventListener('mouseenter', openMenu);
-                menu.addEventListener('mouseenter', openMenu);
-                btn.addEventListener('mouseleave', () => closeMenu(260));
-                menu.addEventListener('mouseleave', () => closeMenu(200));
+                // 桌面端：mouseenter/mouseleave 悬浮展开（仅非触屏、非移动端视口）
+                btn.addEventListener('mouseenter', () => { if (_useHover()) openMenu(); });
+                menu.addEventListener('mouseenter', () => { if (_useHover()) openMenu(); });
+                btn.addEventListener('mouseleave', () => { if (_useHover()) closeMenu(160); });
+                menu.addEventListener('mouseleave', () => { if (_useHover()) closeMenu(120); });
                 // 点击文档外部关闭（统一处理，防止重复触发）
                 const outsideHandler = (e) => {
-                    // 如果点击/触摸发生在按钮或菜单内部，不关闭（由按钮 click 处理切换）
                     if (btn.contains(e.target) || menu.contains(e.target)) return;
                     if (openState) closeMenu(0);
                 };
@@ -7249,7 +7274,6 @@ ${sumContent}
                         // 更多按钮 + 菜单：设到独立定位，z-index 900 可覆盖 clue
                         '.nav-more-wrap { position: relative; z-index: auto; }',
                         '#btnNavMore { position: relative; z-index: 901 !important; isolation: isolate; pointer-events: auto !important; }',
-                        '.nav-more-menu.open { position: fixed !important; z-index: 900 !important; }',
                         // 线索按钮和浮层：z-index 600/610，独立于 header、不被其剪切；强制 pointer-events: auto
                         '#btnToggleClueSidebar {',
                         '  z-index: 600 !important; pointer-events: auto !important;',
@@ -7269,10 +7293,10 @@ ${sumContent}
                         '.btn-header { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
                         '.status-bar { flex-wrap: wrap; gap: 4px 8px; }',
                         '.status-item { flex: 0 0 auto; min-width: 0; }',
-                        // 线索按钮/标题结构恢复：桌面端保持原来的方形按钮带图标 + 文字
-                        '#btnToggleClueSidebar { width: auto !important; min-width: 56px; height: auto !important; padding: 8px 10px !important; display: inline-flex !important; align-items: center; gap: 6px; flex-direction: row !important; writing-mode: initial !important; font-size: 0.82rem !important; border-radius: 6px !important; }',
-                        '#btnToggleClueSidebar .clue-btn-icon { font-size: 1rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }',
-                        '#btnToggleClueSidebar .clue-btn-text { display: inline; font-weight: 700; letter-spacing: 0.04em; }',
+                        // 线索按钮/标题结构恢复：纯emoji图标（无文字），桌面端紧凑方形
+                        '#btnToggleClueSidebar { width: 44px !important; height: 44px !important; min-width: 0 !important; padding: 0 !important; display: inline-flex !important; align-items: center; justify-content: center !important; flex-direction: row !important; writing-mode: initial !important; border-radius: 8px !important; box-sizing: border-box !important; overflow: hidden; }',
+                        '#btnToggleClueSidebar .clue-btn-icon { font-size: 1.15rem; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }',
+                        '#btnToggleClueSidebar .clue-btn-text { display: none !important; }',
                         // 线索面板头部独立 icon/文字/关闭结构
                         '.clue-sidebar-header { align-items: center !important; }',
                         '.clue-header-title { display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; }',
@@ -7299,33 +7323,37 @@ ${sumContent}
                         '  .input-row { gap: 4px; }',
                         '  .input-text { min-height: 36px; padding: 6px 8px; font-size: 0.82rem; }',
                         '  .btn-send { padding: 4px 10px; font-size: 0.78rem; }',
-                        '  /* 更多菜单：移动端贴顶更宽，避免切屏溢出 */',
+                        '  /* 更多菜单：移动端贴顶更宽，避免切屏溢出（仅 .open 时生效） */',
                         '  .nav-more-menu.open { top: 52px !important; right: 8px !important; left: 8px !important; width: auto !important; max-width: none !important; }',
-                        '  /* 线索浮动按钮：移动端右侧竖排胶囊，📋图标+文字可见，不盖顶栏按钮/发送区 */',
+                        '  /* 线索浮动按钮：移动端右侧纯emoji方形，不盖顶栏按钮/发送区 */',
                         '  #btnToggleClueSidebar {',
                         '    position: fixed !important;',
                         '    right: 0 !important; top: 44vh !important; transform: translateY(-50%) !important;',
                         '    bottom: auto !important; left: auto !important;',
-                        '    min-width: 0 !important; width: auto !important; height: auto !important;',
-                        '    padding: 14px 6px 14px 8px !important; border-radius: 10px 0 0 10px !important;',
+                        '    min-width: 0 !important; width: 42px !important; height: 48px !important;',
+                        '    padding: 0 !important; border-radius: 10px 0 0 10px !important;',
                         '    display: inline-flex !important; flex-direction: column !important;',
-                        '    align-items: center !important; justify-content: center !important; gap: 4px !important;',
+                        '    align-items: center !important; justify-content: center !important; gap: 0 !important;',
                         '    writing-mode: initial !important; font-size: 0.68rem !important;',
                         '    box-shadow: -2px 3px 10px rgba(60,40,12,0.18) !important;',
                         '    background: linear-gradient(180deg, #fffef7 0%, #f5e7c0 100%) !important;',
                         '  }',
-                        '  #btnToggleClueSidebar .clue-btn-icon { font-size: 1.2rem; display: block !important; }',
-                        '  #btnToggleClueSidebar .clue-btn-text { writing-mode: vertical-rl; text-orientation: upright; letter-spacing: 0.15em; font-weight: 700; display: block !important; font-size: 0.72rem !important; }',
-                        '  /* 线索便签面板：移动端留足线索按钮 + 安全边距，不被 notch/header 剪切 */',
+                        '  #btnToggleClueSidebar .clue-btn-icon { font-size: 1.25rem; display: inline-flex !important; align-items: center; justify-content: center; line-height: 1; }',
+                        '  #btnToggleClueSidebar .clue-btn-text { display: none !important; }',
+                        '  /* 线索便签面板：移动端留足线索按钮 + 安全边距，不被 notch/header 剪切',
+                        '     注意：.clue-sidebar 基础选择器不写 right/left，避免默认就显示在屏幕上（导致"自动弹出"），',
+                        '     只在 .open/.docked-*（且无拖拽 inline style 覆盖）时写定位，保证拖拽设置的 inline left/right 优先 */',
                         '  .clue-sidebar {',
                         '    width: min(82vw, 320px) !important; max-width: 320px !important;',
                         '    max-height: calc(100dvh - 104px) !important; min-height: 240px;',
-                        '    top: 56px !important; right: 48px !important; left: auto !important;',
+                        '    top: 56px !important;',
                         '    z-index: 610 !important; pointer-events: auto !important;',
                         '    filter: drop-shadow(-3px 6px 0 rgba(80,52,20,0.12));',
                         '  }',
-                        '  .clue-sidebar.open { right: 48px !important; }',
-                        '  .clue-sidebar.docked-left { right: auto !important; left: 12px !important; }',
+                        '  /* 显示状态：仅在 open/docked 时才定位到屏幕上；无 inline 拖拽样式时使用如下值，inline 优先 */',
+                        '  .clue-sidebar:not([style*="left"]):not([style*="right"]).open { right: 48px; left: auto; }',
+                        '  .clue-sidebar:not([style*="left"]):not([style*="right"]).docked-left { right: auto; left: 12px; }',
+                        '  .clue-sidebar:not([style*="left"]):not([style*="right"]).docked-right { right: 48px; left: auto; }',
                         '}',
                         // ============== 超窄屏 (< 420px)：顶栏文字进一步压缩 ==============
                         '@media (max-width: 420px) {',
@@ -7334,11 +7362,12 @@ ${sumContent}
                         '  .chat-area { padding: 8px 6px; }',
                         '  .input-text { font-size: 0.78rem; }',
                         '  .nav-more-menu.open { top: 48px !important; right: 6px !important; left: 6px !important; }',
+                        '  /* 线索便签：<420px 尺寸压缩（仅宽度；定位仍由 open/docked + 无 inline 才应用） */',
                         '  .clue-sidebar {',
                         '    width: min(84vw, 300px) !important;',
                         '    max-height: calc(100dvh - 96px) !important;',
-                        '    right: 42px !important;',
                         '  }',
+                        '  /* <420px 下的 open/docked 显示位置仍遵循上一条规则；不在此重复 right，避免默认可见 */',
                         '}'
                     ].join('\n');
                     document.head.appendChild(st);

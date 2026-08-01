@@ -756,8 +756,8 @@
             return [memCtx, skillCtx, statusCtx, npcCtx].filter(Boolean).join('\n');
         };
         function getSkillContext() {
-            const c = gch();
-            if (!c.skills || Object.keys(c.skills).length === 0) return '';
+            const c = (typeof gch === 'function') ? gch() : null;
+            if (!c || !c.skills || Object.keys(c.skills).length === 0) return '';
             const skills = Object.entries(c.skills).map(([k, v]) => k + ' Lv.' + v).join('、');
             return '【玩家技能】' + skills;
         }

@@ -82,8 +82,8 @@
         { id: 'gardener', name: '园艺师', desc: '种植5种作物', icon: '🌱', check: () => { const s = window.gst(); return s && (s.cropsGrown || 0) >= 5; } },
         { id: 'scavenger', name: '拾荒者', desc: '拾取100件物资', icon: '📥', check: () => { const s = window.gst(); return s && (s.itemsPickedUp || 0) >= 100; } },
         { id: 'salvage_king', name: '拾荒之王', desc: '拾取500件物资', icon: '👑', check: () => { const s = window.gst(); return s && (s.itemsPickedUp || 0) >= 500; } },
-        { id: 'fast_learner', name: '敏捷学者', desc: '学会3种技能', icon: '📚', check: () => { const s = window.gst(); const skills = s && s.skills ? Object.keys(s.skills) : []; return skills.length >= 3; } },
-        { id: 'polyglot', name: '多面手', desc: '学会8种技能', icon: '🎓', check: () => { const s = window.gst(); const skills = s && s.skills ? Object.keys(s.skills) : []; return skills.length >= 8; } },
+        { id: 'fast_learner', name: '敏捷学者', desc: '学会3种技能', icon: '📚', check: () => { const c = (typeof window.gch === 'function') ? window.gch() : null; const skills = c && c.skills ? Object.keys(c.skills) : []; return skills.length >= 3; } },
+        { id: 'polyglot', name: '多面手', desc: '学会8种技能', icon: '🎓', check: () => { const c = (typeof window.gch === 'function') ? window.gch() : null; const skills = c && c.skills ? Object.keys(c.skills) : []; return skills.length >= 8; } },
         { id: 'wealthy', name: '小富翁', desc: '累计拥有1000货币', icon: '💰', check: () => { const s = window.gst(); return s && (s.money || 0) >= 1000; } },
         { id: 'tycoon', name: '大富翁', desc: '累计拥有10000货币', icon: '💎', check: () => { const s = window.gst(); return s && (s.money || 0) >= 10000; } },
 
