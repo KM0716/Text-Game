@@ -485,6 +485,7 @@
                 <button type="button" class="btn-modal" id="btnSetExportBackup" style="font-size:0.7rem;">导出全部备份</button>
                 <button type="button" class="btn-modal" id="btnSetImportBackup" style="font-size:0.7rem;">选择备份文件导入</button>
             </div>
+            <input type="file" id="inputSetImportBackup" accept=".json" style="display:none;">
             <p id="setImportBackupStatus" class="field-hint" style="margin-top:8px;"></p>
         </div>
         <div class="setting-group">
@@ -636,12 +637,22 @@
         </div>
     </div>
 
-    <!-- ===== 游戏增强系统（合成/战斗/状态/成就/事件/NPC/日志/结局/导入导出/上下文/音效） ===== -->
-    <!-- 数据文件须在 main.js 之前加载，main.js 启动时读取 window 全局 -->
+    <!-- ===== 游戏脚本（按依赖顺序加载） ===== -->
+    <!-- 0. 独立数据模块（物品/NPC/成就/事件常量，零依赖，window全局暴露供main.js启动时读取） -->
     <script src="js/npc_data.js"></script>
     <script src="js/items_data.js"></script>
     <script src="js/achievements.js"></script>
     <script src="js/events.js"></script>
+    <!-- 1. data.js：纯数据常量（DPROMPT/物品/配方/NPC/事件/成就/结局），零依赖，全部 localStorage 本地保存 -->
+    <script src="js/data.js"></script>
+    <!-- 2. audio.js：音效/BGM/Toast/对话框工具（依赖data.js常量+BGM/SE资源路径） -->
+    <script src="js/audio.js"></script>
+    <!-- 3. gamesystems.js：游戏子系统（合成/NPC/事件/战斗/成就/结局/导入导出/日志/上下文）
+         依赖：data.js(常量) + audio.js(工具) + main.js(核心gst/gch/渲染)
+         注：内部使用 initDefaults() 做 window 兜底，加载顺序轻微错位也可正常工作 -->
+    <script src="js/gamesystems.js"></script>
+    <!-- 4. main.js：核心IIFE（沙盒配置/存档读写/状态渲染/核心hin()AI对话循环/Init初始化）
+         暴露gst/gch/gsbx/ld/sv/hin/upui等给其他文件使用；API配置自动 localStorage 持久化，刷新不丢失 -->
     <script src="js/main.js"></script>
 </body>
 </html>

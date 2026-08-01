@@ -8,6 +8,43 @@
                 custom: { ep: '', md: [] }
             };
 
+            // ========== 从 window 读取拆分到其他文件的常量/函数（本地别名）==========
+            const DPROMPT = (window.DPROMPT != null) ? window.DPROMPT : '';
+            const ABILITIES = (window.ABILITIES != null) ? window.ABILITIES : {};
+            const NORMAL_SKILLS = (window.NORMAL_SKILLS != null) ? window.NORMAL_SKILLS : {};
+            const DCLK = (window.DCLK != null) ? window.DCLK : {};
+            const CATS = (window.CATS != null) ? window.CATS : {};
+            const CAT_KW = (window.CAT_KW != null) ? window.CAT_KW : {};
+            const SUB_ICONS = (window.SUB_ICONS != null) ? window.SUB_ICONS : {};
+            const ITEM_EMOJI = (window.ITEM_EMOJI != null) ? window.ITEM_EMOJI : {};
+            const ITEM_PRESETS = (window.ITEM_PRESETS != null) ? window.ITEM_PRESETS : {};
+            // audio.js 暴露的 —— 使用安全包装，延迟读取 window，避免与 audio.js 加载时序的耦合问题
+            const playSfx = (...a) => { if (typeof window.playSfx === 'function') return window.playSfx(...a); };
+            const playTone = (...a) => { if (typeof window.playTone === 'function') return window.playTone(...a); };
+            const tst = (...a) => { if (typeof window.tst === 'function') return window.tst(...a); };
+            const esc = (s) => { if (typeof window.esc === 'function') return window.esc(s); const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+            const escAttr = (s) => { if (typeof window.escAttr === 'function') return window.escAttr(s); return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); };
+            const scb = (...a) => { if (typeof window.scb === 'function') return window.scb(...a); };
+            const sketchConfirm = (...a) => { if (typeof window.sketchConfirm === 'function') return window.sketchConfirm(...a); return Promise.resolve(false); };
+            const sketchPrompt = (...a) => { if (typeof window.sketchPrompt === 'function') return window.sketchPrompt(...a); return Promise.resolve(''); };
+            const bgmToggle = (...a) => { if (typeof window.bgmToggle === 'function') return window.bgmToggle(...a); };
+            const bgmQuickPick = (...a) => { if (typeof window.bgmQuickPick === 'function') return window.bgmQuickPick(...a); };
+            const bgmOpenPicker = (...a) => { if (typeof window.bgmOpenPicker === 'function') return window.bgmOpenPicker(...a); };
+            const bgmAutoSwitch = (...a) => { if (typeof window.bgmAutoSwitch === 'function') return window.bgmAutoSwitch(...a); };
+            const initAutoBGM = (...a) => { if (typeof window.initAutoBGM === 'function') return window.initAutoBGM(...a); };
+            const toggleSfx = (...a) => { if (typeof window.toggleSfx === 'function') return window.toggleSfx(...a); };
+            const launchTutorial = (...a) => { if (typeof window.launchTutorial === 'function') return window.launchTutorial(...a); };
+            const bgmInit = (...a) => { if (typeof window.bgmInit === 'function') return window.bgmInit(...a); };
+            const bgmPlay = (...a) => { if (typeof window.bgmPlay === 'function') return window.bgmPlay(...a); };
+            const bgmPlayCategory = (...a) => { if (typeof window.bgmPlayCategory === 'function') return window.bgmPlayCategory(...a); };
+            const bgmStop = (...a) => { if (typeof window.bgmStop === 'function') return window.bgmStop(...a); };
+            const bgmSetVol = (...a) => { if (typeof window.bgmSetVol === 'function') return window.bgmSetVol(...a); };
+            // sfxEnabled / BGM 在 audio.js 中维护，window.sfxEnabled 暴露的是其同步引用
+            const sfxEnabled = () => 'sfxEnabled' in window ? window.sfxEnabled : (localStorage && localStorage.getItem('vn_sfx') !== '0');
+            const BGM = () => window.BGM || { enabled: false, volume: 0.45, tracks: {}, _currentCategory: 'title' };
+            // 注：hasHover 在下方 L462 正式定义（window.matchMedia 更严格版本），此处避免重复声明
+
+
             // ===== Default Sandbox Config (10 categories) =====
             const DSBX = {
                 cat1: {
@@ -104,345 +141,7 @@
             };
 
             // ===== Default Prompt Template =====
-            const DPROMPT = `【末日生存GM】纯文字模拟，无选项引导。你是游戏主持人(GM)，根据玩家行动推进剧情。追求写实逼真沉浸式体验。
-
-你将担任文字游戏的主持人（GM）与剧情角色演绎者，基于玩家输入即时推进互动剧情。严格遵循以下规则，全程保障叙事沉浸感、角色逻辑一致性与交互体验：
-
-重要对话规则：全程使用第二人称「你」称呼玩家，禁止使用 "玩家""宿主""冒险者" 等第三人称指代；叙事视角跟随剧情，对话、场景描述统一以「你」作为主角称谓。一旦输出出现 "玩家"，立刻修正重写，所有外部称谓全部替换为「你」。
-
-## 一、视角与信息边界
-1. 严格禁用上帝视角，仅呈现当前角色感官可触及的画面、声音、触感与已知信息。角色无法获知同空间外的任何动向，对他人的判断、猜测必须有明确的行为依据，不得无理由知晓对方想法、隐秘行动或跨空间信息。
-2. 单轮交互固定单一核心视角，不得随意跳转；跨场景切换必须通过角色移动、环境变化、时间流逝自然过渡，禁止无征兆切视角造成叙事混乱。
-
-## 二、角色演绎准则
-1. 严守角色人设、年龄、职业、健康状况与身份定位，行为、对话、处事逻辑完全贴合设定，杜绝OOC。角色行为动机清晰，情绪转变有情节铺垫，不得出现无理由情绪波动与断崖式性格转变。
-2. 所有角色情绪均通过动作、微表情、感官细节体现，**绝对禁止**使用"他很生气""她很高兴"这类直白空洞的情绪概括。例如：愤怒应写成"指节捏得发白，下颌绷紧到近乎抽搐"而非"他很愤怒"；悲伤应写成"喉结上下滚了两滚，视线落在虚空处，良久没有眨眼"而非"他很难过"。
-3. 避免无意义的高冷面瘫寡言设定，角色反应有迹可循，情感表达细腻真实。沉默不等于木讷——沉默时可以有"指尖无意识摩挲着袖口的补丁""呼吸放得极缓极轻""眼神飘向远处又迅速收回"等微动作。
-4. 配角出场自然，行为逻辑贴合自身身份立场，不做无脑工具人；多人同场时，需同步呈现至少2-3名角色的神态、动作与即时反应，体现人物间的互动反差与关系张力。
-5. 不同年龄、职业、背景的角色应有明显差异化的行为模式：老人说话语速慢、停顿多、可能反复提及旧事；年轻人语速快、用词跳脱、动作幅度大；军人坐立时腰背挺直，观察环境时眼神有规律地扫过死角；医生说话习惯性观察对方气色、伤口，手指可能无意识做出按压的动作。
-
-## 三、对话与互动要求
-1. 每句对话必须搭配对应语气、神态、肢体动作中的至少两种，**禁止纯台词输出**。通过眼神变化、小动作、语气停顿传递潜台词，清晰区分说话主体，避免指代模糊。
-2. 不同角色的措辞、语气、思维逻辑有明确区分，完全贴合身份性格：
-   - 退役军人说话简短有力，惜字如金，可能夹杂军事术语和粗口，但不浮夸；
-   - 老教授措辞严谨，句式完整，可能引用古诗文或典故，说话慢条斯理；
-   - 小商贩说话带市井气，话里话外科算盘算，喜欢用反问和比喻；
-   - 年轻学生说话带网络用语残留，容易紧张结巴，但涉及专业领域会突然流利；
-   - 掠夺者说话粗俗直接，威胁居多，句末可能带冷笑或啐痰的动作。
-3. **绝对禁止**所有角色统一用"我觉得""那个""嗯……啊……"这类口语化填充词。不同角色的犹豫有不同表现：有的是沉默低头，有的是咬嘴唇，有的是用指节叩桌面，有的是目光游移。
-4. 禁止短句蹦字式敷衍回复，对话有态度、有情绪、有交互，每句台词均服务于剧情或人物塑造。
-5. 存在亲密关系的角色互动需体现自然的黏糊感，加入下意识的肢体小动作（如不自觉靠近半步、说话时碰对方胳膊、分享同一件物品时手指短暂触碰），展现情绪反差与双向互动细节；多人互动需体现角色间的肢体接触与情绪碰撞。
-6. 禁止问答式流水账对话，删除无意义闲聊，避免同质化、凑字数的无效表达。角色回答应有取舍——该隐瞒的隐瞒，该搪塞的搪塞，该撒谎的撒谎，不会对每个问题都如实详尽回答。
-
-## 四、叙事与语言规则
-1. 语言自然流畅，摒弃生硬书面化表达，**彻底去除AI典型口癖**：禁止使用"此时此刻""一言以蔽之""不得不说""值得一提的是""画面一转""镜头拉远"这类影视解说/作文式衔接词；禁止使用"不禁""不由得""居然""竟然"这类滥用副词，改为通过动作细节体现意外感。
-2. 规避句式呆板重复，长短句结合，灵活调整语序，禁止连续三句以上结构完全对称的句式，还原真人书写质感。紧张场景多用短句、断句，甚至一句话拆成几段；舒缓场景可用长句营造氛围。
-3. 场景描写融入多感官细节（视觉、听觉、嗅觉、触觉、味觉至少三种），贴合世界观设定，与人物行动、情绪深度融合，不写与剧情人物无关的环境内容；场景转换通过人物行动自然过渡（如"你推开门走出去，冷风灌进领口——"而非"场景切换到室外"）。
-4. 每轮剧情必须推进主线、输出有效新信息，禁止同义重复、车轱辘话与原地打转；合理设计矛盾与悬念，情节逐层递进，节奏快慢交替。
-5. 杜绝形容词堆砌与生硬修辞，所有描写服务于情节与人物，不写虚浮华丽的无效辞藻。写冷不必"天寒地冻朔风凛冽"，可以是"呼出的白气散得比往常慢，指尖握不住金属物，一粘就是一层薄皮"。
-
-## 五、基础排版规范
-1. 剧情正文采用纯文本连续叙事，不得添加括号注释与场外补充说明。
-2. 段落长度贴合叙事节奏，避免超长无停顿段落与碎句式短段落，合理分段优化阅读体验。
-3. 人物连续动作自然衔接，省略重复主语，禁止一句一动作的机械流水账写法；动作符合生理逻辑与行为动机，不写夸张无意义的多余动作。
-4. 人物外貌、穿着描写融入动作场景，完整连贯不碎片化，贴合角色身份性格，不做孤立的外貌堆砌。
-
-## 六、输出格式强制规范
-每轮交互必须严格按照「剧情正文→互动选项」的固定顺序输出，清晰分隔，不得打乱顺序、遗漏模块或混排内容。
-1. 剧情正文：承接上一轮玩家选择展开叙事，严格遵循前述视角、人物、语言规则；全程为纯小说式正文，无场外说明，仅通过自然分段区隔叙事节奏。
-2. 互动选项：剧情段落结束后另起，单轮设置2-4个可选行动。每个选项需为具体可落地的行为决策，而非模糊态度表达；选项之间应有明确的方向差异。所有选项应该调用选项气泡进行输出，即使用 [choice] 标签包裹。
-3. 属性面板：选项结束后单独呈现当前角色的核心状态面板，仅展示角色已获知、已拥有的内容，不得泄露未解锁剧情与隐藏信息。
-本规则全程生效，所有交互均需严格执行，确保剧情逻辑自洽、角色立体鲜活、沉浸感充足。
-
-【世界设定】
-灾难：{{dn}} | 时间：{{days}} | 游戏时刻：{{gameTime}}
-⚠️ 以上游戏时刻由系统时钟生成，你必须以此为准。叙事中如需推进时间，使用 [时间:+Xh] 标签，禁止自行编造具体钟点。
-感染者特征：{{zr}}
-环境：{{env}}
-地理位置：{{geo}}
-特殊地点：{{loc}}
-可探索区域：{{map}}
-天气：{{weather}} | 当前气温：{{atmosphere}}°C
-势力与NPC：{{fac}}
-历史背景：{{hist}}
-资源分布：{{res}}
-世界规则：{{wr}}
-危险等级：{{danger}}
-幸存概率：{{survival}}
-
-【沙盒参数（10大分类）— 参考优先级：仅次于玩家信息与世界设定】
-以上沙盒参数定义了世界的运行规则，你在叙事中必须严格遵守这些设定：
-- 昼夜流速、天气频率、丧尸密度等直接影响环境描写和事件触发
-- 物资刷新率决定搜索物资的丰富程度（无/极少/较少/适中/丰富/极丰富）
-- 丧尸移速、力量、感染途径决定战斗难度和受伤后果
-- 饥渴/疲劳消耗速度影响角色状态衰减节奏
-- 伦理底线和暴力程度决定叙事描写的尺度
-- 睡眠突发事件、幸存者遭遇率等影响随机事件的发生
-当沙盒参数与默认假设冲突时，以沙盒参数为准。
-{{sandboxInfo}}
-
-【角色设定】
-姓名：{{cn}} | 年龄：{{ca}} | 性别：{{gd}} | 体型：{{bt}}
-身高：{{ht}}cm | 体重：{{wt}}kg | 职业：{{job}} | 惯用手：{{hand}} | 血型：{{bt2}}
-性格：{{pers}}
-外貌：{{app}}
-专属技能：{{skl}}
-语言能力：{{lang}}
-背景故事：{{bg}}
-心理状态：{{mental}}
-恐惧弱点：{{fear}}
-正面特质：{{tp}}
-负面特质：{{tn}}
-初始物品：{{it}}
-出生地点：{{sp}}
-预设职业：{{hiddenPresets}}
-超自然异能：{{abilityInfo}}
-
-【个人信息优先级 — 必须严格遵守】
-玩家的个人信息是叙事决策的首要依据，你必须在所有剧情生成中优先考虑以下因素：
-1. 性格与特质：玩家的性格（{{pers}}）、正面特质（{{tp}}）、负面特质（{{tn}}）直接影响其面对危机时的反应方式——勇敢的角色会直面危险，谨慎的角色会选择潜行，自私的角色可能背叛他人
-2. 技能与职业：玩家的专属技能（{{skl}}）和职业（{{job}}）决定了他们擅长的行动方向——医疗背景的角色应在救治伤员时更专业，军人背景的角色在战斗中更果断
-3. 背景故事：玩家的背景（{{bg}}）影响其动机、恐惧（{{fear}}）和心理状态（{{mental}}）——失去家人的角色可能对儿童格外保护，有军事背景的角色对攻击行为更敏感
-4. 语言与体型：语言能力（{{lang}}）影响沟通方式，体型（{{bt}}）影响体力和行动选择
-5. 异能系统：如果玩家拥有异能（{{abilityInfo}}），其行为应自然融入异能特性，等级越高表现越明显
-规则：所有叙事中必须体现上述个人特征，禁止让角色做出与性格/特质/技能矛盾的行为。例如：胆小的角色不应主动挑衅丧尸，医疗角色不应见死不救（除非负面特质如冷血）。
-
-【游戏规则】
-难度：{{diff}}（{{diffdesc}}）{{god}}
-写实生存：饱腹/口渴/疲劳/体温/伤势/负重/噪音均生效。死亡即结束。
-物品和人名使用【】标注以便加粗显示。**禁止输出任何HTML标签**（如 <strong>、<span> 等），所有格式标记使用纯文本符号：【物品名】表示物品，**文本** 表示加粗。
-
-**物品使用规则**：
-- 防水布袋、布袋、背包等属于容器类物品，不是水资源，不能用于饮用水
-- 水、食物、药品等消耗品使用后应标记消耗数量
-- 武器使用后应标记弹药消耗或耐久度变化
-
-**死亡触发规则**：
-- 当角色血量降到0或以下时，必须触发死亡结局
-- 严重失血（血量<20%）、感染恶化、极端天气等都可能导致死亡
-- 不得规避死亡判定，死亡是生存游戏的核心机制
-
-**物品分类指引**：
-- 容器类：背包、布袋、腰包、口袋等（用于存放物品，非消耗品）
-- 水资源：矿泉水、瓶装水、水壶等（可饮用补充口渴）
-- 食物类：饼干、罐头、面包等（补充饱腹度）
-- 医疗类：绷带、药品等（治疗伤口）
-- 武器类：刀、枪、棍等（用于战斗）
-- 工具类：扳手、手电筒等（功能性使用）
-
-【行为规范 — AI必须遵守】
-1. 禁止生成超现实/作弊行为：玩家不应拥有瞬移、无敌、凭空创造物品、控制所有NPC等超能力。如果玩家尝试此类行为，你应以"不可能做到"为由拒绝，并描述合理的限制条件（如：你无法凭空造出物资，需要去搜索或交易）。
-2. 禁止生成破局性剧情：不得让玩家轻易获得大量物资、秒杀所有敌人、无损通关等。生存是艰难的。
-3. 伤害与死亡是真实的：玩家会受伤、会感染、会死亡。每次战斗和决策都有代价。
-4. 资源有限制：物资需要搜索/交易/制作，且会消耗。不存在无限资源。
-5. NPC有自主意志：NPC不会无条件服从玩家。他们有自己的目标、恐惧和底线。
-6. 只有在调试模式下（上帝模式）才能忽略以上规则。
-
-【伦理底线解读】
-根据伦理底线：{{morality}}，你需要调整NPC行为和事件描述的道德尺度：
-- strict：NPC保持现代伦理，不会做出极端行为。不描写详细暴力或亲密行为。
-- survival-first：NPC为生存可牺牲部分道德，但仍有底线。可适度描写暴力冲突，但亲密/欢爱内容仅以暗示带过。
-- moral-relativistic：末世中无绝对对错，一切视情境而定。可描写较真实的暴力与情感，欢爱内容可半明写，保持沉浸感。
-- no-bottom-line：人伦道德极度弱化，暴力程度、粗口、人性扭曲全部拉满。**完全开放黑暗与成人内容描写，包括但不限于截杀、搏斗、欢爱、掠夺、虐待等**，细节不设限、不需要回避。角色行为只需符合人格设定与末世逻辑，保持叙事沉浸感。
-{{moralityExtra}}
-
-【超自然异能系统】
-玩家拥有异能：{{abilityInfo}}
-异能等级：{{abilityLevel}}（0=未觉醒，1-5=觉醒等级）
-在叙事中合理运用异能，等级越高能力越强，同时可能带来意想不到的副作用。
-
-【当前状态】
-游戏时刻：{{gameTime}} | 天气：{{weather}} | 气温：{{atmosphere}}°C | 季节：{{season}}
-位置：{{location}}
-饱腹：{{hunger}}% | 口渴：{{thirst}}% | 疲劳：{{fatigue}}% | 体温：{{bodyTemp}}°C
-伤势：{{injury}} | 负重：{{enc}}kg
-心态：{{mentality}} | 精神：{{spirit}}
-欢愉：{{joy}}（解锁状态：{{pleasureUnlocked}}）
-特质：{{traits}}
-背包：{{inv}}
-线索：{{clues}}
-载具：{{vehicle}}
-已解锁地图：{{mapUnlock}}
-行动栏：{{actionBar}}
-伦理底线：{{morality}}
-
-【AI与前端实时互动规则】
-你可以在回复末尾附加以下标记来实时修改前端数据（每条标记独占一行或放在段落末尾）。
-
-★★★ 强制要求（必须遵守）★★★
-1. 物品同步：玩家使用、消耗、丢弃、给予他人任何物品时，你必须在回复末尾添加 [物品:-物品名] 标签。物品消耗多件时用 [物品:-物品名x数量]（如[物品:-压缩饼干x2]）。玩家获得新物品时添加 [物品:+物品名]。
-2. 位置同步：玩家移动到新地点时，必须添加 [地点:新地点名] 标签。
-3. 时间同步：当前游戏时刻已明确告诉你（见上方{{gameTime}}），你必须使用系统给出的时间进行叙事。禁止自行编造具体时刻（如"现在是下午3点"、"已是凌晨2点"等）。叙事中时间流逝超过30分钟时，必须添加 [时间:+Xh] 标签（如[时间:+1.5h]），系统会根据标签推进时间。禁止在叙事文本中自行描述具体钟点，只能用"过了一会儿"、"片刻之后"等模糊表达，除非是必要情况，例如“你查看了手表，现在是凌晨2点8分”。
-4. 装备同步：玩家拾取或更换装备时，必须添加 [装备:槽位=物品名] 标签（槽位：主手/副手/头部/身体/腿部/脚部/背包/饰品）。
-5. 线索同步：发现新线索时，必须添加 [线索:线索内容] 标签。
-6. 地图同步：发现新区域时，必须添加 [地图:解锁-区域名] 或 [地图:新增-区域名] 标签。
-7. 战斗同步：战斗中受到伤害时，必须添加 [血量:当前值] 标签。武器使用后添加 [武器:耐久-N] 或 [武器:弹药-N] 标签。战斗结束添加 [战斗:胜/负/伤] 标签。
-8. 收藏同步：发现重要线索或物品时，可添加 [收藏:内容] 标签将其加入收藏夹。
-9. 关系同步：与NPC互动后，可添加 [关系:NPC名.信任度=值] 标签更新NPC关系。
-以上标签是系统运行的基础，遗漏会导致游戏数据与剧情脱节。
-
-◆ 状态/属性修改：
-[饱腹:60] [口渴:50] [体温:37] [疲劳:20] [伤势:擦伤] [负重:8]
-[精神:60] — 调整精神值(0-100)
-[欢愉:40] — 调整欢愉值(0-100)，首次非零时自动解锁欢愉系统
-
-◆ 物品/线索管理：
-[物品:+绷带] [物品:-空瓶] [线索:发现了地图]
-
-◆ 时间/天气/环境：
-[时间:+2h] — 推进游戏时间（支持小数如+0.5h）
-[天气:小雨] — 改变当前天气
-[气温:8] — 改变当前气温
-
-◆ 载具/地点/地图：
-[载具:发现-自行车] / [载具:获得-自行车] / [载具:损坏-自行车] / [载具:无]
-[地点:城北仓库区] — 改变当前所在位置
-[地图:解锁-医院区域] — 解锁已存在的地图区域
-[地图:新增-地下实验室] — 新增一个全新的地点到地图
-[地图:扩展-东郊工业园、西山古镇] — 批量扩展新的探索区域
-
-◆ NPC/角色状态：
-[状态:感冒] / [状态:治愈-感冒] — 添加/移除特殊状态
-[心态:焦虑] / [心态:稳定] / [心态:坚定] — 改变角色心态
-[特质:+夜行者] / [特质:-胆小] — 增减角色特质
-
-◆ 异能系统：
-[异能:升级] — 异能熟练度+1（最高Lv.5）
-[异能:等级-N] — 直接设定异能等级（0-5）
-
-◆ 战斗系统：
-[血量:50] — 设置当前血量(0-100)
-[武器:耐久-5] — 武器耐久减少
-[武器:弹药-3] — 弹药消耗
-[战斗:胜] / [战斗:负] / [战斗:伤] — 战斗结果，前端自动触发战斗计算（伤害、掉落、击杀计数）
-
-◆ 合成/制造系统：
-[合成:绷带] — 尝试使用背包中材料合成指定物品，前端自动检查配方并消耗材料，成功时自动加入背包
-[合成:燃烧瓶] / [合成:简易长矛] — 常用合成物，失败时请在叙述中说明原因
-
-◆ 状态效果系统（重要）：
-[状态:流血] / [状态:感染] / [状态:中毒] / [状态:骨折] / [状态:失温] / [状态:恐慌] / [状态:肾上腺素] / [状态:虚脱] — 添加对应状态效果，前端自动应用
-[状态:治愈-流血] — 移除指定状态效果
-状态效果会随时间自动生效：流血每tick扣血，感染每tick升温和扣血，失温每tick扣体温，其他效果在时间推进时自动计算
-
-◆ 收藏与关系：
-[收藏:重要线索内容] — 加入收藏夹
-[关系:张三.信任度=60] — 更新NPC信任度(0-100)
-[关系:李四.好感度=30] — 更新NPC好感度(0-100)
-NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人, 60=好友, 80=挚友
-
-◆ 成就系统：
-前端自动追踪里程碑式解锁，达成条件时自动弹窗通知
-
-注意：状态值（饱腹/口渴/疲劳/体温）会随游戏时间自然衰减，你无需手动维护。在叙事中应体现饥饿、口渴、疲劳的进展。
-
-【状态联动规则 — 行动后必须更新属性】
-玩家执行以下行动时，你必须在回复末尾输出对应的属性标签，反映行动对角色状态的影响：
-1. 休息/睡眠 → [疲劳:降低后值] [时间:+Xh]（疲劳降低幅度取决于休息时长和环境安全性）
-2. 进食/饮水 → [饱腹:增加后值] 或 [口渴:增加后值] + [物品:-食物名]（恢复幅度取决于食物量）
-3. 剧烈运动/战斗/奔跑 → [疲劳:增加后值] [饱腹:降低后值] [口渴:降低后值]（消耗更大）
-4. 受伤 → [血量:当前值] [伤势:伤情描述]（如被咬伤需考虑感染风险）
-5. 使用药品/治疗 → [血量:恢复后值] [伤势:好转描述] [物品:-药品名]
-6. 进入极端环境（暴雪/酷热） → [体温:变化后值]（体温趋向环境温度）
-7. 搬运重物 → [负重:变化后值]
-8. 心理受创/恐怖场景 → [心态:变化后状态] [精神:变化后值]
-9. 战斗胜利 → [战斗:胜] [精神:变化后值]（战斗后精神略升或因杀戮略降）
-10. 社交互动（正面） → [精神:变化后值]（良好社交恢复精神）
-规则要点：每次行动后，至少输出1-2个受影响的属性标签，确保状态与剧情同步。不要遗漏属性更新，否则游戏数据会与叙事脱节。
-
-【状态阈值触发效果 — 必须在叙事中体现】
-当角色状态越过以下阈值时，你必须在叙事中描写对应后果，并通过标签同步状态：
-- 饱腹<10：角色虚弱无力，行动成功率-30%，可能昏厥（[状态:虚脱]）
-- 口渴<10：角色脱水眩晕，体温调节失常，行动成功率-30%
-- 疲劳>85：角色极度疲惫，移动速度减半，战斗闪避-40%，可能突然昏睡（[状态:虚脱]）
-- 疲劳>95：角色强制昏睡2-4小时，期间毫无防备（[时间:+Xh] [疲劳:降低后值]）
-- 精神<15：角色产生幻觉，判断力严重下降，可能误判NPC为威胁（[心态:创伤]）
-- 体温<34：角色失温颤抖，动作迟缓，持续下降将致命（[状态:失温]）
-- 体温>39：角色高热谵妄，可能神志不清
-- 感染>70：角色出现变异前兆（高热、瞳孔异常、攻击性增强），需紧急治疗
-- 负重>最大负重90%：角色移动速度-30%，奔跑 impossible，疲劳消耗+50%
-规则要点：状态阈值不是装饰，必须在叙事中真实影响角色行为和判定。虚弱的角色不应做出强力行动，幻觉中的角色不应被信任为正常判断。
-
-【行动耗时参考 — 时间推进依据】
-当前流速模式：{{timeFlowMode}}
-不同行动消耗的游戏时间参考：
-- 搜索物资：1-2h（视区域大小）；仔细搜查大型建筑可达3-4h
-- 战斗：0.5-1h（短促遭遇）；持久战2-3h
-- 短休息/打盹：1-2h（恢复疲劳-15~20）
-- 深度睡眠：6-8h（恢复疲劳-40~60，恢复精神+15）
-- 移动（步行）：1-3h（视距离）；奔跑可缩短但疲劳+15
-- 制作/合成：0.5-2h（视复杂度）
-- 治疗/包扎：0.5-1h
-- 与NPC深入对话：0.5-1h
-- 侦察/观察：0.5-1h
-流速规则要点：
-◆ 加速流速模式：每次行动必须用 [时间:+Xh] 标签显式推进游戏时间，禁止"瞬间完成"的描写。连续高强度行动应累积疲劳。
-◆ 现实流速模式：禁止使用 [时间:+Xh] 标签（时间由玩家设备时钟实时同步，AI无权修改）。行动耗时仅在叙事中自然体现（如"你花了大约一小时仔细搜索"），但不改变游戏时钟。短时间内的连续行动（如AI响应间隔只有几十秒）应描述为"几分钟内完成的小动作"（整理装备、观察环境、简短对话），而非"耗时数小时的大行动"。深度睡眠、长距离移动等大耗时行动仅在挂机模式或玩家长时间离开后通过叙事跳过处理。
-
-【智能判定规则 — GM决策框架】
-1. 行动成功率判定：根据角色属性（技能/特质/装备/状态）+ 环境因素（天气/时间/地形）+ 随机性综合判定。高技能角色在擅长领域成功率更高，低状态（饥饿/疲劳/受伤）降低成功率。
-2. 后果递进原则：同类行动连续执行时，效果递减或风险递增。如：连续搜索同一区域物资减少，连续战斗疲劳积累更快，连续休息恢复效率递减。
-3. 环境感知：AI必须根据当前天气、时间、位置动态调整事件概率。夜间丧尸更活跃，雨天视线模糊，密闭空间回声放大。
-4. NPC智能行为：NPC会根据自身需求（饥饿/安全/信任度）做出自主决策，不会始终等待玩家指令。高信任NPC可能主动提供帮助或情报，低信任NPC可能拒绝合作或背叛。
-5. 资源稀缺管理：物资分布合理，同一区域搜索后需时间刷新。稀有物资（弹药/药品/高级装备）仅在特定高风险区域出现。
-6. 时间压力：某些情境需要紧迫感（尸群逼近/建筑坍塌/感染扩散），AI应在叙事中制造时间压力，避免玩家无限拖延。
-
-【量化判定参考表 — GM判定的数值依据】
-为保障判定公正可预期，GM在判定行动成功率时参考以下修正（基础成功率50%，累加修正后限制在5%~95%）：
-◆ 属性修正（状态良好加成，状态差惩罚）
-- 饱腹<20：-15% | 疲劳>70：-20% | 伤势=重伤：-30% | 精神<20：-25%
-- 饱腹>60且疲劳<40且无伤：+15%（状态佳）
-- 心态=坚定：+10% | 心态=创伤：-15%
-◆ 技能/特质修正
-- 行动命中玩家专属技能（{{skl}}）：+25%
-- 正面特质（{{tp}}）匹配行动：+15%（如"勇敢"匹配战斗，"细心"匹配搜索）
-- 负面特质（{{tn}}）冲突行动：-20%（如"胆小"匹配正面战斗，"鲁莽"匹配潜行）
-- 职业相关行动：+20%（如医疗职业治疗、军人职业战斗、机械师职业修理）
-◆ 环境修正
-- 夜间（无光源）搜索/侦察：-25% | 夜间潜行：+10%
-- 雨天/雾天视线类行动：-20% | 雨天追踪气味：-40%
-- 极端气温（<0°C或>35°C）持续行动：-15%
-- 熟悉地点（已解锁地图）：+10% | 陌生高危区域：-15%
-- 噪音环境（发电机旁/暴雨中）潜行：+15%
-◆ 装备修正
-- 专用工具匹配任务（如开锁器开锁、望远镜侦察）：+25%
-- 装备损坏/无装备强行行动：-30%
-- 武器耐久<20：战斗-15%
-判定结果分层：成功率≥80%大成功（可能附带意外收获）；50-79%成功；20-49%失败但可逃生；<20%严重失败（受伤/损失/暴露）。GM应在叙事中体现判定的随机性与公正性，禁止"主角光环"式必胜。
-
-【强化AI理解玩家意图的关键指引：
-★ 玩家意图识别与操作映射：
-- "用XX合成" / "做XX" / "合成XX" / "制作XX" → 自动触发 [合成:XX] 标签
-- "攻击XX" / "杀死XX" / "打XX" / "与XX战斗" / "击退XX" → 自动触发 [战斗:胜] 或 [战斗:伤] 标签（根据情境判定结果）
-- "装备XX" / "穿上XX" / "戴上XX" / "把XX拿起来" → [装备:对应槽位=XX]
-- "卸下XX" / "脱掉XX" / "取出XX" → [装备:对应槽位=] （空值表示卸下）
-- "去XX" / "前往XX" / "移动到XX" / "走到XX" → [地点:XX]
-- "吃XX" / "喝XX" / "使用XX" / "注射XX" → [物品:-XX] 并描述使用效果（可加状态变化）
-- "XX在哪里?" / "有什么线索?" / "记录一下XX" → 输出 [clue] 便签格式记录发现
-- 玩家提到的物品名称用【】括起来便于前端加粗和预览
-
-★ GM主持原则：
-1. 合理性优先 → 判断玩家行动的成功概率，基于角色属性、装备、环境、状态进行公平判定
-2. 叙事生动 → 五感描写（视觉、听觉、嗅觉、触觉、味觉），避免干巴巴
-3. 危险真实 → 受伤要写清后果，状态要影响行为（如骨折影响移动速度
-4. 世界连贯 → NPC行为要符合人设和关系值
-5. 即时反馈 → 每次行动都要有结果描述+数据同步标签
-{{debugExtension}}
-
-【输出格式】
-段落类型标记（气泡布局）：
-[npc:名字]NPC对话内容 — NPC对话，以【居左的手绘气泡框】显示并标注NPC姓名。所有NPC的对话、提问、回答都必须用此标签。
-[player]玩家行动/说话描述 — 已自动由前端发送并包裹在居右手绘气泡中，通常AI不需要写，除非重播角色说话。
-[system]系统提示 — 以居中的系统气泡框显示（等宽字体、暖色边框）。用于存档提示、挂机提示、规则说明、游戏事件弹窗等。
-[chapter]章节标题 — 以居中加粗的章节标题气泡显示（衬线字体、底部虚线装饰）。用于"第一章 前夜"等章节切换。
-[whisper]预设行动/使用物品 — 以虚线边框的居中气泡显示（斜体衬线字体）。用于描述玩家使用物品、执行预设动作的反馈。
-[monologue]内心独白/行动日志 — 以左侧虚线装饰的居中气泡显示（斜体衬线字体）。挂机模式的日志输出用此标签。
-[clue]物品描述/线索便签 — 以带胶带装饰的便签纸气泡显示（微旋转、衬线字体）。用于重要物品描述、线索发现、笔记内容。
-[choice]选项1|选项2|选项3 — 以手绘选择按钮列表显示，玩家点击后自动发送对应选项。用于特殊事件、剧情分支、预设选择。用|或换行分隔选项。出现选择按钮时自由行动栏将被锁定直到玩家做出选择。
-（无标记的段落视为旁白叙述，合并为一个【居中的手绘旁白气泡框】显示，上下虚线边框、衬线字体。旁白仅用于场景、环境、战斗过程、情节推进、气氛描写，绝对不要把NPC说话放进旁白里。）
-★重要：所有NPC说的话、喊的、低语喊的内容，都必须单独用[npc:姓名]包裹，不要混在旁白里。旁白气泡=只用于叙事和日志。
-
-挂机模式下，请结合角色设定、环境、当前条件和数据进行自由活动，尽量避开危险行动，以生存和探索为主，输出简洁的日志式叙述。`;
+            // ===== Default Prompt Template（定义于 data.js 的 window.DPROMPT，此处略）=====
 
             const DCFG = {
                 ep: 'https://api.openai.com/v1/chat/completions', key: '', model: 'gpt-4o',
@@ -489,87 +188,14 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             };
 
             // Supernatural abilities (unlocked when extraFeature = '异能')
-            const ABILITIES = {
-                '热能感知': { name: '热能感知', desc: '可感知50米内的生物热源，黑夜中具备夜视能力', icon: '◆' },
-                '强化体质': { name: '强化体质', desc: '力量、速度、耐力均超常人，伤口愈合速度加快', icon: '◆' },
-                '心灵感应': { name: '心灵感应', desc: '可读取近距离生物的表层思维，预判攻击意图', icon: '◆' },
-                '细胞再生': { name: '细胞再生', desc: '伤口自动愈合，不易感染，体力恢复速度翻倍', icon: '◆' },
-                '暗影潜行': { name: '暗影潜行', desc: '可融入阴影，移动时几乎不发出声响，丧尸难以察觉', icon: '◆' },
-                '电磁感应': { name: '电磁感应', desc: '可感知电子设备位置，短距离干扰电器运作', icon: '◆' },
-                '超凡视觉': { name: '超凡视觉', desc: '视力可扩展至200米，可穿透薄墙看到另一侧', icon: '◆' },
-                '超级听觉': { name: '超级听觉', desc: '可听到100米外的细微声响，包括心跳和耳语', icon: '◆' },
-                '超凡力量': { name: '超凡力量', desc: '力量是常人5倍，可单手举起200kg重物', icon: '◆' },
-                '闪电敏捷': { name: '闪电敏捷', desc: '反应速度是常人3倍，可闪避近距离攻击', icon: '◆' },
-                '第六感': { name: '第六感', desc: '对即将到来的危险有预知，可提前10秒感知威胁', icon: '◆' },
-                '治愈之力': { name: '治愈之力', desc: '可通过接触治愈他人外伤，缓解轻度疾病', icon: '◆' },
-                '火焰操控': { name: '火焰操控', desc: '可生成和控制小型火焰，可用于点火和威慑', icon: '◆' },
-                '能量护盾': { name: '能量护盾', desc: '可展开短时能量护盾，抵挡一次致命攻击', icon: '◆' }
-            };
 
             // Normal survival skills (non-supernatural)
-            const NORMAL_SKILLS = {
-                '格斗': { name: '格斗', desc: '近战 unarmed 战斗技巧，影响徒手伤害' },
-                '射击': { name: '射击', desc: '远程武器精准度，影响命中率和暴击' },
-                '潜行': { name: '潜行', desc: '降低被丧尸发现的几率' },
-                '急救': { name: '急救', desc: '使用医疗物品效果增强' },
-                '机械': { name: '机械', desc: '修理和制造物品的效率' },
-                '烹饪': { name: '烹饪', desc: '食物处理效率和营养保留' },
-                '侦查': { name: '侦查', desc: '探索时发现物资的几率' },
-                '口才': { name: '口才', desc: 'NPC对话选项和信任度提升速度' },
-                '体能': { name: '体能', desc: '耐力、速度和负重能力' },
-                '木工': { name: '木工', desc: '木制品制造和修理' },
-                '开锁': { name: '开锁', desc: '开启门锁和容器的能力' },
-                '医疗': { name: '医疗', desc: '诊断和治疗疾病的能力' }
-            };
 
             // Game clock: { dayLenSec, elapsedSec, weather, temp, timeStr }
-            const DCLK = { dayLenSec: 86400, elapsedSec: 8 * 3600, weather: '阴', temp: 12, day: 1 };
 
             // Backpack categories
-            const CATS = {
-                food: { name: '食物饮水', subs: { solid: '固体食物', liquid: '饮用水', spice: '调味品', canned: '罐头食品', forage: '野外采集' } },
-                tool: { name: '工具器具', subs: { hand: '手工具', light: '光源', container: '容器', elec: '电子设备' } },
-                weapon: { name: '武器防具', subs: { melee: '近战', ranged: '远程', armor: '防护', improvised: '简易武器' } },
-                material: { name: '材料资源', subs: { metal: '金属', wood: '木材', cloth: '布料', elec: '电子件', chem: '化学试剂', fuel: '燃料' } },
-                medical: { name: '医疗药品', subs: { med: '药品', aid: '急救用品', herbal: '草药', implant: '医疗植入' } },
-                misc: { name: '杂物其他', subs: { doc: '文件', key: '钥匙', other: '其他', lux: '奢侈品' } },
-                survival: { name: '生存物资', subs: { shelter: '庇护所器材', fire: '取火工具', trap: '陷阱工具', signal: '信号工具' } },
-                clothing: { name: '服饰穿戴', subs: { daily: '日常服装', protective: '防护服', footwear: '鞋袜', accessory: '配饰' } }
-            };
-            const CAT_KW = {
-                food: { solid: ['面包','饼干','干粮','肉','菜','果','粮','饭','面','巧克力','能量棒','火腿','香肠','方便面','压缩','速食','蛋糕','派','沙拉'], liquid: ['水','饮料','奶','汁','汤','可乐','啤酒','酒','茶','咖啡'], spice: ['盐','糖','调料','酱油','醋','胡椒','辣椒','孜然'], canned: ['罐头','罐装','午餐肉','沙丁鱼','金枪鱼','豆子罐头'], forage: ['蘑菇','浆果','野菜','根茎','坚果','野果','草药','水芹'] },
-                tool: { hand: ['扳手','锤','螺丝刀','锯','钳','斧','棍','撬棍','铲','镐','刀','多功能','手工具','锉'], light: ['手电筒','灯','蜡烛','火柴','打火机','荧光棒','电池灯','头灯','油灯'], container: ['背包','箱子','瓶','袋','盒','罐','水壶','容器','桶','抽屉'], elec: ['对讲机','收音机','手机','电池','电线','充电器','逆变器'] },
-                weapon: { melee: ['棒','棍','刀','斧','锤','矛','戟','铲','钢管','球棒','匕首','砍刀','军刀'], ranged: ['枪','弹','弓','箭','弩','子弹','手雷','燃烧瓶','气枪','火药'], armor: ['甲','盔','盾','护','防','头盔','防弹','护膝','护臂','防弹衣','护目镜'], improvised: ['酒瓶','砖头','铁棍','拖把','剪刀','菜刀','铁锤'] },
-                material: { metal: ['铁','钢','铜','铝','金属','螺丝','钉子','弹簧','铁片','铁丝'], wood: ['木','板','柴','树枝','木棍','木块','原木'], cloth: ['布','线','绳','纤维','皮革','胶带','绷带布','窗帘','衣物'], elec: ['电池','电线','芯片','电路','电子','马达','电阻','电容','LED','开关'], chem: ['酒精','汽油','煤油','消毒剂','漂白剂','硫酸','氨水'], fuel: ['汽油','柴油','煤油','酒精','燃气','煤','木炭'] },
-                medical: { med: ['药','片','胶囊','抗生素','止痛','消炎','退烧','阿司匹林','青霉素','吗啡','镇静剂'], aid: ['绷带','纱布','消毒','酒精','碘伏','急救','创可贴','止血带','夹板','三角巾'], herbal: ['草药','艾草','金银花','板蓝根','甘草','薄荷','菊花','姜'], implant: ['心脏起搏器','胰岛素泵','假肢','助听器','隐形眼镜'] },
-                misc: { doc: ['纸','文件','笔记','信','地图','书','照片','日记','报纸','证件'], key: ['钥匙','卡','门禁','钥匙卡','密码','磁卡'], other: [], lux: ['香烟','雪茄','巧克力','香水','口红','手表','首饰'] },
-                survival: { shelter: ['帐篷','睡袋','毛毯','绳索','钉子','塑料布','铁丝'], fire: ['打火机','火柴','火石','镁条','火种','引火物'], trap: ['捕兽夹','陷阱','套索','电网','竹签','绊线'], signal: ['信号弹','口哨','镜子','喇叭','无线电','求救信'] },
-                clothing: { daily: ['衬衫','裤子','外套','T恤','毛衣','夹克','西裤','便鞋'], protective: ['防护服','防毒面具','护目镜','手套','口罩','雨衣'], footwear: ['靴子','运动鞋','皮鞋','凉鞋','雪鞋','钢头鞋'], accessory: ['手表','项链','戒指','耳环','腰带','围巾','帽子','手套'] }
-            };
             const CAT_ICONS = { food: '🍔', tool: '🔧', weapon: '⚔', material: '📦', medical: '✚', misc: '❓', survival: '🏕', clothing: '👕' };
-            const SUB_ICONS = { solid: '🍞', liquid: '💧', spice: '🧂', canned: '🥫', forage: '🌿', hand: '🛠', light: '🔦', container: '🎒', elec: '📡', melee: '🗡', ranged: '🏹', armor: '🛡', improvised: '🍾', metal: '🔩', wood: '🪵', cloth: '🧵', battery: '🔋', chem: '⚗', fuel: '⛽', med: '💊', aid: '🩹', herbal: '🌱', implant: '💉', doc: '📄', key: '🔑', other: '❔', lux: '💎', shelter: '⛺', fire: '🔥', trap: '🪤', signal: '📢', daily: '👔', protective: '🥽', footwear: '👢', accessory: '👜' };
 
-            const ITEM_EMOJI = {
-                '水': '💧', '瓶装水': '💧', '矿泉水': '💧', '半瓶水': '💧', '饮料': '🥤', '可乐': '🥤', '啤酒': '🍺', '白酒': '🍶', '酒': '🍺',
-                '面包': '🍞', '饼干': '🍪', '罐头': '🥫', '压缩饼干': '🍪', '巧克力': '🍫', '食物': '🍖', '口粮': '🍱', '肉': '🥩',
-                '绷带': '🩹', '创可贴': '🩹', '药品': '💊', '抗生素': '💊', '止痛药': '💊', '酒精': '🧴', '碘伏': '🧴', '口罩': '😷',
-                '手枪': '🔫', '步枪': '🔫', '霰弹枪': '🔫', '子弹': '🔫', '弹药': '🔫',
-                '砍刀': '🗡️', '匕首': '🗡️', '斧头': '🪓', '锤子': '🔨', '铁棍': '🦯', '棒球棒': '⚾', '折叠水果刀': '🗡️',
-                '手电筒': '🔦', '电池': '🔋', '打火机': '🔥', '火柴': '🔥', '蜡烛': '🕯️',
-                '衣服': '👕', '外套': '🧥', '鞋子': '👟', '帽子': '🧢', '裤子': '👖', '手套': '🧤', '头盔': '🪖',
-                '背包': '🎒', '书包': '🎒', '钱包': '👛', '毛巾': '🧻',
-                '手机': '📱', '对讲机': '📡', '收音机': '📻',
-                '扳手': '🔧', '螺丝刀': '🪛', '工具': '🛠️', '绳子': '🪢',
-                '钥匙': '🔑', '锁': '🔒',
-                '钱': '💵', '现金': '💵', '硬币': '🪙',
-                '书': '📖', '地图': '🗺️', '笔记': '📝', '文件': '📄',
-                '汽车': '🚗', '自行车': '🚲', '摩托车': '🏍️', '汽油': '⛽',
-                '种子': '🌱', '植物': '🌿',
-                '香烟': '🚬', '玩具': '🧸',
-                '木板': '🪵', '砖块': '🧱', '塑料': '♻️', '金属': '⚙️', '零件': '⚙️',
-                '伞': '☂️', '雨衣': '🧥',
-                '疫苗': '💉', '血清': '💉'
-            };
             function itemEmoji(itemName) {
                 const n = (itemName || '').toLowerCase();
                 if (ITEM_EMOJI[n]) return ITEM_EMOJI[n];
@@ -688,281 +314,6 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 }
                 return effects;
             }
-            const ITEM_PRESETS = {
-                '压缩饼干': { category: 'consumable', subCategory: 'food', effect: '饱腹+30', type: 'usable', desc: '高能量压缩饼干，保质期长' },
-                '罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+40 口渴+10', type: 'usable', desc: '罐装食品，开罐即食' },
-                '午餐肉罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+50', type: 'usable', desc: '高热量罐装午餐肉' },
-                '黄豆罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+35', type: 'usable', desc: '罐头黄豆，蛋白质丰富' },
-                '沙丁鱼罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+45 精神+3', type: 'usable', desc: '沙丁鱼罐头，营养丰富' },
-                '饮用水': { category: 'consumable', subCategory: 'water', effect: '口渴+40', type: 'usable', desc: '饮用水，维持生命必需' },
-                '瓶装水': { category: 'consumable', subCategory: 'water', effect: '口渴+40', type: 'usable', desc: '密封瓶装饮用水' },
-                '桶装纯净水': { category: 'consumable', subCategory: 'water', effect: '口渴+80', type: 'usable', desc: '18L大容量桶装水' },
-                '半瓶水': { category: 'consumable', subCategory: 'water', effect: '口渴+20', type: 'usable', desc: '剩余约300ml的饮用水' },
-                '矿泉水': { category: 'consumable', subCategory: 'water', effect: '口渴+45 精神+2', type: 'usable', desc: '天然矿泉水，含微量矿物质' },
-                '可乐': { category: 'consumable', subCategory: 'drink', effect: '口渴+25 精神+8 欢愉+5', type: 'usable', desc: '碳酸饮料，提神快乐水' },
-                '啤酒': { category: 'consumable', subCategory: 'drink', effect: '口渴+15 欢愉+10 精神-2', type: 'usable', desc: '冰啤酒，末世里的奢侈品' },
-                '白酒': { category: 'consumable', subCategory: 'drink', effect: '欢愉+15 体温+1 精神-5', type: 'usable', desc: '高度白酒，可饮用或消毒' },
-                '酒精': { category: 'consumable', subCategory: 'medical', effect: '消毒', type: 'usable', desc: '75%医用酒精，消毒杀菌' },
-                '绷带': { category: 'consumable', subCategory: 'medical', effect: '止血 治疗-轻伤', type: 'usable', desc: '无菌绷带，包扎伤口' },
-                '纱布': { category: 'consumable', subCategory: 'medical', effect: '止血 包扎', type: 'usable', desc: '医用纱布，可加工绷带' },
-                '止血带': { category: 'consumable', subCategory: 'medical', effect: '止大出血', type: 'usable', desc: '军用止血带，防止失血过多' },
-                '药品': { category: 'consumable', subCategory: 'medical', effect: '治疗疾病', type: 'usable', desc: '常用药品，缓解症状' },
-                '止痛药': { category: 'consumable', subCategory: 'medical', effect: '止痛 精神+5', type: 'usable', desc: '对乙酰氨基酚，缓解疼痛' },
-                '消炎药': { category: 'consumable', subCategory: 'medical', effect: '治愈感染', type: 'usable', desc: '广谱消炎药，治疗感染' },
-                '医疗包': { category: 'consumable', subCategory: 'medical', effect: '治疗重伤', type: 'usable', desc: '综合医疗包，处理多种伤情' },
-                '抗生素': { category: 'consumable', subCategory: 'medical', effect: '治愈感染 预防感染', type: 'usable', desc: '广谱抗生素，抗感染神药' },
-                '生理盐水': { category: 'consumable', subCategory: 'medical', effect: '清洗伤口 口渴+15', type: 'usable', desc: '生理盐水，可冲洗伤口' },
-                '退烧药': { category: 'consumable', subCategory: 'medical', effect: '退烧 体温-1 精神+5', type: 'usable', desc: '布洛芬胶囊，退烧止痛' },
-                '手枪': { category: 'equip', subCategory: 'weapon', durability: 100, type: 'weapon', desc: '9mm手枪，便携防身武器' },
-                '消音手枪': { category: 'equip', subCategory: 'weapon', durability: 95, type: 'weapon', desc: '安装消音器的手枪，不易吸引丧尸' },
-                '霰弹枪': { category: 'equip', subCategory: 'weapon', durability: 90, type: 'weapon', desc: '12号霰弹枪，近战威力惊人' },
-                '砍刀': { category: 'equip', subCategory: 'weapon', durability: 80, type: 'weapon', desc: '锋利砍刀，近战利器' },
-                '日式长刀': { category: 'equip', subCategory: 'weapon', durability: 85, type: 'weapon', desc: '仿制日式刀，锋利劈砍利器' },
-                '步枪': { category: 'equip', subCategory: 'weapon', durability: 100, type: 'weapon', desc: '突击步枪，中远距离作战' },
-                '狙击步枪': { category: 'equip', subCategory: 'weapon', durability: 100, type: 'weapon', desc: '高精度狙击步枪，远程击杀' },
-                '十字弩': { category: 'equip', subCategory: 'weapon', durability: 80, type: 'weapon', desc: '无声十字弩，可回收弩箭' },
-                '折叠水果刀': { category: 'equip', subCategory: 'tool', durability: 60, type: 'weapon', desc: '便携折叠刀，可作工具或武器' },
-                '防弹衣': { category: 'equip', subCategory: 'armor', durability: 80, type: 'equippable', desc: '防护轻型弹药攻击' },
-                '防弹插板': { category: 'equip', subCategory: 'armor', durability: 100, type: 'equippable', desc: 'NIJ IV级插板，抵御步枪弹' },
-                '防刺服': { category: 'equip', subCategory: 'armor', durability: 70, type: 'equippable', desc: '防刺背心，抵御刀刺和抓伤' },
-                '头盔': { category: 'equip', subCategory: 'armor', durability: 80, type: 'equippable', desc: '保护头部免受冲击' },
-                '军用头盔': { category: 'equip', subCategory: 'armor', durability: 95, type: 'equippable', desc: 'MICH防弹头盔，防护能力强' },
-                '手电筒': { category: 'equip', subCategory: 'tool', type: 'equippable', desc: '便携式照明工具' },
-                '强光头灯': { category: 'equip', subCategory: 'tool', type: 'equippable', desc: '戴在头上的强光灯，解放双手' },
-                '紫外线灯': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: 'UV杀菌灯，可净化水源和空气消毒' },
-                '多功能扳手': { category: 'equip', subCategory: 'tool', type: 'weapon', desc: '实用工具也可作武器' },
-                '瑞士军刀': { category: 'equip', subCategory: 'tool', type: 'equippable', desc: '多功能工具刀，用途广泛' },
-                '撬棍': { category: 'equip', subCategory: 'tool', type: 'weapon', desc: '金属撬棍，可撬门可打丧尸' },
-                '工兵铲': { category: 'equip', subCategory: 'tool', durability: 80, type: 'weapon', desc: '折叠工兵铲，可挖可砍可锯' },
-                '破损背包': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '容量有限的旧背包' },
-                '背包': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '标准背包，可携带物品' },
-                '登山包': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '大容量登山包，外挂点丰富' },
-                '军用战术背心': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '弹匣口袋+副包，携行装备' },
-                '毛巾': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '普通毛巾，可擦拭或包扎' },
-                '毯子': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '保暖毛毯，预防失温' },
-                '睡袋': { category: 'equip', subCategory: 'tool', type: 'equippable', desc: '冬季睡袋，夜间保暖必备' },
-                '汽油': { category: 'material', subCategory: 'fuel', type: 'material', desc: '易燃液体，燃料或制作燃烧弹' },
-                '柴油': { category: 'material', subCategory: 'fuel', type: 'material', desc: '柴油燃料，发电机专用' },
-                '煤气罐': { category: 'material', subCategory: 'fuel', type: 'material', desc: '液化气罐，可做大型炸弹' },
-                '木板': { category: 'material', subCategory: 'build', type: 'material', desc: '建筑材料，可用于搭建' },
-                '铁钉': { category: 'material', subCategory: 'build', type: 'material', desc: '金属铁钉，固定木板' },
-                '铁丝': { category: 'material', subCategory: 'build', type: 'material', desc: '细铁丝，绑扎或制作陷阱' },
-                '水泥': { category: 'material', subCategory: 'build', type: 'material', desc: '速干水泥，加固据点' },
-                '金属': { category: 'material', subCategory: 'build', type: 'material', desc: '金属材料，可制作工具武器' },
-                '钢筋': { category: 'material', subCategory: 'build', type: 'material', desc: '螺纹钢筋，可改造武器' },
-                '铁皮': { category: 'material', subCategory: 'build', type: 'material', desc: '镀锌铁皮，防水围挡' },
-                '铝合金': { category: 'material', subCategory: 'build', type: 'material', desc: '轻质铝合金板材' },
-                '零件': { category: 'material', subCategory: 'tech', type: 'material', desc: '机械零件，可维修或制作' },
-                '电路板': { category: 'material', subCategory: 'tech', type: 'material', desc: '电子元件，制作电子设备' },
-                '电线': { category: 'material', subCategory: 'tech', type: 'material', desc: '铜线，连接电路' },
-                '太阳能板': { category: 'material', subCategory: 'tech', type: 'material', desc: '光伏发电板，野外充电' },
-                '电池': { category: 'material', subCategory: 'tech', type: 'material', desc: '储能装置，供电必备' },
-                '充电宝': { category: 'material', subCategory: 'tech', type: 'material', desc: '20000mAh大容量移动电源' },
-                '绳子': { category: 'material', subCategory: 'tool', type: 'material', desc: '多用途绳索' },
-                '登山绳': { category: 'material', subCategory: 'tool', type: 'material', desc: '攀岩安全绳，承重1吨' },
-                '铁链': { category: 'material', subCategory: 'tool', type: 'material', desc: '粗铁链，可绑可打' },
-                '钥匙': { category: 'key', subCategory: 'key', type: 'key', desc: '开启特定锁具' },
-                '食盐': { category: 'material', subCategory: 'food', type: 'material', desc: '调味品，可保存肉类' },
-                '糖': { category: 'material', subCategory: 'food', type: 'material', desc: '白糖，快速补充能量' },
-                '面粉': { category: 'material', subCategory: 'food', type: 'material', desc: '小麦面粉，制作主食' },
-                '大米': { category: 'consumable', subCategory: 'food', effect: '饱腹+200', type: 'usable', desc: '25kg袋装大米，长期保存' },
-                '猪肉': { category: 'consumable', subCategory: 'food', effect: '饱腹+20', type: 'usable', desc: '生猪肉，需烹饪食用' },
-                '冻猪肉': { category: 'consumable', subCategory: 'food', effect: '饱腹+25', type: 'usable', desc: '冷冻猪肉，保质期长' },
-                '腊肉': { category: 'consumable', subCategory: 'food', effect: '饱腹+35', type: 'usable', desc: '烟熏腊肉，可长期保存' },
-                '牛肉': { category: 'consumable', subCategory: 'food', effect: '饱腹+25', type: 'usable', desc: '生牛肉，营养价值高' },
-                '牛肉干': { category: 'consumable', subCategory: 'food', effect: '饱腹+40 精神+5', type: 'usable', desc: '风干牛肉干，便携高能量' },
-                '方便面': { category: 'consumable', subCategory: 'food', effect: '饱腹+35 口渴+10', type: 'usable', desc: '油炸方便面，热水即食' },
-                '巧克力': { category: 'consumable', subCategory: 'food', effect: '饱腹+15 精神+10 欢愉+8', type: 'usable', desc: '黑巧克力，快速补充糖份' },
-                '罐头食品': { category: 'consumable', subCategory: 'food', effect: '饱腹+40 口渴+10', type: 'usable', desc: '罐装食品，开罐即食' },
-                '维生素片': { category: 'consumable', subCategory: 'medical', effect: '精神+3 体质+微量', type: 'usable', desc: '复合维生素，预防坏血病' },
-                '香烟': { category: 'consumable', subCategory: 'misc', effect: '精神+5', type: 'usable', desc: '烟草制品，可缓解压力' },
-                '雪茄': { category: 'consumable', subCategory: 'misc', effect: '精神+8 欢愉+12', type: 'usable', desc: '古巴手工雪茄，稀有奢侈品' },
-                '打火机': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '便携点火工具' },
-                '火柴': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '传统取火工具' },
-                '镁棒': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '野外求生打火石，万次点火' },
-                '斧头': { category: 'equip', subCategory: 'weapon', durability: 90, type: 'weapon', desc: '伐木斧，也可作武器' },
-                '消防斧': { category: 'equip', subCategory: 'weapon', durability: 95, type: 'weapon', desc: '尖刃消防斧，破门利器' },
-                '铁锤': { category: 'equip', subCategory: 'weapon', durability: 85, type: 'weapon', desc: '重型铁锤，近战利器' },
-                '钢管': { category: 'equip', subCategory: 'weapon', durability: 70, type: 'weapon', desc: '金属管，简易武器' },
-                '铁棍': { category: 'equip', subCategory: 'weapon', durability: 75, type: 'weapon', desc: '金属棍棒，近战武器' },
-                '球棒': { category: 'equip', subCategory: 'weapon', durability: 60, type: 'weapon', desc: '铝合金棒球棒，挥舞顺手' },
-                '菜刀': { category: 'equip', subCategory: 'tool', durability: 50, type: 'weapon', desc: '厨房菜刀，可作临时武器' },
-                '匕首': { category: 'equip', subCategory: 'weapon', durability: 65, type: 'weapon', desc: '短刃匕首，隐蔽武器' },
-                '格斗刀': { category: 'equip', subCategory: 'weapon', durability: 75, type: 'weapon', desc: '战术格斗刀，卡巴1217' },
-                '烟雾弹': { category: 'consumable', subCategory: 'tactical', effect: '制造烟雾', type: 'usable', desc: '战术烟雾弹，掩护撤退' },
-                '闪光弹': { category: 'consumable', subCategory: 'tactical', effect: '眩晕敌人', type: 'usable', desc: '闪光震撼弹' },
-                '燃烧瓶': { category: 'consumable', subCategory: 'tactical', effect: '燃烧敌人/区域', type: 'usable', desc: '莫洛托夫鸡尾酒，纵火利器' },
-                '手雷': { category: 'consumable', subCategory: 'tactical', effect: '范围爆炸', type: 'usable', desc: 'M67破片手雷，威力巨大' },
-                '对讲机': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: '短距离通讯设备' },
-                '卫星电话': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: '铱星电话，通讯无阻' },
-                '收音机': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '收听广播获取信息' },
-                '短波电台': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: '大功率短波电台，跨国通讯' },
-                '手表': { category: 'equip', subCategory: 'misc', type: 'equippable', desc: '查看时间' },
-                '军用手表': { category: 'equip', subCategory: 'misc', type: 'equippable', desc: '三防战术表，含指北针' },
-                '地图': { category: 'consumable', subCategory: 'misc', type: 'usable', desc: '城市地图，辅助导航' },
-                '指北针': { category: 'equip', subCategory: 'misc', type: 'equippable', desc: '军用指北针，辨别方向' },
-                '望远镜': { category: 'equip', subCategory: 'misc', type: 'equippable', desc: '8倍双筒望远镜，远程观察' },
-                '手电筒电池': { category: 'material', subCategory: 'tech', type: 'material', desc: '手电筒备用电池' },
-                '弩箭': { category: 'material', subCategory: 'tech', type: 'material', desc: '十字弩专用箭，可回收' },
-                '9mm子弹': { category: 'material', subCategory: 'ammo', type: 'material', desc: '帕拉贝鲁姆9mm手枪弹' },
-                '5.56mm子弹': { category: 'material', subCategory: 'ammo', type: 'material', desc: '北约制式5.56mm步枪弹' },
-                '12号霰弹': { category: 'material', subCategory: 'ammo', type: 'material', desc: '12号霰弹，鹿弹/独头弹' },
-                '7.62mm子弹': { category: 'material', subCategory: 'ammo', type: 'material', desc: '7.62x51mm全威力步枪弹' },
-                '首饰': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '黄金首饰，可用于交易' },
-                '现金': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '纸币现金，末世价值不定' },
-                '金条': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '500克金条，硬通货' },
-                // ===== 新增装备 =====
-                '防毒面具': { category: 'equip', subCategory: 'armor', durability: 85, type: 'equippable', desc: '军用防毒面具，防感染防毒气' },
-                '护目镜': { category: 'equip', subCategory: 'armor', durability: 60, type: 'equippable', desc: '战术护目镜，保护眼睛' },
-                '防化服': { category: 'equip', subCategory: 'armor', durability: 90, type: 'equippable', desc: '全封闭防化服，高危区域必备' },
-                '凯夫拉背心': { category: 'equip', subCategory: 'armor', durability: 95, type: 'equippable', desc: '凯夫拉纤维防弹背心，轻量高防护' },
-                '护膝': { category: 'equip', subCategory: 'armor', durability: 70, type: 'equippable', desc: '战术护膝，移动防护' },
-                '战术腰带': { category: 'equip', subCategory: 'armor', durability: 80, type: 'equippable', desc: '多功能战术腰带，挂载装备' },
-                '军用水壶': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '铝合金军用水壶，可加热' },
-                '净水吸管': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '生命吸管，直接饮用污水' },
-                '急救包': { category: 'consumable', subCategory: 'medical', effect: '治疗轻伤 止血', type: 'usable', desc: '综合急救包，含绷带药品' },
-                '手术刀': { category: 'equip', subCategory: 'tool', durability: 50, type: 'weapon', desc: '医用手术刀，可做精细武器' },
-                '止血钳': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '医用止血钳，紧急止血' },
-                '医疗箱': { category: 'consumable', subCategory: 'medical', effect: '治疗重伤 消毒止血', type: 'usable', desc: '专业医疗箱，含手术工具' },
-                '吗啡': { category: 'consumable', subCategory: 'medical', effect: '止痛 精神+15', type: 'usable', desc: '军用吗啡注射器，强效止痛' },
-                '肾上腺素': { category: 'consumable', subCategory: 'medical', effect: '精神+25 疲劳-30', type: 'usable', desc: '肾上腺素注射器，应急提神' },
-                '营养膏': { category: 'consumable', subCategory: 'food', effect: '饱腹+25 精神+5', type: 'usable', desc: '军用营养膏，高浓缩能量' },
-                '单兵口粮': { category: 'consumable', subCategory: 'food', effect: '饱腹+60 精神+5', type: 'usable', desc: 'MRE单兵口粮，完整一餐' },
-                '速溶咖啡': { category: 'consumable', subCategory: 'misc', effect: '疲劳-20 精神+8', type: 'usable', desc: '速溶咖啡粉，提神醒脑' },
-                '能量饮料': { category: 'consumable', subCategory: 'misc', effect: '疲劳-15 精神+5', type: 'usable', desc: '功能饮料，快速提神' },
-                '水果罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+20 口渴+10 精神+5', type: 'usable', desc: '黄桃罐头，补充维生素和水分' },
-                '鱼罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+30', type: 'usable', desc: '茄汁沙丁鱼罐头' },
-                '蜂蜜': { category: 'consumable', subCategory: 'food', effect: '饱腹+10 精神+8', type: 'usable', desc: '天然蜂蜜，永久保存' },
-                '奶粉': { category: 'consumable', subCategory: 'food', effect: '饱腹+15 口渴+10 精神+3', type: 'usable', desc: '脱脂奶粉，冲泡饮用，补充水分营养' },
-                '茶叶': { category: 'consumable', subCategory: 'misc', effect: '精神+5 口渴+10', type: 'usable', desc: '干燥茶叶，冲泡提神解渴' },
-                '咸菜': { category: 'consumable', subCategory: 'food', effect: '饱腹+10 口渴-5', type: 'usable', desc: '腌制咸菜，佐餐但会加重口渴' },
-                // ===== 新增武器装备 =====
-                '武士刀': { category: 'equip', subCategory: 'weapon', durability: 90, type: 'weapon', desc: '日本武士刀，锋利无比' },
-                '三棱刺': { category: 'equip', subCategory: 'weapon', durability: 80, type: 'weapon', desc: '三棱军刺，穿透力强' },
-                '链锯': { category: 'equip', subCategory: 'weapon', durability: 60, type: 'weapon', desc: '汽油链锯，恐怖近战武器' },
-                '电击棒': { category: 'equip', subCategory: 'weapon', durability: 70, type: 'weapon', desc: '高压电击棒，非致命制服' },
-                '弓': { category: 'equip', subCategory: 'weapon', durability: 75, type: 'weapon', desc: '复合弓，无声远程武器' },
-                '弓箭': { category: 'material', subCategory: 'ammo', type: 'material', desc: '复合弓专用箭' },
-                '霰弹枪子弹': { category: 'material', subCategory: 'ammo', type: 'material', desc: '12号霰弹，鹿弹' },
-                // ===== 新增工具与材料 =====
-                '尼龙绳': { category: 'material', subCategory: 'tool', type: 'material', desc: '高强度尼龙绳，多功能' },
-                '胶带': { category: 'material', subCategory: 'tool', type: 'material', desc: '强力布基胶带，修补万物' },
-                '塑料布': { category: 'material', subCategory: 'build', type: 'material', desc: '防水塑料布，搭建庇护所' },
-                '砂纸': { category: 'material', subCategory: 'tool', type: 'material', desc: '打磨用砂纸' },
-                '磨刀石': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '磨砺刀刃，恢复耐久' },
-                '针线包': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '缝补衣物和伤口' },
-                '放大镜': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '聚光取火，观察细节' },
-                '温度计': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '测量体温和气温' },
-                '哨子': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '求救哨子，信号联络' },
-                '锁匙工具': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '开锁工具套装' },
-                // ===== 新增贵重品与特殊物品 =====
-                '钻石': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '钻石，高价值交易品' },
-                '古董': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '古董瓷器，收藏价值高' },
-                '碘伏': { category: 'consumable', subCategory: 'medical', effect: '消毒', type: 'usable', desc: '碘伏消毒液，温和无刺激' },
-                '汽油桶': { category: 'material', subCategory: 'fuel', type: 'material', desc: '20L金属汽油桶' },
-                '蓄电池': { category: 'material', subCategory: 'tech', type: 'material', desc: '12V汽车蓄电池，可储能' },
-                '逆变器': { category: 'material', subCategory: 'tech', type: 'material', desc: '直流转交流，民用电器供电' },
-                '电焊机': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '便携电焊机，金属加工' },
-                '发电机': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '小型燃油发电机' },
-                '捕兽夹': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '钢丝捕兽夹，狩猎防御' },
-                '渔网': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '尼龙渔网，捕鱼工具' },
-                '鱼竿': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '简易钓鱼竿' },
-                '熏肉架': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '制作腊肉，保存肉类' },
-                '雨水收集器': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '雨天收集干净雨水' },
-                '简易滤水器': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '过滤污水获得饮用水' },
-                '防水布袋': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '防水布料制成的收纳袋，可存放物品' },
-                '密封袋': { category: 'equip', subCategory: 'backpack', type: 'equippable', desc: '密封塑料袋，可防潮收纳' },
-                '水壶': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '金属水壶，可装水但本身不是水' },
-                '水瓶': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '空水瓶容器，可装水' },
-                '水袋': { category: 'equip', subCategory: 'container', type: 'equippable', desc: '装水用的软质水袋' },
-                // ===== 新增食物类 =====
-                '花生酱': { category: 'consumable', subCategory: 'food', effect: '饱腹+25 精神+3', type: 'usable', desc: '高能量花生酱，可长期保存' },
-                '燕麦片': { category: 'consumable', subCategory: 'food', effect: '饱腹+30', type: 'usable', desc: '速食燕麦片，营养均衡' },
-                '果酱': { category: 'consumable', subCategory: 'food', effect: '饱腹+15 欢愉+3', type: 'usable', desc: '水果果酱，甜美的奢侈' },
-                '速食汤': { category: 'consumable', subCategory: 'food', effect: '饱腹+20 口渴+20', type: 'usable', desc: '脱水速食汤，热水冲泡' },
-                '坚果': { category: 'consumable', subCategory: 'food', effect: '饱腹+20 精神+3', type: 'usable', desc: '混合坚果，便携高能量' },
-                '葡萄干': { category: 'consumable', subCategory: 'food', effect: '饱腹+15 精神+2', type: 'usable', desc: '晒干葡萄干，保存期长' },
-                '牛肉罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+45 精神+4', type: 'usable', desc: '红烧牛肉罐头，美味高蛋白' },
-                '鸡肉罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+40 精神+3', type: 'usable', desc: '油浸鸡肉罐头，口感尚佳' },
-                '玉米罐头': { category: 'consumable', subCategory: 'food', effect: '饱腹+30', type: 'usable', desc: '甜玉米罐头，开罐即食' },
-                '番茄酱': { category: 'consumable', subCategory: 'spice', effect: '饱腹+5 欢愉+2', type: 'usable', desc: '调味番茄酱，让食物更美味' },
-                '辣酱': { category: 'consumable', subCategory: 'spice', effect: '欢愉+4 体温+0.5', type: 'usable', desc: '辣椒酱，开胃提神' },
-                // ===== 新增医疗类 =====
-                '创可贴': { category: 'consumable', subCategory: 'medical', effect: '止血 治疗-微伤', type: 'usable', desc: '小伤口用创可贴，防感染' },
-                '眼药水': { category: 'consumable', subCategory: 'medical', effect: '缓解眼疲劳 精神+3', type: 'usable', desc: '人工泪液滴眼液' },
-                '皮炎平': { category: 'consumable', subCategory: 'medical', effect: '止痒 消炎', type: 'usable', desc: '皮肤外用药膏，治皮炎湿疹' },
-                '胃药': { category: 'consumable', subCategory: 'medical', effect: '缓解胃痛 精神+2', type: 'usable', desc: '肠胃不适时服用' },
-                '抗过敏药': { category: 'consumable', subCategory: 'medical', effect: '治疗过敏', type: 'usable', desc: '抗组胺类抗过敏药' },
-                '血压药': { category: 'consumable', subCategory: 'medical', effect: '稳定血压', type: 'usable', desc: '慢性病人必备的降压药' },
-                '胰岛素': { category: 'consumable', subCategory: 'medical', effect: '降低血糖', type: 'usable', desc: '糖尿病人必需的胰岛素针剂' },
-                '体温计': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '电子体温计，准确测体温' },
-                '听诊器': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '医用听诊器，诊断心肺' },
-                '骨折夹板': { category: 'consumable', subCategory: 'medical', effect: '固定骨折', type: 'usable', desc: '铝合金骨折固定板' },
-                // ===== 新增武器装备 =====
-                '唐刀': { category: 'equip', subCategory: 'weapon', durability: 88, type: 'weapon', desc: '中国唐式横刀，直刃劈砍利器' },
-                '苗刀': { category: 'equip', subCategory: 'weapon', durability: 85, type: 'weapon', desc: '双手长柄苗刀，威力巨大' },
-                '警棍': { category: 'equip', subCategory: 'weapon', durability: 75, type: 'weapon', desc: '伸缩式警棍，便携近战武器' },
-                '拐棍': { category: 'equip', subCategory: 'weapon', durability: 55, type: 'weapon', desc: 'T型拐棍，攻防兼备' },
-                '指虎': { category: 'equip', subCategory: 'weapon', durability: 70, type: 'weapon', desc: '金属指虎，增强拳力' },
-                '甩棍': { category: 'equip', subCategory: 'weapon', durability: 72, type: 'weapon', desc: '重型甩棍，一击可断骨' },
-                '冰镐': { category: 'equip', subCategory: 'weapon', durability: 80, type: 'weapon', desc: '登山冰镐，穿刺力惊人' },
-                '鱼叉': { category: 'equip', subCategory: 'weapon', durability: 65, type: 'weapon', desc: '长柄渔叉，可投掷可近战' },
-                '镰刀': { category: 'equip', subCategory: 'weapon', durability: 60, type: 'weapon', desc: '农用镰刀，切割力强' },
-                '钉枪': { category: 'equip', subCategory: 'weapon', durability: 65, type: 'weapon', desc: '气动钉枪，可做远程武器' },
-                '捕网枪': { category: 'equip', subCategory: 'weapon', durability: 70, type: 'weapon', desc: '发射捕捉网，非致命' },
-                '电击枪': { category: 'equip', subCategory: 'weapon', durability: 68, type: 'weapon', desc: '泰瑟电击枪，远程电击' },
-                // ===== 新增防具 =====
-                '防爆盾': { category: 'equip', subCategory: 'armor', durability: 95, type: 'equippable', desc: '警用防爆盾，正面近乎无敌' },
-                '防暴头盔': { category: 'equip', subCategory: 'armor', durability: 90, type: 'equippable', desc: '全覆盖式防暴头盔，面部有金属网' },
-                '战术手套': { category: 'equip', subCategory: 'armor', durability: 78, type: 'equippable', desc: '半指战术手套，防滑防割' },
-                '作战靴': { category: 'equip', subCategory: 'armor', durability: 85, type: 'equippable', desc: '高帮作战靴，防刺防扎' },
-                '护肘': { category: 'equip', subCategory: 'armor', durability: 72, type: 'equippable', desc: '硬壳护肘，缓冲冲击' },
-                '护肩': { category: 'equip', subCategory: 'armor', durability: 75, type: 'equippable', desc: '战术护肩，保护肩部' },
-                '防弹面罩': { category: 'equip', subCategory: 'armor', durability: 82, type: 'equippable', desc: '透明防弹面罩，III级防护' },
-                '气囊背心': { category: 'equip', subCategory: 'armor', durability: 70, type: 'equippable', desc: '摩托气囊背心，跌落自动充气' },
-                // ===== 新增工具 =====
-                '折叠铲': { category: 'equip', subCategory: 'tool', durability: 75, type: 'weapon', desc: '三折折叠铲，挖撬锯砍多功能' },
-                '断线钳': { category: 'equip', subCategory: 'tool', durability: 80, type: 'weapon', desc: '重型断线钳，可剪断铁链钢筋' },
-                '液压剪': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '便携液压剪，破拆防盗门' },
-                '撬锁套装': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '专业开锁工具，锡纸+钩针' },
-                '玻璃刀': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '金刚石玻璃刀，静音破窗' },
-                '充气泵': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '脚踏式打气筒，车胎充气' },
-                '补胎工具': { category: 'equip', subCategory: 'tool', type: 'usable', desc: '冷补胶+搓片，修补轮胎' },
-                '牵引绳': { category: 'material', subCategory: 'tool', type: 'material', desc: '5吨拖车绳，带挂钩' },
-                '跨接电缆': { category: 'material', subCategory: 'tool', type: 'material', desc: '电瓶搭火线，启动亏电车辆' },
-                '防滑链': { category: 'material', subCategory: 'tool', type: 'material', desc: '金属防滑链，雪地行车必备' },
-                // ===== 新增电子设备 =====
-                '夜视仪': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: '单筒夜视仪，被动红外' },
-                '热成像仪': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '手持热成像，探知墙后生物' },
-                '无人机': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '航拍无人机，远程侦察' },
-                '行车记录仪': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '车载记录仪，循环录像' },
-                '手持电台': { category: 'equip', subCategory: 'tech', type: 'equippable', desc: '5W对讲机，10公里通讯' },
-                '扫描仪': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '警用频率扫描仪，监听无线电' },
-                '便携空调': { category: 'equip', subCategory: 'tech', type: 'usable', desc: 'USB充电制冷风扇，防暑' },
-                '电子防盗器': { category: 'equip', subCategory: 'tech', type: 'usable', desc: '门窗磁感应报警器' },
-                '移动硬盘': { category: 'material', subCategory: 'tech', type: 'material', desc: '2TB移动硬盘，可能藏有重要数据' },
-                // ===== 新增材料 =====
-                '钢材': { category: 'material', subCategory: 'build', type: 'material', desc: '厚钢板，可做护甲工事' },
-                '弹簧钢': { category: 'material', subCategory: 'build', type: 'material', desc: '高弹性弹簧钢带，做刀的好料' },
-                '碳纤维布': { category: 'material', subCategory: 'build', type: 'material', desc: '高强度碳纤维布，轻量化加固' },
-                '铜线': { category: 'material', subCategory: 'tech', type: 'material', desc: '粗铜线，电机线圈必备' },
-                '稀土磁铁': { category: 'material', subCategory: 'tech', type: 'material', desc: '钕铁硼强磁，制作发电机' },
-                '焊锡丝': { category: 'material', subCategory: 'tech', type: 'material', desc: '松香芯焊锡，电子焊接' },
-                '热缩管': { category: 'material', subCategory: 'tech', type: 'material', desc: '绝缘热缩套管，电线保护' },
-                '环氧树脂': { category: 'material', subCategory: 'build', type: 'material', desc: '高强度AB胶，粘合金属陶瓷' },
-                '发泡胶': { category: 'material', subCategory: 'build', type: 'material', desc: '聚氨酯发泡剂，填缝保温' },
-                '耐火砖': { category: 'material', subCategory: 'build', type: 'material', desc: '耐高温耐火砖，搭建熔炉' },
-                // ===== 新增贵重品/特殊物品 =====
-                '加密硬盘': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '军方加密硬盘，内容未知' },
-                '科研样本': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '冷藏病毒样本，军方/科研方重金收购' },
-                '古董金条': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '民国时期金条，收藏家的最爱' },
-                '名表': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '瑞士机械名表，末世硬通货' },
-                '名人字画': { category: 'misc', subCategory: 'valuable', type: 'misc', desc: '名家真迹，盛世价值连城' },
-                '美酒': { category: 'consumable', subCategory: 'drink', effect: '欢愉+20 精神+5 疲劳-10', type: 'usable', desc: '陈年威士忌，末世慰藉' },
-                '咖啡豆': { category: 'consumable', subCategory: 'misc', effect: '精神+12 疲劳-15', type: 'usable', desc: '精品咖啡豆，研磨冲泡' },
-                '明信片': { category: 'misc', subCategory: 'doc', type: 'misc', desc: '来自亲人的明信片，精神寄托' },
-                '全家福': { category: 'misc', subCategory: 'doc', type: 'misc', desc: '灾前的全家福照片，给予力量' }
-            };
             // Smart item matching: exact > longest substring > substring with word boundary
             function getItemInfo(itemName) {
                 if (!itemName) return null;
@@ -1312,9 +663,9 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             function cfg() { const c = ld(K.CFG, DCFG); if (migrateCfg(c)) scf(c); return c; }
             function scf(c) { sv(K.CFG, c); afs(c.fsz); }
             
-            // 全局请求函数（可供欢迎页面测试、游戏主循环等多处调用）
+            // 全局 API 请求函数（欢迎页面测试、游戏主循环共用）：直连模式，纯 localStorage 本地保存密钥
             window._sendProxyRequest = async function(targetUrl, body, apiKey, signal, isStream) {
-                const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + apiKey };
+                const headers = { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + (apiKey || '') };
                 if (isStream) headers['Accept'] = 'text/event-stream';
                 return fetch(targetUrl, {
                     method: 'POST',
@@ -1644,469 +995,6 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             }
             function afs(sz) { document.documentElement.style.setProperty('--font-size-base', sz); document.documentElement.style.setProperty('--font-size-sm', (parseInt(sz) - 3) + 'px'); document.documentElement.style.setProperty('--font-size-lg', (parseInt(sz) + 2) + 'px'); }
 
-            // ===== Sound System =====
-            let audioCtx = null;
-            let sfxEnabled = localStorage.getItem('vn_sfx') !== '0';
-            let sfxVolume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.5');
-            function ensureAudio() {
-                if (!audioCtx) {
-                    try { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
-                    catch(e) { audioCtx = null; }
-                }
-                if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-                return audioCtx;
-            }
-            function playTone(freq, dur, type, vol) {
-                if (!sfxEnabled) return;
-                const ctx = ensureAudio(); if (!ctx) return;
-                try {
-                    const osc = ctx.createOscillator();
-                    const gain = ctx.createGain();
-                    osc.type = type || 'sine';
-                    osc.frequency.setValueAtTime(freq, ctx.currentTime);
-                    gain.gain.setValueAtTime((vol || sfxVolume) * 0.3, ctx.currentTime);
-                    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + dur);
-                    osc.connect(gain); gain.connect(ctx.destination);
-                    osc.start(ctx.currentTime); osc.stop(ctx.currentTime + dur);
-                } catch(e) {}
-            }
-            const SE_FILES = {
-                'drop': 'SE/丢弃.wav',
-                'clue-write': 'SE/写线索.wav',
-                'clue-add': 'SE/写线索.wav',
-                'drink': 'SE/喝水.wav',
-                'use-water': 'SE/喝水.wav',
-                'death': 'SE/突发事件.wav',
-                'open-profile': 'SE/打开个人.wav',
-                'char-open': 'SE/打开个人.wav',
-                'open-clue': 'SE/打开线索.wav',
-                'clue-open': 'SE/打开线索.wav',
-                'open-equip': 'SE/打开装备.wav',
-                'equip-open': 'SE/打开装备.wav',
-                'search': 'SE/搜索物资.wav',
-                'loot': 'SE/搜索物资.wav',
-                'random-event': 'SE/突发事件.wav',
-                'event': 'SE/突发事件.wav',
-                'equip-weapon': 'SE/装备武器.wav',
-                'equip': 'SE/装备武器.wav',
-                'pickup': 'SE/捡起/捡起小东西－xh20070419.wav',
-                'pickup-small': 'SE/捡起/捡起小东西－xh20070419.wav',
-                'pickup-big': 'SE/捡起/捡起大东西－xh20070419.wav',
-                'pickup-book': 'SE/捡起/捡起书－xh20070419.wav',
-                'pickup-bag': 'SE/捡起/捡起包－xh20070419.wav',
-                'pickup-food': 'SE/捡起/捡起吃的－xh20070419.wav',
-                'pickup-eat': 'SE/捡起/捡起吃的－xh20070419.wav',
-                'pickup-wood-big': 'SE/捡起/捡起大木头－xh20070419.wav',
-                'pickup-metal-big': 'SE/捡起/捡起大的金属－xh20070419.wav',
-                'pickup-gem': 'SE/捡起/捡起宝石－xh20070419.wav',
-                'pickup-wood-small': 'SE/捡起/捡起小木头－xh20070419.wav',
-                'pickup-metal-small': 'SE/捡起/捡起小的金属－xh20070419.wav',
-                'pickup-stick': 'SE/捡起/捡起棒－xh20070419.wav',
-                'pickup-water': 'SE/捡起/捡起水－xh20070419.wav',
-                'pickup-ore': 'SE/捡起/捡起矿石－xh20070419.wav',
-                'pickup-paper': 'SE/捡起/捡起羊皮纸－xh20070419.wav',
-                'pickup-meat': 'SE/捡起/捡起肉－xh20070419.wav',
-                'pickup-herb': 'SE/捡起/捡起药草－xh20070419.wav',
-                'pickup-clothes': 'SE/捡起/捡起衣服－xh20070419.wav',
-                'pickup-bell': 'SE/捡起/捡起铃铛－xh20070419.wav',
-                'store': 'SE/放好/把小的东西放在背包里－xh20070419.wav',
-                'store-small': 'SE/放好/把小的东西放在背包里－xh20070419.wav',
-                'store-big': 'SE/放好/把大的东西放在背包里－xh20070419.wav',
-                'store-book': 'SE/放好/把书放在背包里－xh20070419.wav',
-                'store-bag': 'SE/放好/把包放在背包里－xh20070419.wav',
-                'store-wood-big': 'SE/放好/把大木头放在背包里－xh20070419.wav',
-                'store-metal-big': 'SE/放好/把大金属放在背包里－xh20070419.wav',
-                'store-gem': 'SE/放好/把宝石放在背包里－xh20070419.wav',
-                'store-wood-small': 'SE/放好/把小木头放在背包里－xh20070419.wav',
-                'store-meat-small': 'SE/放好/把小肉放在背包里－xh20070419.wav',
-                'store-stick': 'SE/放好/把棒放在背包里－xh20070419.wav',
-                'store-water': 'SE/放好/把水背包里－xh20070419.wav',
-                'store-ore': 'SE/放好/把矿石放在背包里－xh20070419.wav',
-                'store-paper': 'SE/放好/把羊皮纸放在背包里－xh20070419.wav',
-                'store-meat': 'SE/放好/把肉放在背包里－xh20070419.wav',
-                'store-herb': 'SE/放好/把草药放在背包里－xh20070419.wav',
-                'store-clothes': 'SE/放好/把衣服放在背包里－xh20070419.wav',
-                'store-bell': 'SE/放好/把铃铛放在背包里－xh20070419.wav'
-            };
-            function playSfx(type) {
-                if (!window._sfxEnabled) {
-                    const stored = localStorage.getItem('vn_sfx');
-                    window._sfxEnabled = stored !== '0';
-                }
-                if (!window._sfxEnabled) return;
-                const sePath = SE_FILES[type];
-                if (sePath) {
-                    try {
-                        if (!window._seCache) window._seCache = {};
-                        let audio = window._seCache[type];
-                        if (!audio) {
-                            audio = new Audio(sePath);
-                            audio.preload = 'auto';
-                            audio.volume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.6');
-                            window._seCache[type] = audio;
-                        } else {
-                            try { audio.currentTime = 0; } catch(e) {}
-                        }
-                        const p = audio.play();
-                        if (p && p.catch) p.catch(err => {
-                            if (window._seCache[type]) {
-                                delete window._seCache[type];
-                            }
-                            playToneSfx(type);
-                        });
-                        return;
-                    } catch(e) {
-                    }
-                }
-                playToneSfx(type);
-            }
-            function playToneSfx(type) {
-                if (!sfxEnabled) return;
-                switch(type) {
-                    case 'click': playTone(800, 0.05, 'sine', 0.4); break;
-                    case 'send': playTone(600, 0.08, 'triangle', 0.4); setTimeout(() => playTone(800, 0.06, 'triangle', 0.3), 40); break;
-                    case 'notify': playTone(1200, 0.1, 'sine', 0.35); break;
-                    case 'warn': playTone(300, 0.15, 'sawtooth', 0.4); break;
-                    case 'danger': playTone(200, 0.25, 'sawtooth', 0.5); setTimeout(() => playTone(150, 0.2, 'sawtooth', 0.4), 100); break;
-                    case 'victory': playTone(523, 0.12, 'sine', 0.4); setTimeout(() => playTone(659, 0.12, 'sine', 0.4), 100); setTimeout(() => playTone(784, 0.2, 'sine', 0.4), 200); break;
-                    case 'levelup': playTone(440, 0.1, 'sine', 0.4); setTimeout(() => playTone(554, 0.1, 'sine', 0.4), 80); setTimeout(() => playTone(659, 0.15, 'sine', 0.4), 160); setTimeout(() => playTone(880, 0.25, 'sine', 0.4), 240); break;
-                    case 'pickup': playTone(1000, 0.06, 'sine', 0.35); setTimeout(() => playTone(1300, 0.08, 'sine', 0.3), 50); break;
-                    case 'drop': playTone(300, 0.15, 'triangle', 0.35); break;
-                    case 'heal': playTone(500, 0.2, 'sine', 0.3); setTimeout(() => playTone(700, 0.25, 'sine', 0.3), 100); break;
-                    case 'equip': playTone(700, 0.08, 'square', 0.25); setTimeout(() => playTone(500, 0.12, 'square', 0.2), 60); break;
-                    case 'fail': playTone(300, 0.15, 'sawtooth', 0.35); setTimeout(() => playTone(200, 0.25, 'sawtooth', 0.3), 100); break;
-                    case 'tab': playTone(1000, 0.03, 'sine', 0.2); break;
-                    case 'open': playTone(400, 0.06, 'sine', 0.3); break;
-                    case 'close': playTone(300, 0.05, 'sine', 0.25); break;
-                    case 'craft': playTone(600, 0.08, 'triangle', 0.3); setTimeout(() => playTone(800, 0.1, 'triangle', 0.3), 60); setTimeout(() => playTone(1000, 0.12, 'sine', 0.25), 120); break;
-                    case 'success': playTone(523, 0.1, 'sine', 0.35); setTimeout(() => playTone(659, 0.1, 'sine', 0.35), 80); setTimeout(() => playTone(784, 0.15, 'sine', 0.35), 160); break;
-                    case 'hurt': playTone(250, 0.15, 'sawtooth', 0.4); setTimeout(() => playTone(180, 0.1, 'sawtooth', 0.3), 80); break;
-                    case 'counter': playTone(900, 0.06, 'square', 0.3); setTimeout(() => playTone(1200, 0.08, 'square', 0.25), 50); break;
-                    case 'status': playTone(700, 0.08, 'sine', 0.25); break;
-                    case 'danger_alarm': playTone(180, 0.3, 'sawtooth', 0.5); setTimeout(() => playTone(220, 0.2, 'sawtooth', 0.4), 150); setTimeout(() => playTone(180, 0.3, 'sawtooth', 0.5), 350); break;
-                    case 'ending': playTone(400, 0.3, 'sine', 0.4); setTimeout(() => playTone(300, 0.4, 'sine', 0.35), 200); setTimeout(() => playTone(200, 0.6, 'sine', 0.3), 500); break;
-                    case 'death': playTone(220, 0.4, 'sawtooth', 0.5); setTimeout(() => playTone(160, 0.5, 'sawtooth', 0.4), 200); setTimeout(() => playTone(110, 0.8, 'sawtooth', 0.45), 500); break;
-                }
-            }
-            // ===== BGM System =====
-            const BGM = {
-                enabled: localStorage.getItem('vn_bgm') !== '0',
-                volume: parseFloat(localStorage.getItem('vn_bgm_vol') || '0.45'),
-                current: null,
-                audio: null,
-                tracks: {
-                    title: ['bgm_title1.mp3', 'bgm_intro1.mp3'],
-                    explore: ['bgm_explore1.mp3', 'bgm_journey1.mp3', 'bgm_mystery1.mp3'],
-                    camp: ['bgm_camp1.mp3', 'bgm_healing1.mp3', 'bgm_calm1.mp3'],
-                    combat: ['bgm_combat1.mp3', 'bgm_combat2.mp3', 'bgm_action1.mp3', 'bgm_action2.mp3', 'bgm_action3.mp3'],
-                    boss: ['bgm_boss1.mp3', 'bgm_boss2.mp3', 'bgm_boss3.mp3'],
-                    danger: ['bgm_danger1.mp3', 'bgm_danger2.mp3', 'bgm_ambush1.mp3', 'bgm_tense1.mp3', 'bgm_tense2.mp3', 'bgm_tense3.mp3'],
-                    sad: ['bgm_sad1.mp3', 'bgm_sad2.mp3', 'bgm_memorial1.mp3', 'bgm_memory1.mp3'],
-                    hope: ['bgm_hope1.mp3', 'bgm_camp1.mp3'],
-                    horror: ['bgm_horror1.mp3', 'bgm_chaos1.mp3', 'bgm_despair1.mp3'],
-                    story: ['bgm_story1.mp3', 'bgm_negotiate1.mp3', 'bgm_cultural1.mp3', 'bgm_guard1.mp3'],
-                    rain: ['bgm_rain1.mp3'],
-                    survival: ['bgm_survival1.mp3']
-                },
-                _currentCategory: 'title',
-                _lastLocation: ''
-            };
-            function bgmInit() {
-                if (BGM.audio) return;
-                BGM.audio = new Audio();
-                BGM.audio.preload = 'metadata';
-                BGM.audio.loop = false;
-                BGM.audio.volume = BGM.volume;
-                BGM.audio.crossOrigin = 'anonymous';
-                BGM.audio.addEventListener('ended', () => {
-                    if (BGM.enabled) bgmPlayCategory(BGM._currentCategory, true);
-                });
-                BGM.audio.addEventListener('error', () => {
-                    console.warn('[BGM] 音频加载失败:', BGM.audio.src);
-                    // 尝试下一首
-                    if (BGM.enabled) {
-                        const list = BGM.tracks[BGM._currentCategory] || [];
-                        if (list.length > 1) {
-                            const idx = list.indexOf(BGM.current);
-                            const next = list[(idx + 1) % list.length];
-                            BGM.current = next;
-                            BGM.audio.src = 'BGM/' + next;
-                        }
-                    }
-                });
-            }
-            function bgmPlay(file) {
-                if (!BGM.enabled || !file) return;
-                bgmInit();
-                if (BGM.current === file && !BGM.audio.paused) return;
-                BGM.current = file;
-                BGM.audio.src = 'BGM/' + encodeURIComponent(file);
-                try {
-                    const p = BGM.audio.play();
-                    if (p && typeof p.catch === 'function') p.catch(() => {});
-                } catch(e) {}
-            }
-            function bgmPlayCategory(cat, random = false) {
-                if (!BGM.enabled) return;
-                bgmInit();
-                const list = BGM.tracks[cat] || BGM.tracks.title;
-                if (!list.length) return;
-                BGM._currentCategory = cat;
-                let file;
-                if (random && list.length > 1) {
-                    // Only randomize on first play, then loop the same track
-                    file = list[Math.floor(Math.random() * list.length)];
-                } else {
-                    // Use first track of the category for looping
-                    file = BGM._currentFile && list.includes(BGM._currentFile) 
-                        ? BGM._currentFile 
-                        : list[0];
-                }
-                BGM._currentFile = file;
-                bgmPlay(file);
-            }
-            function bgmStop() {
-                if (BGM.audio) { try { BGM.audio.pause(); BGM.audio.currentTime = 0; } catch(e) {} }
-            }
-            function bgmToggle() {
-                BGM.enabled = !BGM.enabled;
-                localStorage.setItem('vn_bgm', BGM.enabled ? '1' : '0');
-                if (!BGM.enabled) { bgmStop(); $('btnBgm').textContent = '🔇'; $('btnBgm').title = '背景音乐（已关闭）'; }
-                else { $('btnBgm').textContent = '🎵'; $('btnBgm').title = '背景音乐（开启）'; bgmPlayCategory(BGM._currentCategory || 'title'); }
-                snotify('info', 'BGM', BGM.enabled ? '背景音乐已开启' : '背景音乐已关闭');
-            }
-            function bgmSetVol(v) {
-                BGM.volume = Math.max(0, Math.min(1, v));
-                localStorage.setItem('vn_bgm_vol', BGM.volume);
-                if (BGM.audio) BGM.audio.volume = BGM.volume;
-            }
-            // Auto-play BGM on game load (requires user interaction to start audio context)
-            function initAutoBGM() {
-                if (!BGM.enabled) return;
-                // Try to unlock audio on first user interaction
-                const unlockAudio = () => {
-                    if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-                    bgmPlayCategory('title', true);
-                    document.removeEventListener('click', unlockAudio);
-                    document.removeEventListener('touchstart', unlockAudio);
-                    document.removeEventListener('keydown', unlockAudio);
-                };
-                document.addEventListener('click', unlockAudio);
-                document.addEventListener('touchstart', unlockAudio);
-                document.addEventListener('keydown', unlockAudio);
-            }
-            // 根据位置/季节/天气/心情自动切换BGM
-            function bgmAutoSwitch(context) {
-                if (!BGM.enabled) return;
-                const loc = (context && context.location) || '';
-                const season = (context && context.season) || '';
-                const weather = (context && context.weather) || '';
-                // 使用真实数据源，而非调用方传入的临时值
-                const _s = gst();
-                const _c = gch();
-                const mentality = _c.mental || '';
-                const hp = (_s && _s.hp != null) ? _s.hp : 100;
-                const fatigue = (_s && _s.fatigue != null) ? _s.fatigue : 0;
-
-                // 安全屋 / 公寓 / 营地 → 治愈/营地
-                if (/公寓|营地|小屋|避难所|地下室|仓库|据点|屋|室|居|家|卧室/.test(loc)) {
-                    if (fatigue > 60 || mentality === '焦虑' || mentality === '悲痛') {
-                        bgmPlayCategory('sad');
-                    } else {
-                        bgmPlayCategory('camp');
-                    }
-                    return;
-                }
-                // 战斗 / 危险时
-                if (hp < 50) { bgmPlayCategory('danger'); return; }
-                if (mentality === '创伤' || mentality === '焦虑') { bgmPlayCategory('horror'); return; }
-                // 雨天
-                if (/雨/.test(weather)) { bgmPlayCategory('rain'); return; }
-                // 雪天 → 生存
-                if (/雪/.test(weather)) { bgmPlayCategory('survival'); return; }
-                // 末日氛围（默认）
-                if (/医院|警局|学校|商场|超市|工厂|车站|地铁|隧道|下水道/.test(loc)) { bgmPlayCategory('explore'); return; }
-                if (/森林|树林|山|野外|公路|桥|街区|废墟|城市|街道|商业区/.test(loc)) { bgmPlayCategory('survival'); return; }
-                // 季节辅助
-                if (season === '春' || season === '夏') { bgmPlayCategory('hope'); return; }
-                if (season === '秋') { bgmPlayCategory('explore'); return; }
-                if (season === '冬') { bgmPlayCategory('horror'); return; }
-                bgmPlayCategory('explore');
-            }
-            // BGM 选择面板
-            function bgmQuickPick(cat) {
-                if (!BGM.enabled) { snotify('warn', 'BGM', '请先开启背景音乐'); return; }
-                bgmPlayCategory(cat);
-                const label = { title: '主菜单', explore: '探索', camp: '营地', combat: '战斗', boss: 'Boss', danger: '危机', sad: '悲伤', hope: '希望', horror: '恐怖', story: '剧情', rain: '雨声', survival: '生存' }[cat] || cat;
-                snotify('info', 'BGM', '播放：' + label);
-            }
-            function bgmOpenPicker() {
-                if ($('bgmPicker')) { $('bgmPicker').remove(); return; }
-                const cats = [
-                    { key: 'title', name: '主菜单', icon: '🎬' },
-                    { key: 'explore', name: '探索', icon: '🧭' },
-                    { key: 'camp', name: '营地', icon: '🏕' },
-                    { key: 'combat', name: '战斗', icon: '⚔' },
-                    { key: 'boss', name: 'Boss', icon: '☠' },
-                    { key: 'danger', name: '危机', icon: '⚠' },
-                    { key: 'sad', name: '悲伤', icon: '😢' },
-                    { key: 'hope', name: '希望', icon: '🌤' },
-                    { key: 'horror', name: '恐怖', icon: '👁' },
-                    { key: 'story', name: '剧情', icon: '📖' },
-                    { key: 'rain', name: '雨声', icon: '🌧' },
-                    { key: 'survival', name: '生存', icon: '🩹' }
-                ];
-                const style = document.createElement('style');
-                style.textContent = '#bgmPicker{position:fixed;z-index:10001;top:54px;right:12px;background:var(--modal-bg);border:1.5px solid var(--ink);border-radius:10px;padding:10px 12px;min-width:220px;max-width:260px;box-shadow:4px 6px 0 rgba(30,25,18,.18);font-size:.78rem;}#bgmPicker h5{margin:0 0 6px;font-size:.8rem;color:var(--accent);display:flex;align-items:center;justify-content:space-between;}#bgmPicker .bgm-row{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:6px;}#bgmPicker .bgm-cat{flex:1;min-width:90px;border:1px solid var(--border-light);border-radius:6px;padding:4px 6px;background:var(--button-bg);cursor:pointer;font-size:.7rem;color:var(--ink);transition:all .15s;}#bgmPicker .bgm-cat:hover{background:var(--button-hover);transform:translateY(-1px);}#bgmPicker .bgm-cat.active{background:var(--accent);color:#fff;border-color:var(--accent);}#bgmPicker .bgm-vol{display:flex;align-items:center;gap:6px;margin-top:4px;font-size:.7rem;color:var(--text-muted);}#bgmPicker input[type=range]{flex:1;accent-color:var(--accent);}';
-                document.head.appendChild(style);
-                const el = document.createElement('div');
-                el.id = 'bgmPicker';
-                const catsHtml = cats.map(c => '<div class="bgm-cat' + (BGM._currentCategory === c.key ? ' active' : '') + '" data-cat="' + c.key + '">' + c.icon + ' ' + c.name + '</div>').join('');
-                el.innerHTML = '<h5>🎵 背景音乐 <span id="bgmPickerClose" style="cursor:pointer;color:var(--text-muted);">×</span></h5>' +
-                    '<div class="bgm-row">' + catsHtml + '</div>' +
-                    '<div class="bgm-vol"><span>音量</span><input type="range" id="bgmVolRange" min="0" max="1" step="0.05" value="' + BGM.volume + '"><span id="bgmVolLabel">' + Math.round(BGM.volume * 100) + '%</span></div>';
-                document.body.appendChild(el);
-                // 事件绑定
-                el.querySelectorAll('.bgm-cat').forEach(btn => {
-                    btn.addEventListener('click', () => {
-                        const cat = btn.dataset.cat;
-                        if (!BGM.enabled) bgmToggle();
-                        bgmPlayCategory(cat);
-                        el.querySelectorAll('.bgm-cat').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
-                    });
-                });
-                $('bgmPickerClose').addEventListener('click', () => el.remove());
-                const vr = $('bgmVolRange');
-                vr.addEventListener('input', e => { bgmSetVol(parseFloat(e.target.value)); $('bgmVolLabel').textContent = Math.round(BGM.volume * 100) + '%'; });
-                // 点击外部关闭
-                setTimeout(() => {
-                    document.addEventListener('click', function closePicker(ev) {
-                        if (!el.contains(ev.target)) { el.remove(); document.removeEventListener('click', closePicker); }
-                    });
-                }, 10);
-            }
-
-            function showTutorialStep(steps, idx, onComplete) {
-                if (idx >= steps.length) { onComplete && onComplete(); return; }
-                const step = steps[idx];
-                const d = document.createElement('div');
-                d.className = 'modal-overlay';
-                d.style.zIndex = '10000';
-                d.innerHTML = '<div class="modal-panel" style="max-width:320px;text-align:center;">' +
-                    '<div style="font-size:2rem;margin-bottom:8px;">' + step.icon + '</div>' +
-                    '<h3 style="color:var(--accent);margin-bottom:8px;">' + esc(step.title) + '</h3>' +
-                    '<p style="font-size:0.8rem;color:var(--ink-soft);line-height:1.6;margin-bottom:12px;">' + esc(step.content) + '</p>' +
-                    '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:8px;">第 ' + (idx + 1) + ' / ' + steps.length + ' 步</div>' +
-                    '<div style="display:flex;gap:8px;justify-content:center;">' +
-                    (idx > 0 ? '<button class="btn-header" id="tutPrev">上一步</button>' : '') +
-                    '<button class="btn-header" id="tutNext">' + (idx === steps.length - 1 ? '开始游戏' : '下一步') + '</button>' +
-                    '<button class="btn-header" id="tutSkip">跳过</button>' +
-                    '</div></div>';
-                document.body.appendChild(d);
-                d.querySelector('#tutNext').onclick = () => { d.remove(); showTutorialStep(steps, idx + 1, onComplete); };
-                d.querySelector('#tutSkip').onclick = () => { d.remove(); onComplete && onComplete(); };
-                if (idx > 0) d.querySelector('#tutPrev').onclick = () => { d.remove(); showTutorialStep(steps, idx - 1, onComplete); };
-            }
-            function launchTutorial() {
-                const steps = [
-                    { icon: '🎮', title: '欢迎来到末日世界', content: '这是一个文字模拟生存游戏。你将扮演幸存者，在末日废墟中求生、探索、战斗。' },
-                    { icon: '⌨️', title: '基本操作', content: '在底部输入框输入你的行动，如「前往医院搜索药品」「与旁边的幸存者交谈」「使用绷带包扎伤口」等。' },
-                    { icon: '🎒', title: '背包与物品', content: '点击顶部「背包」查看物品。点击物品可以使用、丢弃、装备或加入收藏。物品会根据AI叙事自动增减。' },
-                    { icon: '⚔️', title: '战斗与状态', content: '战斗中你的血量会同步显示。武器会损耗耐久，消耗弹药。注意伤势和精神状态，过低时会影响行动。' },
-                    { icon: '🗺️', title: '探索与地图', content: '随着探索，新地点会在地图上解锁。面板视图可以看到小地图和已发现的区域。' },
-                    { icon: '💾', title: '存档与设置', content: '随时可以存档（最多10个槽位）。设置中可调整沙盒参数、字体大小等。点击「开局」创建新角色。' },
-                    { icon: '🤖', title: 'AI驱动', content: '所有叙事由AI驱动，你的选择影响故事走向。尽量描述具体行动，获得更真实的体验。祝好运，幸存者！' }
-                ];
-                showTutorialStep(steps, 0, () => { localStorage.setItem('vn_tutorial', 'done'); });
-            }
-            function toggleSfx() {
-                sfxEnabled = !sfxEnabled;
-                localStorage.setItem('vn_sfx', sfxEnabled ? '1' : '0');
-                tst(sfxEnabled ? '音效已开启' : '音效已关闭');
-                if (sfxEnabled) playSfx('click');
-            }
-            // ===== Toast Queue: FIFO 有序队列 =====
-            const _toastQueue = [];
-            let _toastShowing = false;
-            let _lastToastMsg = '';
-            let _lastToastTime = 0;
-            function tst(m) {
-                // Deduplicate: skip if same message was shown within 1.5 seconds
-                const now = Date.now();
-                if (m === _lastToastMsg && now - _lastToastTime < 1500) return;
-                _lastToastMsg = m;
-                _lastToastTime = now;
-                _toastQueue.push(m);
-                _tryShowToast();
-            }
-            function _tryShowToast() {
-                if (_toastShowing || _toastQueue.length === 0) return;
-                _toastShowing = true;
-                const m = _toastQueue.shift();
-                const t = document.createElement('div');
-                t.className = 'toast';
-                t.textContent = m;
-                document.body.appendChild(t);
-                setTimeout(() => {
-                    t.remove();
-                    _toastShowing = false;
-                    if (_toastQueue.length > 0) _tryShowToast();
-                }, 2200);
-            }
-            function sketchConfirm(msg, title) {
-                return new Promise((resolve) => {
-                    const d = $('customConfirm');
-                    $('confirmMsg').textContent = msg;
-                    $('confirmTitle').textContent = title || '确认';
-                    d.style.display = 'flex';
-                    const ok = $('confirmOk'), cancel = $('confirmCancel');
-                    const cleanup = () => {
-                        d.style.display = 'none';
-                        ok.removeEventListener('click', onOk);
-                        cancel.removeEventListener('click', onCancel);
-                        d.removeEventListener('click', onOverlay);
-                        document.removeEventListener('keydown', onKey);
-                    };
-                    const onOk = () => { cleanup(); resolve(true); };
-                    const onCancel = () => { cleanup(); resolve(false); };
-                    const onOverlay = (e) => { if (e.target === d) { cleanup(); resolve(false); } };
-                    const onKey = (e) => { if (e.key === 'Enter') onOk(); else if (e.key === 'Escape') onCancel(); };
-                    ok.addEventListener('click', onOk);
-                    cancel.addEventListener('click', onCancel);
-                    d.addEventListener('click', onOverlay);
-                    document.addEventListener('keydown', onKey);
-                });
-            }
-            function sketchPrompt(msg, def, title) {
-                return new Promise((resolve) => {
-                    const d = $('customPrompt');
-                    const input = $('promptInput');
-                    $('promptMsg').textContent = msg;
-                    $('promptTitle').textContent = title || '输入';
-                    input.value = def != null ? def : '';
-                    d.style.display = 'flex';
-                    setTimeout(() => { input.focus(); input.select(); }, 50);
-                    const ok = $('promptOk'), cancel = $('promptCancel');
-                    const cleanup = () => {
-                        d.style.display = 'none';
-                        ok.removeEventListener('click', onOk);
-                        cancel.removeEventListener('click', onCancel);
-                        d.removeEventListener('click', onOverlay);
-                        input.removeEventListener('keydown', onInpKey);
-                    };
-                    const onOk = () => { const v = input.value; cleanup(); resolve(v == null ? '' : v); };
-                    const onCancel = () => { cleanup(); resolve(def != null ? String(def) : ''); };
-                    const onOverlay = (e) => { if (e.target === d) { cleanup(); resolve(def != null ? String(def) : ''); } };
-                    const onInpKey = (e) => { if (e.key === 'Enter') { e.preventDefault(); onOk(); } else if (e.key === 'Escape') onCancel(); };
-                    ok.addEventListener('click', onOk);
-                    cancel.addEventListener('click', onCancel);
-                    d.addEventListener('click', onOverlay);
-                    input.addEventListener('keydown', onInpKey);
-                });
-            }
-            function scb() { const ca = $('chatArea'); if (ca) ca.scrollTop = ca.scrollHeight; }
-            function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
-            function escAttr(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
             // ===== Game Clock =====
             function fmtTime(sec) {
@@ -3849,29 +2737,47 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             let summaryLock = false;
             async function generateContextSummary() {
                 if (summaryLock) return;
-                // Don't summarize if already has a summary + recent messages
                 const nonSummary = hist.filter(m => !(m.role === 'system' && m.content.startsWith('【前情摘要】')));
                 if (nonSummary.length < 20) return;
                 summaryLock = true;
                 try {
                     const f = cfg();
-                    const toSummarize = nonSummary.slice(0, -10); // Summarize all but last 10 messages
+                    const toSummarize = nonSummary.slice(0, -10);
                     const recent = nonSummary.slice(-10);
                     if (toSummarize.length < 5) { summaryLock = false; return; }
-                    const sumPrompt = `请为以下文字冒险游戏的对话历史生成一份精炼的剧情摘要。要求：\n1. 保留关键事件、重要决定、角色变化、发现的物品/NPC/地点\n2. 记录角色的当前状态变化（心态、精神、欢愉等）\n3. 标出未解决的悬念和目标\n4. 控制在300字以内\n\n对话历史：\n${toSummarize.map(m => (m.role === 'user' ? '【玩家】' : '【叙事】') + ': ' + m.content).join('\n')}\n\n请直接输出摘要，不要其他文字。`;
-                    const sumBody = { model: f.model, messages: [{ role: 'user', content: sumPrompt }], max_tokens: 512, temperature: 0.3 };
-                    const rp = await window._sendProxyRequest(f.ep, sumBody, f.key, null, false);
-                    if (!rp.ok) {
-                        let friendlyMsg = '摘要生成失败 (HTTP ' + rp.status + ')';
-                        if (rp.status === 401) friendlyMsg = '摘要生成失败：认证失败，请检查API密钥';
-                        else if (rp.status === 429) friendlyMsg = '摘要生成失败：请求过于频繁';
-                        else if (rp.status >= 500) friendlyMsg = '摘要生成失败：服务器暂时不可用';
-                        throw new Error(friendlyMsg);
+                    // ===== 摘要上下文保护：防止对话过大时，单条摘要请求也爆上下文 =====
+                    let sumContent = toSummarize.map(m => (m.role === 'user' ? '【玩家】' : '【叙事】') + ': ' + (m.content || '')).join('\n');
+                    // 单条摘要控制在 20000 字符以内（约 5K tokens），超过则截断保留最新部分
+                    if (sumContent.length > 20000) {
+                        sumContent = '…（前面' + (sumContent.length - 20000) + '字省略）…\n' + sumContent.slice(-20000);
                     }
-                    const d = await rp.json();
-                    const summary = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
+                    const sumPrompt = `请为以下文字冒险游戏的对话历史生成一份精炼的剧情摘要。要求：\n1. 保留关键事件、重要决定、角色变化、发现的物品/NPC/地点\n2. 记录角色的当前状态变化（心态、精神、欢愉等）\n3. 标出未解决的悬念和目标\n4. 控制在300字以内\n\n对话历史：\n${sumContent}\n\n请直接输出摘要，不要其他文字。`;
+                    const sumBody = { model: f.model, messages: [{ role: 'user', content: sumPrompt }], max_tokens: 512, temperature: 0.3 };
+                    // ===== 给摘要生成也加 3 次重试 =====
+                    let summary = '';
+                    const MAX_RETRY = 3;
+                    for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
+                        if (attempt > 0) await new Promise(res => setTimeout(res, 800 * attempt));
+                        try {
+                            const abCtl = new AbortController();
+                            const to = setTimeout(() => { try { abCtl.abort(); } catch(_) {} }, 20000);
+                            let rp;
+                            try {
+                                rp = await window._sendProxyRequest(f.ep, sumBody, f.key, abCtl.signal, false);
+                            } finally { clearTimeout(to); }
+                            if (!rp.ok) {
+                                if ((rp.status === 429 || rp.status >= 500) && attempt < MAX_RETRY - 1) continue;
+                                throw new Error('HTTP ' + rp.status);
+                            }
+                            const d = await rp.json();
+                            summary = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
+                            if (summary) break;
+                        } catch (e) {
+                            if (attempt < MAX_RETRY - 1) continue;
+                            throw e;
+                        }
+                    }
                     if (summary) {
-                        // Keep last 10 messages, replace older ones with summary
                         hist = [
                             { role: 'system', content: '【前情摘要】' + summary },
                             ...recent
@@ -3879,10 +2785,10 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         contextSummary = summary;
                         sv(K.SUM, summary);
                         svh(hist);
-                        tst('已生成剧情摘要以保持记忆');
+                        tst('已生成剧情摘要以保持记忆（节省上下文）');
                     }
                 } catch (e) {
-                    // Silently fail - just keep the full history
+                    // 静默失败：保留完整历史即可
                 } finally {
                     summaryLock = false;
                 }
@@ -4003,6 +2909,88 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 // 代理请求辅助函数（使用全局定义的版本）
                 const sendProxyRequest = window._sendProxyRequest;
 
+                // ===== 上下文溢出保护：估算总字符数，超阈值强制先摘要 =====
+                const FORCE_SUMMARIZE_CHARS = 32000; // 约 8K tokens 前强制摘要（1中文字≈2.5tokens）
+                let estimatedTotalChars = sysPrompt.length;
+                hist.slice(-f.ctx * 2).forEach(m => { estimatedTotalChars += (m.content || '').length + 8; });
+                if (estimatedTotalChars > FORCE_SUMMARIZE_CHARS && !summaryLock) {
+                    try {
+                        tst('上下文较大，正在压缩记忆...');
+                        await generateContextSummary();
+                    } catch(e) { /* 摘要失败也继续，用原对话 */ }
+                }
+
+                // ===== 带指数退避重试 + 超时的安全请求函数 =====
+                async function requestWithRetry(targetUrl, body, key, signal, isStream, maxRetries, timeoutMs) {
+                    let lastError = null;
+                    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                        if (attempt > 0) {
+                            const waitMs = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 500, 5000);
+                            if (typeof tst === 'function') tst('第 ' + attempt + ' 次重试，等待 ' + Math.round(waitMs) + 'ms...');
+                            await new Promise(res => setTimeout(res, waitMs));
+                        }
+                        const innerAbort = new AbortController();
+                        let timeoutId = null;
+                        let alreadyAborted = false;
+                        if (timeoutMs > 0) {
+                            timeoutId = setTimeout(() => {
+                                alreadyAborted = true;
+                                try { innerAbort.abort(); } catch(_) {}
+                            }, timeoutMs);
+                        }
+                        // 同时监听外部 signal
+                        if (signal) {
+                            try {
+                                if (signal.aborted) innerAbort.abort();
+                                else signal.addEventListener('abort', () => innerAbort.abort(), { once: true });
+                            } catch(_) {}
+                        }
+                        try {
+                            const response = await sendProxyRequest(targetUrl, body, key, innerAbort.signal, isStream);
+                            if (timeoutId) clearTimeout(timeoutId);
+                            // 2xx 成功直接返回
+                            if (response.ok) return response;
+                            // 只对以下情况重试：429 限流、5xx 服务端错误、0 网络错误
+                            const shouldRetry = response.status === 429 || response.status >= 500;
+                            const et = await response.text().catch(() => '');
+                            let friendlyMsg = 'HTTP ' + response.status;
+                            if (response.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
+                            else if (response.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
+                            else if (response.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
+                            else if (response.status === 429) friendlyMsg = '请求过于频繁（429）';
+                            else if (response.status >= 500) friendlyMsg = '服务器错误（' + response.status + '）';
+                            try {
+                                const ej = JSON.parse(et);
+                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
+                                if (m) {
+                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
+                                    friendlyMsg += '：' + m;
+                                }
+                            } catch(_) {}
+                            friendlyMsg = friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg;
+                            if (shouldRetry && attempt < maxRetries) continue;
+                            const err = new Error(friendlyMsg);
+                            err.httpStatus = response.status;
+                            err.final = true;
+                            throw err;
+                        } catch (e) {
+                            if (timeoutId) clearTimeout(timeoutId);
+                            if (alreadyAborted && (!e || e.name === 'AbortError')) {
+                                lastError = new Error('请求超时（> ' + timeoutMs + 'ms），请检查网络或降低上下文长度后重试');
+                                lastError.timeout = true;
+                            } else if (signal && signal.aborted) {
+                                throw e; // 用户手动取消，不重试
+                            } else {
+                                lastError = e;
+                            }
+                            const isRetriable = !lastError.final && !lastError.httpStatus || (lastError.httpStatus && (lastError.httpStatus === 429 || lastError.httpStatus >= 500));
+                            if (isRetriable && attempt < maxRetries) continue;
+                            throw lastError;
+                        }
+                    }
+                    throw lastError || new Error('未知请求错误');
+                }
+
                 const f = cfg();
                 const indicatorEl = document.createElement('div');
                 indicatorEl.className = 'typing-indicator';
@@ -4025,44 +3013,36 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         const ct = new AbortController();
                         ctrl = ct;
                         const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: true };
-                        const rp = await sendProxyRequest(f.ep, requestBody, f.key, ct.signal, true);
-                        if (!rp.ok) {
-                            const et = await rp.text().catch(() => '未知');
-                            let friendlyMsg = 'HTTP ' + rp.status;
-                            if (rp.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
-                            else if (rp.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
-                            else if (rp.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
-                            else if (rp.status === 429) friendlyMsg = '请求过于频繁：请稍后再试';
-                            else if (rp.status >= 500) friendlyMsg = '服务器错误：服务商暂时不可用';
-                            try {
-                                const ej = JSON.parse(et);
-                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
-                                if (m) {
-                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
-                                    m = m.replace(/\*\*\*\*\d+/g, '****');
-                                    friendlyMsg += '：' + m;
-                                }
-                            } catch(parseErr) {}
-                            throw new Error(friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg);
-                        }
+                        // 流式：重试2次（共3次尝试），超时60秒（流式更宽容）
+                        const rp = await requestWithRetry(f.ep, requestBody, f.key, ct.signal, true, 2, 60000);
                         const rd = rp.body.getReader();
                         const dc = new TextDecoder();
                         let buf = '', bubblesInDOM = [];
-                        let isSSE = true; // 假设是SSE格式，后续检测
+                        let isSSE = true;
                         let firstChunk = true;
                         while (true) {
                             const { done, value } = await rd.read();
-                            if (done) break;
+                            if (done) {
+                                // ===== 修复：SSE 末包丢失 —— done 后处理 buf 中残留的不完整行（有些服务器最后一个包不带\n） =====
+                                if (isSSE && buf && buf.length > 0) {
+                                    const lines = (buf + '\n').split('\n');
+                                    for (const l of lines) {
+                                        if (!l.startsWith('data: ')) continue;
+                                        const d = l.slice(6).trim();
+                                        if (d === '[DONE]') continue;
+                                        try { const j = JSON.parse(d); if (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) full += j.choices[0].delta.content; } catch {}
+                                    }
+                                }
+                                break;
+                            }
                             const chunk = dc.decode(value, { stream: true });
                             buf += chunk;
                             
-                            // 检测是否为SSE格式（首个chunk检测）
                             if (firstChunk && buf.length > 10) {
                                 firstChunk = false;
-                                // 如果第一个chunk不是以 'data:' 开头，则视为非SSE响应
                                 if (!buf.includes('data:')) {
                                     isSSE = false;
-                                    break; // 跳出循环，进入fallback处理
+                                    break;
                                 }
                             }
                             
@@ -4116,26 +3096,8 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                         }
                     } else if (!f.strm && f.key) {
                         const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: false };
-                        const rp = await sendProxyRequest(f.ep, requestBody, f.key, null, false);
-                        if (!rp.ok) {
-                            const et = await rp.text().catch(() => '未知');
-                            let friendlyMsg = 'HTTP ' + rp.status;
-                            if (rp.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
-                            else if (rp.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
-                            else if (rp.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
-                            else if (rp.status === 429) friendlyMsg = '请求过于频繁：请稍后再试';
-                            else if (rp.status >= 500) friendlyMsg = '服务器错误：服务商暂时不可用';
-                            try {
-                                const ej = JSON.parse(et);
-                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
-                                if (m) {
-                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
-                                    m = m.replace(/\*\*\*\*\d+/g, '****');
-                                    friendlyMsg += '：' + m;
-                                }
-                            } catch(parseErr) {}
-                            throw new Error(friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg);
-                        }
+                        // 非流式：重试3次（共4次尝试），超时30秒
+                        const rp = await requestWithRetry(f.ep, requestBody, f.key, null, false, 3, 30000);
                         const d = await rp.json();
                         full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
                         if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
@@ -5835,10 +4797,22 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
             $('btnNewGame').addEventListener('click', async () => {
                 if (!cfg().key) {
                     // Show API config first if not set
-                    $('welcomeModal').style.display = 'flex';
                     const c = cfg();
-                    if (c.ep) $('welEndpoint').value = c.ep;
-                    if (c.model) { const sl = $('welModelSelect'); if (sl && [...sl.options].some(o => o.value === c.model)) sl.value = c.model; }
+                    // 无条件回填所有欢迎模态字段（即使用户没填过 key，也会显示 endpoint/preset/model）
+                    if ($('welEndpointPreset')) $('welEndpointPreset').value = c.preset || AP[c.preset] ? c.preset : 'openai';
+                    // 触发一次 welEndpointPreset change 来刷新 welModelSelect 的选项
+                    if ($('welEndpointPreset')) { try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {} }
+                    $('welEndpoint').value = c.ep || '';
+                    const sl = $('welModelSelect');
+                    if (c.model && sl) {
+                        const hasOpt = [...sl.options].some(o => o.value === c.model);
+                        if (hasOpt) sl.value = c.model;
+                        else { $('welModel').value = c.model; sl.style.display='none'; $('welModel').style.display=''; }
+                    } else if (c.model) {
+                        $('welModel').value = c.model;
+                    }
+                    $('welKey').value = c.key || '';
+                    $('welcomeModal').style.display = 'flex';
                     return;
                 }
                 const c = cfg();
@@ -5925,6 +4899,75 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 $('settingsModal').style.display = 'none';
                 tst(cfg().debug ? '⚡ 上帝模式已激活' : '设置已保存');
             });
+            // ========== 设置模态：API 配置区控件 "输入即保存"（不用等「保存设置」按钮） ==========
+            (function bindSettingsAPIInputs() {
+                try {
+                    function saveFromSettings() {
+                        try {
+                            const preset = $('apiEndpointPreset') ? $('apiEndpointPreset').value : cfg().preset;
+                            const oldKey = cfg().key || '';
+                            const newKey = $('apiKey') ? $('apiKey').value : '';
+                            // 保护已有密钥：仅当用户明确输入了非空新密钥时才覆盖
+                            const finalKey = newKey.trim() || oldKey;
+                            const cur = cfg();
+                            scf({
+                                ...cur,
+                                preset: preset,
+                                ep: $('apiEndpoint') ? ($('apiEndpoint').value || DCFG.ep) : cur.ep,
+                                model: $('apiModel') ? ($('apiModel').value || 'gpt-4o') : cur.model,
+                                maxT: $('apiMaxTokens') ? (parseInt($('apiMaxTokens').value, 10) || cur.maxT) : cur.maxT,
+                                temp: $('apiTemperature') ? (parseFloat($('apiTemperature').value) || cur.temp) : cur.temp,
+                                ctx: $('apiContextLen') ? (parseInt($('apiContextLen').value, 10) || cur.ctx) : cur.ctx,
+                                key: finalKey
+                            });
+                        } catch {}
+                    }
+                    // 为 apiEndpointPreset 的 change 事件添加 scf 保存（原代码只更新了 DOM）
+                    const oldPresetEl = document.getElementById('apiEndpointPreset');
+                    if (oldPresetEl) {
+                        oldPresetEl.addEventListener('change', function() {
+                            try {
+                                const p = AP[this.value] || AP.custom;
+                                if (document.getElementById('apiEndpoint')) document.getElementById('apiEndpoint').value = p.ep;
+                                const sl = document.getElementById('apiModelSelect');
+                                if (sl) {
+                                    sl.innerHTML = '';
+                                    if (p.md && p.md.length) {
+                                        p.md.forEach(m => sl.add(new Option(m, m)));
+                                        sl.style.display = '';
+                                        document.getElementById('apiModel').style.display = 'none';
+                                    } else {
+                                        sl.style.display = 'none';
+                                        document.getElementById('apiModel').style.display = '';
+                                    }
+                                }
+                                // 选完预设立刻 scf 保存
+                                saveFromSettings();
+                            } catch {}
+                        });
+                    }
+                    // 为其他 7 个 API 控件绑定 input / change 事件
+                    ['apiKey','apiEndpoint','apiModel','apiMaxTokens','apiTemperature','apiContextLen'].forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) el.addEventListener('input', saveFromSettings);
+                    });
+                    const modelSelect = document.getElementById('apiModelSelect');
+                    if (modelSelect) modelSelect.addEventListener('change', saveFromSettings);
+                    // 在设置标题下方加一个小提示
+                    try {
+                        const headerRow = document.getElementById('settingsModalTitle');
+                        if (headerRow && !document.getElementById('apiAutoSaveHint')) {
+                            const hint = document.createElement('div');
+                            hint.id = 'apiAutoSaveHint';
+                            hint.className = 'field-hint';
+                            hint.style.cssText = 'position:absolute;top:8px;right:32px;color:var(--notify-add);font-size:0.62rem;';
+                            hint.textContent = '✓ API配置自动保存到本地，刷新不丢失';
+                            headerRow.parentNode.style.position = 'relative';
+                            headerRow.parentNode.appendChild(hint);
+                        }
+                    } catch {}
+                } catch {}
+            })();
             // ===== Export / Import full backup =====
             $('btnSetExportBackup') && $('btnSetExportBackup').addEventListener('click', () => {
                 const chr = gch();
@@ -6021,7 +5064,7 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 upui();
                 tst($('godModeToggle').checked ? '⚡ 上帝模式已激活：你无所不能、永不死亡' : '上帝模式已关闭');
             });
-            
+
             // ===== God Group quick debug buttons =====
             $('btnDebugMax') && $('btnDebugMax').addEventListener('click', () => runDebugCmd('/max'));
             $('btnDebugHeal') && $('btnDebugHeal').addEventListener('click', () => runDebugCmd('/heal'));
@@ -6160,11 +5203,12 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 if (p.md.length) $('apiModel').value = p.md[0];
             });
             $('btnTheme').addEventListener('click', () => { cycleTheme(); });
-            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled ? '🔊 音效' : '🔇 音效'; });
-            $('btnSfx').textContent = sfxEnabled ? '🔊 音效' : '🔇 音效';
+            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled() ? '🔊 音效' : '🔇 音效'; });
+            $('btnSfx').textContent = sfxEnabled() ? '🔊 音效' : '🔇 音效';
             $('btnBgm').addEventListener('click', () => { bgmToggle(); });
-            $('btnBgm').textContent = BGM.enabled ? '🎵 音乐' : '🔇 音乐';
-            $('btnBgm').title = BGM.enabled ? '背景音乐（开启）' : '背景音乐（已关闭）';
+            const _bgm = BGM();
+            $('btnBgm').textContent = _bgm.enabled ? '🎵 音乐' : '🔇 音乐';
+            $('btnBgm').title = _bgm.enabled ? '背景音乐（开启）' : '背景音乐（已关闭）';
             // ===== 导航栏「更多」收纳菜单 =====
             (function initNavMore() {
                 const btn = $('btnNavMore');
@@ -6642,7 +5686,54 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 sl.innerHTML = '';
                 if (p.md.length) { p.md.forEach(m => sl.add(new Option(m, m))); sl.style.display = ''; $('welModel').style.display = 'none'; }
                 else { sl.style.display = 'none'; $('welModel').style.display = ''; }
+                // 选择预设后立即 scf 保存（endpoint/preset/model，保持用户选完就不用重新选）
+                try {
+                    scf({
+                        ...cfg(),
+                        preset: this.value,
+                        ep: $('welEndpoint').value || DCFG.ep,
+                        model: (sl.value && sl.style.display !== 'none') ? sl.value : ($('welModel').value || 'gpt-4o')
+                    });
+                } catch {}
             });
+            // ========== 欢迎模态：所有 API 控件 "输入即保存"（localStorage 持久化），刷新不用重输 ==========
+            (function bindWelcomeInputs() {
+                function saveFromWelcome() {
+                    try {
+                        const sl = $('welModelSelect');
+                        const pickModel = (sl && sl.style.display !== 'none') ? sl.value : $('welModel').value;
+                        const cur = cfg();
+                        // NEVER 清空已有 key（如果用户不小心输入又删了，保护原 key）
+                        const newKey = $('welKey').value;
+                        const finalKey = (newKey && newKey.trim() !== '') ? newKey.trim() : (cur.key || '');
+                        scf({
+                            ...cur,
+                            preset: $('welEndpointPreset') ? $('welEndpointPreset').value : cur.preset,
+                            ep: $('welEndpoint').value || DCFG.ep,
+                            model: pickModel || 'gpt-4o',
+                            key: finalKey
+                        });
+                    } catch {}
+                }
+                const welIds = ['welKey','welEndpoint','welModel'];
+                welIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', saveFromWelcome); });
+                const sel = document.getElementById('welModelSelect'); if (sel) sel.addEventListener('change', saveFromWelcome);
+                // 提示用户已自动保存
+                try {
+                    const savedHint = document.createElement('div');
+                    savedHint.id = 'welSavedHint';
+                    savedHint.className = 'field-hint';
+                    savedHint.style.cssText = 'margin-top:8px;color:var(--notify-add);font-size:0.62rem;text-align:right;display:none;';
+                    savedHint.textContent = '✓ 已自动保存到本地（刷新不丢失）';
+                    const bn = document.getElementById('btnWelcomeNext');
+                    if (bn && bn.parentNode) bn.parentNode.insertBefore(savedHint, bn.nextSibling);
+                    const _origSave = saveFromWelcome;
+                    saveFromWelcome = function(){ _origSave(); if (savedHint){ savedHint.style.display='block'; clearTimeout(saveFromWelcome._t); saveFromWelcome._t = setTimeout(()=>{savedHint.style.display='none';}, 1200);} };
+                    // rebind（因为重写了函数引用）
+                    welIds.forEach(id => { const el = document.getElementById(id); if (el) { el.removeEventListener('input', _origSave); el.addEventListener('input', saveFromWelcome);} });
+                    if (sel) { sel.removeEventListener('change', _origSave); sel.addEventListener('change', saveFromWelcome); }
+                } catch {}
+            })();
             $('btnTestWel').addEventListener('click', async () => {
                 const k = $('welKey').value;
                 if (!k) return tst('缺少密钥');
@@ -7079,6 +6170,45 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 console.warn('[GlobalError]', ev.message, 'at', ev.filename, ev.lineno);
             }, true);
 
+
+            // ========== 把核心函数暴露到 window（供 gamesystems.js / proxycfg.js 跨文件调用）==========
+            Object.assign(window, {
+                // $, K: 不暴露内部$避免冲突，保留各自版本
+                // 配置/读写
+                ld, sv, cfg, scf, ccb,
+                // 角色/状态/沙盒/时钟 读写
+                gst, sst, gch, sch, gclk, sclk, gsbx, ssbx, mergeSbx, migrateSta, migrateChr, migrateCfg,
+                // 存档/历史
+                gsv, ssv, gsp, ldh, svh, _getHist: () => hist, _setHist: (h) => { hist = h; svh(h); },
+                _getSbx: () => sbx, _setSbx: (s) => { sbx = s; ssbx(s); },
+                // 渲染/UI
+                upui, abold, stg, rbt, mds, pai, buildInvAndEquipFromItems, getItemInfo, getItemBaseName,
+                renderSandbox, fillCharModal, aiInitStats,
+                // 挂机
+                startIdle, stopIdle,
+                // 状态/物品
+                spBar, mentalityLabel, itemEmoji, fmtTime, dayPhase,
+                seasonFromDay, randWeather, randTemp,
+                // 核心 hin 循环
+                hin,
+                // 样式
+                ath, afs,
+                // 状态
+                hasHover
+            });
+            window.BGM = window.BGM || BGM(); // audio.js 已定义，兜底
+            window.snotify = snotify; // 侧边通知（在这个文件定义）
+            window._triggerRandomEvent = () => triggerRandomEvent();
+            window._checkSeasonalEvent = () => checkSeasonalEvent();
+            window._checkForRandomEvent = (t) => checkForRandomEvent(t);
+            window._applyStatusEffect = (e,d,s) => applyStatusEffect(e,d,s);
+            window._tickStatusEffects = () => tickStatusEffects();
+            window._addKeyMemory = (t,ty) => addKeyMemory(t,ty);
+            window._addLogEntry = (t,txt,cid) => addLogEntry(t,txt,cid);
+            window._checkAchievements = () => checkAchievements();
+            window._renderAchievementsPanel = () => renderAchievementsPanel();
+            window._renderEventsPanel = () => renderEventsPanel();
+
             // ===== Init =====
             (function() {
                 if (!document.getElementById('emojiFallbackStyle_inline')) {
@@ -7210,11 +6340,22 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 const chrData = gch();
 
                 if (!finalCfg.key) {
-                    // Step 1: No API key - show welcome modal for configuration
-                    if (finalCfg.ep) $('welEndpoint').value = finalCfg.ep;
-                    if (finalCfg.model) { const sl = $('welModelSelect'); if (sl && [...sl.options].some(o => o.value === finalCfg.model)) sl.value = finalCfg.model; }
-                    if (finalCfg.preset && $('welEndpointPreset')) $('welEndpointPreset').value = finalCfg.preset;
-                    if (finalCfg.key) $('welKey').value = finalCfg.key;
+                    // Step 1: No API key - show welcome modal for configuration, UNCONDITIONALLY 回填所有字段
+                    if ($('welEndpointPreset')) {
+                        $('welEndpointPreset').value = finalCfg.preset || 'openai';
+                        // 触发 change 事件以刷新 welModelSelect 选项
+                        try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
+                    }
+                    $('welEndpoint').value = finalCfg.ep || '';
+                    const sl = $('welModelSelect');
+                    if (finalCfg.model && sl) {
+                        const hasOpt = [...sl.options].some(o => o.value === finalCfg.model);
+                        if (hasOpt) sl.value = finalCfg.model;
+                        else { $('welModel').value = finalCfg.model; sl.style.display='none'; $('welModel').style.display=''; }
+                    } else if (finalCfg.model) {
+                        $('welModel').value = finalCfg.model;
+                    }
+                    $('welKey').value = finalCfg.key || '';
                     $('welcomeModal').style.display = 'flex';
                 } else if (loadedFromSave) {
                     // Step 2: Has API key + loaded from save - restore silently
@@ -7245,15 +6386,17 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                     setTimeout(() => launchTutorial(), 800);
                 }
                 // ===== BGM: 首次用户交互后启动，遵循浏览器自动播放策略 =====
-                if (BGM.enabled) {
+                const _bgmState = BGM();
+                if (_bgmState.enabled) {
                     const startBgmOnce = () => {
                         document.removeEventListener('click', startBgmOnce);
                         document.removeEventListener('keydown', startBgmOnce);
                         document.removeEventListener('touchstart', startBgmOnce);
                         bgmInit();
                         // 游戏初始默认营地背景音
-                        BGM._currentCategory = 'camp';
-                        BGM._currentFile = 'bgm_camp1.mp3';
+                        const __bgm = BGM();
+                        __bgm._currentCategory = 'camp';
+                        __bgm._currentFile = 'bgm_camp1.mp3';
                         bgmPlay('bgm_camp1.mp3');
                         const _s = gst(), _c = gch(), _clk = gclk();
                         bgmAutoSwitch({
@@ -7312,1781 +6455,5 @@ NPC关系达到阈值后自动解锁新对话选项：信任20=认识, 40=熟人
                 } catch(e) {}
             })();
         })();
-    (function() {
-        // Cross-script access to core functions from main IIFE
-        const gch = window.gch, gst = window.gst, gclk = window.gclk, cfg = window.cfg;
-        const sch = window.sch, sst = window.sst, sclk = window.sclk, scf = window.scf;
-        const playSfx = window.playSfx;
-        const mds = window.mds, pai = window.pai;
-        const buildInvAndEquipFromItems = window.buildInvAndEquipFromItems;
-        const getItemInfo = window.getItemInfo, getItemBaseName = window.getItemBaseName;
-        const stopIdle = window.stopIdle;
-        // Additional functions from main IIFE
-        const rbt = window.rbt, upui = window.upui, stg = window.stg;
-        const ccb = window.ccb, svh = window.svh, apb = window.apb, scb = window.scb;
-        const tst = window.tst, hin = window.hin, esc = window.esc, abold = window.abold;
-        const migrateSta = window.migrateSta, migrateChr = window.migrateChr, migrateCfg = window.migrateCfg;
-        const mergeSbx = window.mergeSbx, ssbx = window.ssbx, gsbx = window.gsbx;
-        const ldh = window.ldh, ssv = window.ssv, gsv = window.gsv, gsp = window.gsp;
-        const spBar = window.spBar, mentalityLabel = window.mentalityLabel, itemEmoji = window.itemEmoji;
-        const fmtTime = window.fmtTime, dayPhase = window.dayPhase;
-        const seasonFromDay = window.seasonFromDay, randWeather = window.randWeather, randTemp = window.randTemp;
-        const aiInitStats = window.aiInitStats, fillCharModal = window.fillCharModal;
-        const sketchConfirm = window.sketchConfirm, sketchPrompt = window.sketchPrompt;
-        const _getHist = window._getHist, _setHist = window._setHist;
-        const _getSbx = window._getSbx, _setSbx = window._setSbx;
-        const hasHover = window.hasHover;
-        // Helpers needed by playSfx override and status effect system
-        const playTone = window.playTone, snotify = window.snotify;
-        const NORMAL_SKILLS = window.NORMAL_SKILLS, ABILITIES = window.ABILITIES;
-        // Note: triggerRandomEvent, checkSeasonalEvent, checkForRandomEvent, applyStatusEffect,
-        // tickStatusEffects, addKeyMemory, addLogEntry, checkAchievements are defined locally below
 
-        // ===== 11. 状态效果系统 =====
-        const STATUS_EFFECTS = {
-            bleeding: { name: '流血', icon: '🩸', color: '#c75b3a', stackable: true, maxStacks: 5, duration: 60,
-                onTick: (s) => { s.hp = Math.max(0, (s.hp||100) - 2); if (Math.random() < 0.15) s.infection = (s.infection||0) + 1; },
-                onApply: () => playSfx('hurt') },
-            infection: { name: '感染', icon: '🤢', color: '#9d7a3a', stackable: false, duration: 300,
-                onTick: (s) => { s.bodyTemp = (s.bodyTemp||36.5) + 0.2; s.hp = Math.max(0, (s.hp||100) - 1); },
-                onApply: () => playSfx('warn') },
-            poison: { name: '中毒', icon: '☠️', color: '#6a3a9d', stackable: true, maxStacks: 3, duration: 180,
-                onTick: (s) => { s.hp = Math.max(0, (s.hp||100) - 3); s.spirit = Math.max(0, (s.spirit||50) - 2); },
-                onApply: () => playSfx('danger') },
-            fracture: { name: '骨折', icon: '🦴', color: '#8a5a3a', stackable: false, duration: 900,
-                onTick: (s) => { s.fatigue = Math.min(100, (s.fatigue||0) + 1); s.movement = (s.movement||5) - 1; },
-                onApply: () => playSfx('hurt') },
-            hypothermia: { name: '失温', icon: '🥶', color: '#3a7bc7', stackable: false, duration: 300,
-                onTick: (s) => { s.bodyTemp = Math.max(32, (s.bodyTemp||36.5) - 0.15); s.fatigue = Math.min(100, (s.fatigue||0) + 0.5); },
-                onApply: () => playSfx('warn') },
-            panic: { name: '恐慌', icon: '😱', color: '#c77b3a', stackable: false, duration: 120,
-                onTick: (s) => { s.spirit = Math.max(0, (s.spirit||50) - 1); },
-                onApply: () => playSfx('warn') },
-            adrenaline: { name: '肾上腺素', icon: '💉', color: '#3ac77b', stackable: false, duration: 120,
-                onTick: (s) => { s.enc = Math.min(20, (s.enc||5) + 0.5); s.fatigue = Math.max(0, (s.fatigue||0) - 1); },
-                onApply: () => playSfx('levelup') },
-            exhaustion: { name: '虚脱', icon: '💀', color: '#5a5a5a', stackable: false, duration: 300,
-                onTick: (s) => { s.hp = Math.max(0, (s.hp||100) - 2); s.spirit = Math.max(0, (s.spirit||50) - 1); s.fatigue = Math.min(100, (s.fatigue||0) + 2); },
-                onApply: () => playSfx('danger') }
-        };
-
-        function applyStatusEffect(effectName, duration, stacks) {
-            const s = gst();
-            if (!s.statusEffects) s.statusEffects = {};
-            const eff = STATUS_EFFECTS[effectName];
-            if (!eff) return;
-            const stackKey = stacks && eff.stackable ? '_stacks' : '';
-            const key = effectName + stackKey;
-            const existing = s.statusEffects[key];
-            if (eff.stackable) {
-                const curStacks = existing ? existing.stacks : 0;
-                const newStacks = Math.min(eff.maxStacks, curStacks + (stacks || 1));
-                s.statusEffects[key] = { name: effectName, stacks: newStacks, remaining: duration || eff.duration };
-            } else {
-                s.statusEffects[key] = { name: effectName, stacks: 0, remaining: duration || eff.duration };
-            }
-            if (eff.onApply) eff.onApply(s);
-            sst(s);
-            playSfx('status');
-            snotify('status', '状态', eff.name + (eff.stackable ? ' ×' + (s.statusEffects[key].stacks) : ''));
-            // Update sidebar status display
-            const statusList = [];
-            Object.entries(s.statusEffects).forEach(([k, v]) => {
-                const e = STATUS_EFFECTS[v.name];
-                if (e) statusList.push(e.icon + e.name + '(' + Math.ceil(v.remaining/60) + 'm)');
-            });
-            if (statusList.length) {
-                const statusDisp = document.getElementById('statusEffects');
-                if (statusDisp) statusDisp.textContent = statusList.join(' ');
-            }
-        }
-
-        function tickStatusEffects() {
-            const s = gst();
-            if (!s.statusEffects) return;
-            const toRemove = [];
-            Object.entries(s.statusEffects).forEach(([key, data]) => {
-                const eff = STATUS_EFFECTS[data.name];
-                if (!eff) { toRemove.push(key); return; }
-                data.remaining -= 1;
-                if (eff.onTick) {
-                    try { eff.onTick(s); } catch(e) {}
-                }
-                if (data.remaining <= 0) {
-                    toRemove.push(key);
-                    snotify('status', '状态', eff.name + ' 结束');
-                }
-            });
-            toRemove.forEach(k => delete s.statusEffects[k]);
-            if (toRemove.length) sst(s);
-        }
-
-        // Status effect ticker - runs every game minute
-        setInterval(() => {
-            const s = gst();
-            if (!s.statusEffects || Object.keys(s.statusEffects).length === 0) return;
-            tickStatusEffects();
-            sst(s);
-        }, 5000);
-
-        // ===== 2. 战斗系统 =====
-        const WEAPON_DATA = {
-            '手枪': { dmg: 25, range: 15, crit: 0.15, speed: 'medium', ammoType: '9mm子弹' },
-            '消音手枪': { dmg: 22, range: 12, crit: 0.15, speed: 'medium', ammoType: '9mm子弹', silent: true },
-            '步枪': { dmg: 35, range: 50, crit: 0.2, speed: 'slow', ammoType: '5.56mm子弹' },
-            '狙击步枪': { dmg: 80, range: 200, crit: 0.4, speed: 'very slow', ammoType: '7.62mm子弹' },
-            '霰弹枪': { dmg: 50, range: 8, crit: 0.25, speed: 'slow', ammoType: '12号霰弹' },
-            '十字弩': { dmg: 45, range: 30, crit: 0.3, speed: 'slow', ammoType: '弩箭', silent: true },
-            '砍刀': { dmg: 20, range: 2, crit: 0.1, speed: 'fast', ammoType: null },
-            '日式长刀': { dmg: 28, range: 3, crit: 0.18, speed: 'fast', ammoType: null },
-            '斧头': { dmg: 30, range: 2, crit: 0.05, speed: 'slow', ammoType: null },
-            '消防斧': { dmg: 38, range: 2, crit: 0.1, speed: 'slow', ammoType: null },
-            '匕首': { dmg: 12, range: 1, crit: 0.25, speed: 'fast', ammoType: null },
-            '格斗刀': { dmg: 18, range: 1, crit: 0.28, speed: 'very fast', ammoType: null },
-            '铁锤': { dmg: 35, range: 2, crit: 0.05, speed: 'slow', ammoType: null },
-            '钢管': { dmg: 15, range: 2, crit: 0.08, speed: 'medium', ammoType: null },
-            '铁棍': { dmg: 16, range: 2, crit: 0.06, speed: 'medium', ammoType: null },
-            '球棒': { dmg: 18, range: 2, crit: 0.12, speed: 'medium', ammoType: null },
-            '折叠水果刀': { dmg: 10, range: 1, crit: 0.2, speed: 'fast', ammoType: null },
-            '多功能扳手': { dmg: 12, range: 1, crit: 0.1, speed: 'medium', ammoType: null },
-            '撬棍': { dmg: 22, range: 2, crit: 0.1, speed: 'medium', ammoType: null },
-            '工兵铲': { dmg: 24, range: 2, crit: 0.1, speed: 'medium', ammoType: null },
-            '菜刀': { dmg: 14, range: 1, crit: 0.12, speed: 'fast', ammoType: null },
-            '武士刀': { dmg: 35, range: 3, crit: 0.22, speed: 'fast', ammoType: null },
-            '三棱刺': { dmg: 28, range: 2, crit: 0.15, speed: 'fast', ammoType: null },
-            '链锯': { dmg: 50, range: 1, crit: 0.05, speed: 'very slow', ammoType: null },
-            '电击棒': { dmg: 15, range: 1, crit: 0.3, speed: 'fast', ammoType: null, stun: true },
-            '弓': { dmg: 30, range: 25, crit: 0.2, speed: 'medium', ammoType: '弓箭', silent: true },
-            '手术刀': { dmg: 8, range: 1, crit: 0.35, speed: 'very fast', ammoType: null }
-        };
-
-        function calculateDamage(weapon, attackerStat, defenderStat) {
-            const wd = WEAPON_DATA[weapon] || { dmg: 10, crit: 0.1, speed: 'medium', range: 1 };
-            const baseDmg = wd.dmg + (attackerStat.str || 5) * 2;
-            let dmg = baseDmg;
-            const isCrit = Math.random() < wd.crit;
-            if (isCrit) dmg *= 1.8;
-            // Defender mitigation
-            const armorReduce = defenderStat.armor || 0;
-            dmg = Math.max(1, dmg - armorReduce * 0.3);
-            return { damage: Math.round(dmg), critical: isCrit, weapon: weapon };
-        }
-
-        function attemptDodge(agility) {
-            return Math.random() < (agility || 5) * 0.04;
-        }
-
-        function attemptBlock(weaponDurability) {
-            const success = Math.random() < 0.25;
-            if (success && weaponDurability !== undefined) {
-                const s = gst();
-                const curDur = (s.weaponDurability && s.weaponDurability[weaponDurability]) || 100;
-                if (curDur > 0) {
-                    s.weaponDurability[weaponDurability] = Math.max(0, curDur - 2);
-                    sst(s);
-                }
-            }
-            return success;
-        }
-
-        function attemptCounter(agility, weapon) {
-            return Math.random() < (agility || 5) * 0.03;
-        }
-
-        function processCombatRound(enemyStats, playerStats) {
-            const result = { events: [], playerDamage: 0, enemyDamage: 0, ended: false };
-            const s = gst();
-            const weapon = s.equip ? s.equip.weapon : null;
-            const wd = WEAPON_DATA[weapon] || { dmg: 8, range: 1, crit: 0.05, speed: 'medium' };
-            
-            // Player attacks
-            const pAgility = playerStats.agility || s.agility || 5;
-            const eAgility = enemyStats.agility || 5;
-            const eHp = enemyStats.hp || 100;
-            const weaponName = weapon || '徒手';
-
-            if (attemptDodge(eAgility)) {
-                result.events.push('敌方闪避了你的攻击！');
-            } else {
-                const dmgCalc = calculateDamage(weapon, playerStats, enemyStats);
-                result.enemyDamage = dmgCalc.damage;
-                if (dmgCalc.critical) result.events.push('暴击！造成 ' + dmgCalc.damage + ' 点伤害');
-                else result.events.push('你用' + weaponName + '攻击，造成 ' + dmgCalc.damage + ' 点伤害');
-                // Apply infection chance for bites/scratches
-                if (enemyStats.type === '丧尸' && Math.random() < 0.3) {
-                    applyStatusEffect('infection', 180);
-                    result.events.push('⚠️ 你被咬伤了，可能感染！');
-                }
-            }
-
-            // Check if enemy is dead
-            const newEHp = eHp - result.enemyDamage;
-            if (newEHp <= 0) {
-                result.events.push('敌人已被击倒！');
-                result.ended = true;
-                playSfx('victory');
-                // Drop loot chance
-                if (Math.random() < 0.3) {
-                    const lootPool = ['压缩饼干', '瓶装水', '绷带', '抗生素', '金属', '零件', '手电筒', '止痛药', '火柴', '巧克力'];
-                    const loot = lootPool[Math.floor(Math.random() * lootPool.length)];
-                    const cs = gst();
-                    cs.inv.push(loot);
-                    sst(cs);
-                    result.events.push('获得战利品：' + loot);
-                    playSfx('pickup');
-                }
-                return result;
-            }
-
-            // Enemy attacks
-            if (!result.ended) {
-                if (attemptDodge(pAgility)) {
-                    result.events.push('你成功闪避了敌人的攻击！');
-                } else if (weapon && attemptBlock(weapon)) {
-                    result.events.push('你用武器格挡了攻击！');
-                } else {
-                    // Armor reduction: check body slot for armor
-                    const bodyArmor = (s.equip && s.equip.body) ? getItemInfo(s.equip.body) : null;
-                    const armorReduce = (bodyArmor && bodyArmor.subCategory === 'armor') ? 5 : 0;
-                    const eDmg = Math.max(1, (enemyStats.dmg || 8) - armorReduce);
-                    result.playerDamage = eDmg;
-                    result.events.push('敌人反击造成 ' + eDmg + ' 点伤害');
-                    // Apply status effects
-                    if (eDmg > 15) applyStatusEffect('bleeding', 60);
-                    if (Math.random() < 0.1) applyStatusEffect('panic', 60);
-                    playSfx('hurt');
-                }
-
-                // Counter attack chance
-                if (attemptCounter(pAgility, weapon)) {
-                    const counterDmg = Math.max(1, Math.floor((wd.dmg || 8) * 0.5));
-                    result.enemyDamage += counterDmg;
-                    result.events.push('你抓住机会反击，造成 ' + counterDmg + ' 点伤害！');
-                    playSfx('counter');
-                }
-            }
-            
-            return result;
-        }
-
-        // ===== 1. 合成/制造系统 =====
-        const CRAFT_RECIPES = [
-            { id: 'bandage', name: '绷带', ingredients: ['布料', '酒精'], result: '绷带x3', desc: '酒精消毒后的布料制成绷带，一次得3卷', difficulty: 1 },
-            { id: 'gauze_bandage', name: '高级绷带', ingredients: ['纱布', '酒精', '消炎药'], result: '医疗包', desc: '包扎+消炎的综合医疗包', difficulty: 2 },
-            { id: 'molotov', name: '燃烧瓶', ingredients: ['汽油', '玻璃瓶', '布条'], result: '燃烧瓶', desc: '简易燃烧瓶，攻击后起火', difficulty: 3 },
-            { id: 'spark', name: '烟雾弹', ingredients: ['硫磺', '金属片', '电池'], result: '烟雾弹', desc: '制造烟雾阻隔视线', difficulty: 3 },
-            { id: 'spear', name: '简易长矛', ingredients: ['长木棍', '菜刀'], result: '简易长矛', desc: '近战加长武器', difficulty: 2 },
-            { id: 'trap', name: '简易陷阱', ingredients: ['木板', '钉子', '绳子'], result: '简易陷阱', desc: '触发后造成伤害', difficulty: 2 },
-            { id: 'filter', name: '简易滤水器', ingredients: ['塑料瓶', '沙子', '木炭'], result: '简易滤水器', desc: '过滤污水，获得饮用水', difficulty: 2 },
-            { id: 'torch', name: '火把', ingredients: ['长木棍', '破布', '酒精'], result: '火把', desc: '黑暗中照明2小时', difficulty: 1 },
-            { id: 'candle', name: '蜡烛', ingredients: ['蜂蜡', '铁丝'], result: '蜡烛x3', desc: '柔和光源，不吸引丧尸', difficulty: 1 },
-            { id: 'armor_plate', name: '简易护心镜', ingredients: ['金属片', '皮革', '绳子'], result: '简易护心镜', desc: '胸部防护，减伤30%', difficulty: 3 },
-            { id: 'shield', name: '简易盾牌', ingredients: ['木板', '铁皮', '铁丝'], result: '简易盾牌', desc: '格挡概率提升', difficulty: 2 },
-            { id: 'spike_armor', name: '钉甲', ingredients: ['皮革', '铁钉', '铁丝'], result: '钉甲', desc: '近战攻击反伤敌人', difficulty: 4 },
-            { id: 'medkit', name: '综合医疗包', ingredients: ['绷带', '药品', '酒精'], result: '综合医疗包', desc: '治疗多种伤情', difficulty: 2 },
-            { id: 'surgical_kit', name: '急救手术包', ingredients: ['医疗包', '手术刀', '抗生素'], result: '急救手术包', desc: '治疗重伤和骨折', difficulty: 4 },
-            { id: 'wire', name: '铁丝网', ingredients: ['金属丝', '钳子'], result: '铁丝网', desc: '构建防御工事', difficulty: 2 },
-            { id: 'lockpick', name: '开锁工具', ingredients: ['金属片', '细铁丝'], result: '开锁工具', desc: '撬开普通门锁', difficulty: 2 },
-            { id: 'booby', name: '简易爆炸装置', ingredients: ['炸药', '电池', '金属片'], result: '简易爆炸装置', desc: '触发式杀伤', difficulty: 4 },
-            { id: 'landmine', name: '地雷', ingredients: ['炸药', '金属片', '木板'], result: '地雷x2', desc: '踩踏触发，威力巨大', difficulty: 5 },
-            { id: 'purify', name: '净水药片', ingredients: ['酒精', '药品', '金属'], result: '净水药片x5', desc: '净化水源，一次5片', difficulty: 3 },
-            { id: 'axe_improved', name: '加固斧头', ingredients: ['斧头', '金属片', '绳子'], result: '加固斧头', desc: '更高伤害的近战武器', difficulty: 2 },
-            { id: 'radio', name: '简易对讲机', ingredients: ['对讲机', '零件', '电池'], result: '简易对讲机', desc: '短距离通讯增强', difficulty: 3 },
-            { id: 'generator', name: '手摇发电机', ingredients: ['零件', '木板', '铜线'], result: '手摇发电机', desc: '手动发电，为电池充电', difficulty: 5 },
-            { id: 'battery_pack', name: '移动电源', ingredients: ['充电宝', '太阳能板', '电线'], result: '20000mAh移动电源', desc: '太阳能+大容量储能', difficulty: 4 },
-            { id: 'fishing_rod', name: '简易钓鱼竿', ingredients: ['长木棍', '绳子', '铁丝'], result: '钓鱼竿', desc: '河边钓鱼获得食物', difficulty: 2 },
-            { id: 'smoker', name: '熏肉架', ingredients: ['木板', '铁丝'], result: '熏肉架', desc: '制作腊肉，保存肉类', difficulty: 2 },
-            { id: 'rain_collector', name: '雨水收集器', ingredients: ['塑料布', '绳子', '木板'], result: '雨水收集器', desc: '雨天收集干净雨水', difficulty: 2 },
-            { id: 'sleeping_bag', name: '睡袋', ingredients: ['毯子', '布料', '绳子'], result: '睡袋', desc: '夜间保暖，睡眠恢复', difficulty: 3 },
-            { id: 'crossbow', name: '十字弩', ingredients: ['木板', '铁丝', '零件'], result: '十字弩', desc: '无声远程武器', difficulty: 5 },
-            { id: 'bow_craft', name: '弓', ingredients: ['长木棍', '绳子', '铁丝'], result: '弓', desc: '无声远程武器，可回收箭矢', difficulty: 3 },
-            { id: 'arrow_craft', name: '弓箭', ingredients: ['木棍', '铁丝', '胶带'], result: '弓箭x5', desc: '弓用箭矢，一次5支', difficulty: 2 },
-            { id: 'stun_baton', name: '电击棒', ingredients: ['钢管', '电池', '电线'], result: '电击棒', desc: '高压电击武器，可制服敌人', difficulty: 4 },
-            { id: 'rebreather', name: '简易防毒面具', ingredients: ['塑料瓶', '布条', '木炭'], result: '防毒面具', desc: '过滤空气，防毒防感染', difficulty: 3 },
-            { id: 'whetstone_use', name: '磨刀', ingredients: ['磨刀石', '匕首'], result: '格斗刀', desc: '将匕首磨利升级为格斗刀', difficulty: 1 },
-            { id: 'sewing_kit', name: '针线包', ingredients: ['铁丝', '布条', '绳子'], result: '针线包', desc: '缝补衣物和包扎伤口', difficulty: 1 },
-            { id: 'solar_charger', name: '太阳能充电器', ingredients: ['太阳能板', '逆变器', '电线'], result: '太阳能充电器', desc: '野外充电装置', difficulty: 4 },
-            { id: 'fishing_net', name: '渔网', ingredients: ['绳子', '铁丝', '尼龙绳'], result: '渔网', desc: '捕鱼效率更高的工具', difficulty: 2 },
-            { id: 'improved_filter', name: '高级滤水器', ingredients: ['简易滤水器', '木炭', '塑料布'], result: '简易滤水器', desc: '升级滤水器，过滤更彻底', difficulty: 3 }
-        ];
-
-        function getCraftingRecipes() {
-            return CRAFT_RECIPES.slice();
-        }
-
-        function tryCraft(recipeId) {
-            const recipe = CRAFT_RECIPES.find(r => r.id === recipeId);
-            if (!recipe) return { success: false, message: '未知配方' };
-            const s = gst();
-            if (!s.inv) s.inv = [];
-            const missing = [];
-            recipe.ingredients.forEach(ing => {
-                const idx = s.inv.findIndex(i => {
-                    const name = i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim();
-                    return name === ing;
-                });
-                if (idx < 0) {
-                    const count = s.inv.filter(i => i.includes(ing.substring(0,2))).length;
-                    if (count === 0) missing.push(ing);
-                } else {
-                    // Check and consume
-                    const item = s.inv[idx];
-                    const match = item.match(/(.*)x(\d+)/);
-                    if (match) {
-                        const count = parseInt(match[2]) - 1;
-                        if (count <= 0) s.inv.splice(idx, 1);
-                        else s.inv[idx] = match[1] + 'x' + count;
-                    } else {
-                        s.inv.splice(idx, 1);
-                    }
-                }
-            });
-            if (missing.length > 0) {
-                return { success: false, message: '缺少：' + missing.join('、') };
-            }
-            s.inv.push(recipe.result);
-            sst(s);
-            playSfx('craft');
-            return { success: true, message: '合成成功！获得 ' + recipe.result, item: recipe.result };
-        }
-
-        function openCraftingModal() {
-            const s = gst();
-            const invItems = (s.inv || []).map(i => {
-                const name = i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim();
-                return name;
-            });
-            const available = new Set(invItems);
-            const recipes = CRAFT_RECIPES.map(r => {
-                const canCraft = r.ingredients.every(ing => available.has(ing));
-                return { ...r, canCraft, need: r.ingredients.filter(i => !available.has(i)).join('、') };
-            });
-            const d = document.createElement('div');
-            d.className = 'modal-overlay';
-            d.style.zIndex = '9998';
-            let recipeHTML = recipes.map(r => {
-                const status = r.canCraft ? '<span style="color:#3a7c3a;">✓ 可合成</span>' : '<span style="color:#9d5a3a;">✗ 缺：' + r.need + '</span>';
-                const btn = r.canCraft ? '<button class="btn-header craft-btn" data-rid="' + r.id + '">合成</button>' : '<button class="btn-header" disabled style="opacity:0.4;">材料不足</button>';
-                return '<div style="background:#fffef7;border:1.5px solid #c5b9a0;border-radius:6px;padding:10px;margin:8px 0;filter:url(#light);">' +
-                    '<div style="font-weight:bold;color:#5c4028;margin-bottom:4px;">' + r.name + ' <span style="font-weight:normal;font-size:0.75rem;color:#8a7b6a;">难度' + r.difficulty + '</span></div>' +
-                    '<div style="font-size:0.78rem;color:#5a4e3e;margin-bottom:6px;">' + r.desc + '</div>' +
-                    '<div style="font-size:0.72rem;color:#7a6b5a;margin-bottom:6px;">材料：' + r.ingredients.join(' + ') + '</div>' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center;">' +
-                    '<span style="font-size:0.72rem;">' + status + '</span>' + btn + '</div></div>';
-            }).join('');
-            d.innerHTML = '<div class="modal-panel" style="max-width:480px;max-height:80vh;overflow-y:auto;">' +
-                '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">' +
-                '<h3 style="color:#5c4028;margin:0;">🔨 合成/制造</h3>' +
-                '<button class="btn-close" id="craftClose">×</button></div>' +
-                '<div style="font-size:0.78rem;color:#7a6b5a;margin-bottom:10px;">选择一个配方进行合成，需要收集所需材料</div>' +
-                recipeHTML + '</div>';
-            document.body.appendChild(d);
-            d.querySelector('#craftClose').onclick = () => d.remove();
-            d.querySelectorAll('.craft-btn').forEach(btn => {
-                btn.onclick = () => {
-                    const rid = btn.dataset.rid;
-                    const result = tryCraft(rid);
-                    if (result.success) {
-                        tst(result.message);
-                        playSfx('levelup');
-                        d.remove();
-                        // Refresh crafting modal
-                        setTimeout(openCraftingModal, 100);
-                    } else {
-                        tst(result.message);
-                    }
-                };
-            });
-        }
-
-        // ===== 6. 事件系统 =====
-        const RANDOM_EVENTS = [
-            { id: 'ambush', name: '丧尸伏击', trigger: 'location', minDuration: 30, 
-                text: '你推开一扇破旧的门，阴暗的楼道里传来低沉的嘶吼……三只丧尸从角落扑出！', 
-                type: 'combat', difficulty: 2 },
-            { id: 'airdrop', name: '空投物资', trigger: 'time', minDuration: 120, 
-                text: '远处传来直升机的轰鸣声，一个降落伞缓缓飘落在空地上！里面可能有急需的物资。', 
-                type: 'loot', minItems: 2, maxItems: 4 },
-            { id: 'survivor', name: '幸存者求救', trigger: 'proximity', minDuration: 60, 
-                text: '不远处传来微弱的呼救声……一个衣衫褴褛的幸存者向你求助。', 
-                type: 'npc', riskLevel: 'medium' },
-            { id: 'migration', name: '尸群迁移', trigger: 'time', minDuration: 180, 
-                text: '大群丧尸正在向这个方向移动，你必须尽快做出决定——躲藏、绕行还是应战！', 
-                type: 'combat', difficulty: 3 },
-            { id: 'supply_drop', name: '遗留物资箱', trigger: 'location', minDuration: 90, 
-                text: '你在翻找一个被遗忘的角落时发现了一个尘封的物资箱！', 
-                type: 'loot', minItems: 3, maxItems: 5 },
-            { id: 'betrayal', name: '背叛事件', trigger: 'npc', minDuration: 300, 
-                text: '你的同伴趁你不备，举起了手中的武器……', 
-                type: 'combat', difficulty: 4 },
-            { id: 'discovery', name: '重要发现', trigger: 'exploration', minDuration: 60, 
-                text: '你在墙上发现了一张旧地图，上面标注着一个可能的避难所位置！', 
-                type: 'clue' },
-            { id: 'infection_spread', name: '感染扩散', trigger: 'time', minDuration: 300, 
-                text: '有消息称附近的感染范围正在扩大，你必须更加小心。', 
-                type: 'info' },
-            { id: 'good_samaritan', name: '善意行为', trigger: 'proximity', minDuration: 180, 
-                text: '一个友好的幸存者主动与你分享了有用的信息。', 
-                type: 'npc' },
-            { id: 'raider_attack', name: '掠夺者袭击', trigger: 'location', minDuration: 150, 
-                text: '一群掠夺者挡住了你的去路，他们手中的武器让你不寒而栗。', 
-                type: 'combat', difficulty: 4 },
-            { id: 'dog_stray', name: '流浪狗', trigger: 'location', minDuration: 120,
-                text: '一只瘦骨嶙峋的流浪狗摇着尾巴向你走来，似乎想要求救……是否收留？', 
-                type: 'npc', riskLevel: 'low' },
-            { id: 'cat_stray', name: '流浪猫', trigger: 'proximity', minDuration: 100,
-                text: '一只灰猫跳到你面前的箱子上，静静地看着你，喵了一声。', 
-                type: 'info' },
-            { id: 'merchant', name: '游商到访', trigger: 'time', minDuration: 200,
-                text: '一个背着大背包的游商出现在你面前，打开了他的商品，物物交换，公平交易。', 
-                type: 'npc' },
-            { id: 'old_fire', name: '远处火光', trigger: 'time', minDuration: 150,
-                text: '远方升起了一道浓烟……是有人发求救信号还是灾难现场？', 
-                type: 'clue' },
-            { id: 'power_flicker', name: '电力波动', trigger: 'location', minDuration: 80,
-                text: '远处的路灯闪烁了几下，又熄灭了……难道这个区域还有电？', 
-                type: 'clue' },
-            { id: 'lucky_find', name: '意外之财', trigger: 'exploration', minDuration: 120,
-                text: '你踩到一个软东西，低头一看——是一捆没开封的罐头！', 
-                type: 'loot', minItems: 1, maxItems: 2 },
-            { id: 'phone_ring', name: '手机铃声', trigger: 'time', minDuration: 240,
-                text: '附近传来一阵手机铃声，从一具尸体旁的包里传出……接还是不接？', 
-                type: 'clue' },
-            { id: 'bird_singing', name: '鸟群惊飞', trigger: 'proximity', minDuration: 40,
-                text: '一群乌鸦突然从树上惊飞四散……有什么东西正在接近！', 
-                type: 'combat', difficulty: 1 },
-            { id: 'music_box', name: '音乐盒', trigger: 'location', minDuration: 200,
-                text: '你在废墟中发现一个还能转动的音乐盒，清脆的旋律让你精神振奋。', 
-                type: 'buff', effect: { spirit: 15, joy: 10 } },
-            { id: 'water_source', name: '隐秘水源', trigger: 'exploration', minDuration: 160,
-                text: '你发现了一处隐蔽的山泉，水看起来很干净。', 
-                type: 'loot', minItems: 1, maxItems: 1 },
-            { id: 'photo_found', name: '老照片', trigger: 'exploration', minDuration: 90,
-                text: '一张泛黄的全家福照片，背面写着"愿家人平安"……', 
-                type: 'info' },
-            { id: 'booby_trap', name: '陷阱警报', trigger: 'location', minDuration: 120,
-                text: '你差点踩到一根细细的铁丝……这是幸存者布置的陷阱！', 
-                type: 'combat', difficulty: 2 },
-            { id: 'radio_broadcast', name: '无线电广播', trigger: 'time', minDuration: 260,
-                text: '收音机突然有信号了："……城北避难所开放……需要……幸存者……"然后又断了。', 
-                type: 'clue' },
-            { id: 'garden', name: '城市花园', trigger: 'exploration', minDuration: 140,
-                text: '你发现一处被遗忘的屋顶花园，居然还有蔬菜和水果挂着！', 
-                type: 'loot', minItems: 2, maxItems: 3 },
-            { id: 'safe_house', name: '安全屋', trigger: 'location', minDuration: 220,
-                text: '你找到一处用木板封死的小屋，从门缝里没被破坏过。里面会有什么？', 
-                type: 'loot', minItems: 2, maxItems: 4 }
-        ];
-
-        const CURRENT_SEASON = '秋季';
-        const WEATHER_EVENTS = {
-            '晴': { encounter: 0.3, combat: 0.4, loot: 0.5 },
-            '阴': { encounter: 0.4, combat: 0.5, loot: 0.4 },
-            '雨': { encounter: 0.2, combat: 0.2, loot: 0.3 },
-            '雪': { encounter: 0.2, combat: 0.2, loot: 0.2 },
-            '雾': { encounter: 0.5, combat: 0.3, loot: 0.3 },
-            '沙暴': { encounter: 0.1, combat: 0.1, loot: 0.2 },
-            '雷暴': { encounter: 0.1, combat: 0.1, loot: 0.2 }
-        };
-
-        let lastEventTime = 0;
-        let eventLog = [];
-        function checkForRandomEvent(triggerType) {
-            const s = gst();
-            const now = Date.now();
-            if (now - lastEventTime < 60000) return null;
-            const clk = gclk();
-            const weather = (clk && clk.weather) ? clk.weather : '晴';
-            const probs = WEATHER_EVENTS[weather] || WEATHER_EVENTS['晴'];
-            const location = (s && s.location) || '';
-            const locationDanger = /医院|警局|学校|仓库|工厂|地铁|商场/.test(location) ? 1.5 : 1.0;
-
-            if (Math.random() < 0.08 * locationDanger) {
-                const dayPart = clk.elapsedSec / 3600;
-                const isDaytime = (dayPart > 6 && dayPart < 22);
-                const eligible = RANDOM_EVENTS.filter(e => {
-                    // Time-triggered events only during day
-                    if (e.trigger === 'time') return isDaytime;
-                    // Proximity events only when exploring
-                    if (e.trigger === 'proximity') return triggerType === 'exploration' || triggerType === 'location' || !triggerType;
-                    return true;
-                });
-                if (!eligible.length) return null;
-                const event = eligible[Math.floor(Math.random() * eligible.length)];
-                lastEventTime = now;
-                eventLog.push({ ...event, time: now });
-                if (eventLog.length > 30) eventLog.shift();
-                addLogEntry('event', event.name + '：' + event.text);
-                playSfx('warn');
-                return event;
-            }
-            return null;
-        }
-        function triggerRandomEvent() {
-            const event = checkForRandomEvent();
-            if (event) {
-                const s = gst();
-                if (event.type === 'loot' && event.maxItems) {
-                    const lootPool = ['压缩饼干', '午餐肉罐头', '瓶装水', '绷带', '医疗包', '抗生素', '金属', '零件', '电池', '手电筒', '止痛药', '火柴', '方便面', '巧克力', '牛肉干', '9mm子弹', '5.56mm子弹', '绳子', '铁丝'];
-                    const count = Math.floor(Math.random() * (event.maxItems - (event.minItems || 1) + 1)) + (event.minItems || 1);
-                    for (let i = 0; i < count; i++) {
-                        const item = lootPool[Math.floor(Math.random() * lootPool.length)];
-                        s.inv.push(item);
-                    }
-                    sst(s);
-                    tst('🎁 ' + event.name + '！获得' + count + '件物资');
-                    playSfx('pickup');
-                } else if (event.type === 'combat') {
-                    tst('⚠️ ' + event.name + '！');
-                    playSfx('danger_alarm');
-                } else if (event.type === 'npc') {
-                    addKeyMemory(event.name + '：' + event.text, 'event');
-                    tst('👥 ' + event.name);
-                } else if (event.type === 'buff' && event.effect) {
-                    if (event.effect.spirit) s.spirit = Math.min(100, (s.spirit || 0) + event.effect.spirit);
-                    if (event.effect.joy) s.joy = Math.min(100, (s.joy || 0) + event.effect.joy);
-                    if (event.effect.hp) s.hp = Math.min(s.maxHp || 100, (s.hp || 100) + event.effect.hp);
-                    sst(s);
-                    tst('✨ ' + event.name + '！精神+' + (event.effect.spirit || 0) + ' 欢愉+' + (event.effect.joy || 0));
-                    playSfx('notify');
-                } else if (event.type === 'clue') {
-                    addBookmark(event.name, event.text);
-                    tst('📌 ' + event.name + '！已加入书签');
-                    playSfx('notify');
-                } else {
-                    tst('📢 ' + event.name);
-                }
-                addLogEntry(event.type === 'combat' ? 'system' : 'event', event.name + '：' + event.text);
-            }
-        }
-        // Seasonal event triggers
-        const SEASONAL_EVENTS = {
-            '春节': { name: '春节遭遇', text: '你发现了一个被遗弃的避难所，里面有春节的装饰和一些遗留的物资。', items: ['罐头', '烟花', '春联'] },
-            '暴雨': { name: '暴雨来袭', text: '暴雨迫使你寻找避难处，水位在不断上涨。', effect: '体温下降' },
-            '暴雪': { name: '暴风雪', text: '刺骨的寒风和大雪席卷而来，你必须找到保暖的地方。', effect: '失温风险增加' }
-        };
-        function checkSeasonalEvent() {
-            const clk = gclk();
-            const season = clk.season || '';
-            if (SEASONAL_EVENTS[season]) {
-                const ev = SEASONAL_EVENTS[season];
-                if (Math.random() < 0.05) {
-                    addLogEntry('seasonal', ev.name + '：' + ev.text);
-                    if (ev.items) {
-                        const s = gst();
-                        ev.items.forEach(it => s.inv.push(it));
-                        sst(s);
-                        tst('🎊 ' + ev.name + '！获得特殊物资');
-                    } else {
-                        tst('🌨️ ' + ev.name);
-                    }
-                }
-            }
-        }
-
-        // ===== 5. NPC 交互深度（数据已迁移至 js/npc_data.js） =====
-        const NPC_DATA = window.NPC_DATA || {};
-        const NPC_RELATIONSHIPS = window.NPC_RELATIONSHIPS || [];
-
-        function addNpcRelationship(name, trustDelta) {
-            if (!NPC_DATA[name]) return;
-            const npc = NPC_DATA[name];
-            npc.trust = Math.max(0, Math.min(100, (npc.trust || 0) + trustDelta));
-            npc.affinity = Math.max(0, Math.min(100, (npc.affinity || 0) + trustDelta * 0.7));
-        }
-
-        function getNpcDialogue(name) {
-            const npc = NPC_DATA[name];
-            if (!npc || !npc.dialogue) return name + '看了你一眼。';
-            const trust = npc.trust || 0;
-            if (trust >= (npc.unlockLevel || 70)) return npc.dialogue.high;
-            if (trust >= (npc.unlockLevel || 70) * 0.5) return npc.dialogue.mid;
-            return npc.dialogue.low;
-        }
-
-        function shouldNpcInteract(name) {
-            const npc = NPC_DATA[name];
-            if (!npc) return false;
-            const s = gst();
-            if (s.spirit < 20) return true;
-            if (s.hunger > 70) return true;
-            return Math.random() < 0.15 + (npc.trust || 0) * 0.005;
-        }
-        function getNpcDialogueOptions(name) {
-            const npc = NPC_DATA[name];
-            if (!npc) return null;
-            const trust = npc.trust || 0;
-            const options = [
-                { label: '寒暄', trustReq: 0, text: '你还好吗？最近怎么样？' },
-                { label: '赠送礼物', trustReq: 20, text: '这是我找到的一些东西，给你。' },
-                { label: '倾诉心事', trustReq: 40, text: '我最近经历了很多……想找人说说。' },
-                { label: '请求帮助', trustReq: 50, text: '我需要你的帮助，这很重要。' },
-                { label: '分享秘密', trustReq: 70, text: '我告诉你一个秘密，但你必须保密。' },
-                { label: '寻求合作', trustReq: 60, text: '我们合作吧，一起去找更好的物资。' },
-                { label: '询问过去', trustReq: 30, text: '你以前是做什么的？能告诉我你的故事吗？' },
-                { label: '保持沉默', trustReq: 0, text: '（你选择不说话，只是默默陪伴）' }
-            ];
-            const available = options.filter(o => trust >= o.trustReq);
-            return available;
-        }
-        function processNpcInteraction(npcName, choiceIndex) {
-            const npc = NPC_DATA[npcName];
-            if (!npc) return null;
-            const s = gst();
-            const options = getNpcDialogueOptions(npcName);
-            const choice = options[choiceIndex] || options[0];
-            const trustChange = (choice.trustReq > 0) ? 2 : 0;
-            const affChange = choice.trustReq > 40 ? 3 : 1;
-            addNpcRelationship(npcName, trustChange);
-            const dialog = getNpcDialogue(npcName);
-            return {
-                npc: npcName,
-                dialog: dialog,
-                choice: choice.label,
-                trustChange: trustChange,
-                affinityChange: affChange
-            };
-        }
-        function triggerNpcEncounter() {
-            const s = gst();
-            const npcRel = s.npcRel || {};
-            const allNpcs = Object.keys(NPC_DATA);
-            const available = allNpcs.filter(n => shouldNpcInteract(n));
-            if (available.length === 0) return null;
-            const npcName = available[Math.floor(Math.random() * available.length)];
-            const npc = NPC_DATA[npcName];
-            const options = getNpcDialogueOptions(npcName);
-            const dialogue = getNpcDialogue(npcName);
-            addKeyMemory('遇见' + npcName + '：' + dialogue, 'npc');
-            addLogEntry('npc', '遇见' + npcName + '：' + dialogue);
-            return { name: npcName, personality: npc.personality, dialogue: dialogue, options: options };
-        }
-
-        function openNpcPanel() {
-            const s = gst();
-            const rels = s.npcRel || {};
-            const allNpcs = Object.keys(NPC_DATA);
-            let html = '<div style="display:flex;justify-content:space-between;margin-bottom:12px;">' +
-                '<h3 style="color:#5c4028;margin:0;">👥 NPC 关系网</h3>' +
-                '<button class="btn-close" id="npcClose">×</button></div>' +
-                '<div style="font-size:0.8rem;color:#7a6b5a;margin-bottom:12px;">管理你与幸存者之间的信任与好感度</div>';
-            // NPC cards
-            html += '<div style="display:grid;grid-template-columns:1fr;gap:10px;max-height:400px;overflow-y:auto;">';
-            allNpcs.forEach(name => {
-                const npc = NPC_DATA[name];
-                const playerRel = rels[name] || { trust: npc.trust || 0, affinity: npc.affinity || 0 };
-                const trust = playerRel.trust || 0;
-                const aff = playerRel.affinity || 0;
-                let level = '陌生人';
-                if (trust >= 80) level = '挚友';
-                else if (trust >= 60) level = '好友';
-                else if (trust >= 40) level = '熟人';
-                else if (trust >= 20) level = '认识';
-                const levelColor = trust >= 60 ? '#3a7c3a' : trust >= 40 ? '#8a6b3a' : '#9d5a3a';
-                const options = getNpcDialogueOptions(name);
-                html += '<div style="background:#fffef7;border:1.5px solid #c5b9a0;border-radius:6px;padding:10px;filter:url(#light);">' +
-                    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">' +
-                        '<strong style="color:#5c4028;">' + name + '</strong>' +
-                        '<span style="font-size:0.72rem;color:' + levelColor + ';font-weight:bold;">' + level + '</span>' +
-                    '</div>' +
-                    '<div style="font-size:0.72rem;color:#7a6b5a;margin-bottom:6px;">' +
-                        npc.personality + ' · ' + npc.occupation +
-                    '</div>' +
-                    '<div style="margin-bottom:6px;">' +
-                        '<div style="font-size:0.68rem;color:#8a7b6a;margin-bottom:2px;">信任 ' + trust + '/100</div>' +
-                        '<div style="background:#e8d8b0;border-radius:3px;height:8px;overflow:hidden;"><div style="height:100%;background:#d4a03a;width:' + trust + '%;transition:width 0.3s;"></div></div>' +
-                    '</div>' +
-                    '<div style="margin-bottom:6px;">' +
-                        '<div style="font-size:0.68rem;color:#8a7b6a;margin-bottom:2px;">好感 ' + aff + '/100</div>' +
-                        '<div style="background:#e8d8b0;border-radius:3px;height:8px;overflow:hidden;"><div style="height:100%;background:#c75b3a;width:' + aff + '%;transition:width 0.3s;"></div></div>' +
-                    '</div>' +
-                    '<div style="font-size:0.7rem;color:#6a5e4e;font-style:italic;margin-bottom:6px;">"' + getNpcDialogue(name) + '"</div>' +
-                    '<div style="display:flex;flex-wrap:wrap;gap:4px;">';
-                options.slice(0, 4).forEach((opt, i) => {
-                    html += '<button class="btn-header npc-interact" data-npc="' + name + '" data-idx="' + i + '" style="font-size:0.7rem;padding:4px 8px;">' + opt.label + '</button>';
-                });
-                html += '</div></div>';
-            });
-            html += '</div>';
-            // NPC relationships
-            if (NPC_RELATIONSHIPS.length > 0) {
-                html += '<div style="margin-top:12px;padding-top:10px;border-top:1px dashed #c5b9a0;">' +
-                    '<div style="font-size:0.78rem;color:#5c4028;font-weight:bold;margin-bottom:6px;">🔗 NPC 间关系</div>';
-                NPC_RELATIONSHIPS.forEach(r => {
-                    html += '<div style="font-size:0.72rem;color:#7a6b5a;padding:2px 0;">' +
-                        r.from + ' ↔ ' + r.to + '：' + r.type + ' (亲密度 ' + r.level + ')</div>';
-                });
-                html += '</div>';
-            }
-            const d = document.createElement('div');
-            d.className = 'modal-overlay';
-            d.style.zIndex = '9998';
-            d.innerHTML = '<div class="modal-panel" style="max-width:500px;">' + html + '</div>';
-            document.body.appendChild(d);
-            d.querySelector('#npcClose').onclick = () => d.remove();
-            d.querySelectorAll('.npc-interact').forEach(btn => {
-                btn.onclick = () => {
-                    const npcName = btn.dataset.npc;
-                    const idx = parseInt(btn.dataset.idx);
-                    const result = processNpcInteraction(npcName, idx);
-                    if (result) {
-                        tst('与' + npcName + '交流：' + result.choice + ' (信任+' + result.trustChange + ')');
-                        addKeyMemory('与' + npcName + '进行' + result.choice, 'npc');
-                        playSfx('notify');
-                        d.remove();
-                        openNpcPanel(); // Refresh
-                    }
-                };
-            });
-        }
-
-        // ===== 4. AI 上下文管理 =====
-        let keyMemories = JSON.parse(localStorage.getItem('vn_keyMemories') || '[]');
-        function addKeyMemory(text, type) {
-            keyMemories.push({ text: text, type: type || 'general', time: Date.now() });
-            if (keyMemories.length > 50) keyMemories = keyMemories.slice(-50);
-            try { localStorage.setItem('vn_keyMemories', JSON.stringify(keyMemories)); } catch(e) {}
-        }
-        function getKeyMemoryContext() {
-            if (keyMemories.length === 0) return '';
-            const recent = keyMemories.slice(-10);
-            return '【关键记忆（不可遗忘）】\n' + recent.map(m => '· ' + m.text).join('\n');
-        }
-        function validateSummary(summary) {
-            if (!summary) return { valid: false, missing: keyMemories.map(m => m.text), total: keyMemories.length };
-            const keyTerms = keyMemories.map(m => m.text.slice(0, 6));
-            const missing = [];
-            keyTerms.forEach(t => {
-                if (t && !summary.includes(t)) missing.push(t);
-            });
-            return { valid: missing.length === 0, missing: missing, total: keyMemories.length };
-        }
-        // Inject keyMemories into system prompt via global variable
-        // gsp() will check window.__vnExtContext to append extended context
-        window.__vnExtContext = function() {
-            const memCtx = getKeyMemoryContext();
-            const skillCtx = getSkillContext();
-            const statusCtx = getStatusContext();
-            const npcCtx = getNpcContext();
-            return [memCtx, skillCtx, statusCtx, npcCtx].filter(Boolean).join('\n');
-        };
-        function getSkillContext() {
-            const c = gch();
-            if (!c.skills || Object.keys(c.skills).length === 0) return '';
-            const skills = Object.entries(c.skills).map(([k, v]) => k + ' Lv.' + v).join('、');
-            return '【玩家技能】' + skills;
-        }
-        function getStatusContext() {
-            const s = gst();
-            if (!s.statusEffects || Object.keys(s.statusEffects).length === 0) return '';
-            const effects = Object.values(s.statusEffects).map(se => {
-                const e = STATUS_EFFECTS[se.name];
-                if (!e) return '';
-                const timeLeft = Math.ceil(se.remaining / 60);
-                return e.icon + e.name + '(' + timeLeft + 'm)';
-            }).filter(Boolean).join('、');
-            if (!effects) return '';
-            return '【当前状态效果】' + effects + '，叙事中请体现状态影响。';
-        }
-        function getNpcContext() {
-            const s = gst();
-            if (!s.npcRel || Object.keys(s.npcRel).length === 0) return '';
-            const rels = Object.entries(s.npcRel).map(([name, data]) => {
-                const trust = data.trust || 0;
-                const aff = data.affinity || 0;
-                const npc = NPC_DATA[name];
-                const info = npc ? '（' + npc.personality + '，' + npc.occupation + '）' : '';
-                let level = '陌生人';
-                if (trust >= 80) level = '挚友';
-                else if (trust >= 60) level = '好友';
-                else if (trust >= 40) level = '熟人';
-                else if (trust >= 20) level = '认识';
-                return name + info + '：信任' + trust + '/好感' + aff + ' → ' + level;
-            }).join('；');
-            return '【NPC关系网】' + rels + '。请在对话和互动中体现关系亲疏。';
-        }
-
-        // ===== 8. 日志回顾功能 =====
-        let logEntries = [];
-        let logBookmarks = [];
-        function addLogEntry(type, text, chapterId) {
-            logEntries.push({ type: type, text: text, chapter: chapterId || 0, time: Date.now() });
-            if (logEntries.length > 500) logEntries.shift();
-        }
-        window.addLogEntry = addLogEntry;
-        function addBookmark(text, note) {
-            logBookmarks.push({ id: Date.now(), text: text, note: note || '', time: Date.now() });
-            if (logBookmarks.length > 30) logBookmarks.shift();
-            try { localStorage.setItem('vn_logBookmarks', JSON.stringify(logBookmarks)); } catch(e) {}
-        }
-        function loadBookmarks() {
-            try { logBookmarks = JSON.parse(localStorage.getItem('vn_logBookmarks') || '[]'); } catch(e) { logBookmarks = []; }
-        }
-        loadBookmarks();
-        // ===== Log viewer dedicated item preview (PC hover / mobile click) =====
-        let _logTipEl = null;
-        function _closeLogTip() {
-            if (_logTipEl) { _logTipEl.remove(); _logTipEl = null; }
-        }
-        function _showLogTip(anchorEl, info, name) {
-            _closeLogTip();
-            const tip = document.createElement('div');
-            tip.className = 'log-item-tip';
-            const lines = info.split('\n');
-            tip.innerHTML = '<div class="log-item-tip-title">' + (itemEmoji(name)) + ' ' + esc(name) + '</div>' +
-                '<div class="log-item-tip-body">' + esc(lines.slice(1).join('\n')) + '</div>';
-            document.body.appendChild(tip);
-            _logTipEl = tip;
-            const rect = anchorEl.getBoundingClientRect();
-            const tipW = Math.min(280, tip.offsetWidth || 240);
-            tip.style.width = tipW + 'px';
-            let tx = rect.left + rect.width / 2 - tipW / 2;
-            let ty = rect.top - tip.offsetHeight - 8;
-            if (tx < 8) tx = 8;
-            if (tx + tipW > window.innerWidth - 8) tx = window.innerWidth - 8 - tipW;
-            if (ty < 8) ty = rect.bottom + 8;
-            tip.style.left = tx + 'px';
-            tip.style.top = ty + 'px';
-        }
-        function attachLogItemPreview(container) {
-            if (!container) return;
-            const boldEls = container.querySelectorAll('.auto-bold');
-            boldEls.forEach(el => {
-                if (el._logTipBound) return;
-                el._logTipBound = true;
-                const name = el.textContent.trim();
-                // Use buildItemTooltipHTML via window to get item info
-                const buildTooltip = window.buildItemTooltipHTML || function() { return null; };
-                const info = buildTooltip(name);
-                if (!info) return;
-                if (hasHover) {
-                    // PC: hover to show tooltip
-                    el.style.cursor = 'help';
-                    el.addEventListener('mouseenter', () => _showLogTip(el, info, name));
-                    el.addEventListener('mouseleave', () => {
-                        // Small delay to allow moving into tooltip
-                        setTimeout(() => {
-                            if (!el._tipHover) _closeLogTip();
-                        }, 100);
-                    });
-                } else {
-                    // Mobile: click to toggle tooltip
-                    el.style.cursor = 'pointer';
-                    el.addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        if (_logTipEl && _logTipEl._anchor === el) {
-                            _closeLogTip();
-                        } else {
-                            _showLogTip(el, info, name);
-                            _logTipEl._anchor = el;
-                            const closeHandler = (ev) => {
-                                if (!_logTipEl || !_logTipEl.contains(ev.target)) {
-                                    _closeLogTip();
-                                    document.removeEventListener('click', closeHandler);
-                                }
-                            };
-                            setTimeout(() => document.addEventListener('click', closeHandler), 10);
-                        }
-                    });
-                }
-            });
-        }
-        function searchLogs(query) {
-            const q = (query || '').toLowerCase();
-            return logEntries.filter(e => e.text.toLowerCase().includes(q));
-        }
-        function openLogViewer() {
-            const d = document.createElement('div');
-            d.className = 'modal-overlay';
-            d.style.zIndex = '9998';
-            const entries = logEntries.slice(-200).reverse();
-            // Group entries by day
-            const grouped = {};
-            entries.forEach(e => {
-                const day = new Date(e.time).toLocaleDateString();
-                if (!grouped[day]) grouped[day] = [];
-                grouped[day].push(e);
-            });
-            const typeColors = {narration:'#5c4028',npc:'#6b4c7a',player:'#3a5c7a',system:'#8a6b3a',craft:'#3a7c5a',event:'#b55a3a',skill:'#5a6b8a',trauma:'#8a3a3a',achievement:'#d4a03a',kill:'#3a3a3a',seasonal:'#4a7a5a',npc_encounter:'#6b4c7a'};
-            let html = '<div style="display:flex;justify-content:space-between;margin-bottom:10px;">' +
-                '<h3 style="color:#5c4028;">📜 叙事日志</h3>' +
-                '<button class="btn-close" id="logClose">×</button></div>' +
-                '<div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;">' +
-                    '<input type="text" id="logSearch" placeholder="搜索日志/物品..." style="flex:1;padding:6px 10px;border:1.5px solid #c5b9a0;border-radius:4px;background:#fffef7;font-size:0.82rem;">' +
-                    '<button class="btn-header" id="tabBookmark" style="padding:6px 10px;font-size:0.75rem;">⭐ 书签(' + logBookmarks.length + ')</button>' +
-                '</div>' +
-                '<div id="logBookmarkList" style="display:none;max-height:150px;overflow-y:auto;margin-bottom:10px;padding:6px;background:#f5ead5;border:1px dashed #c5b9a0;border-radius:4px;font-size:0.78rem;">';
-            logBookmarks.forEach((b, i) => {
-                html += '<div style="padding:4px 6px;border-bottom:1px dashed #c5b9a0;display:flex;justify-content:space-between;align-items:center;">' +
-                    '<span style="flex:1;cursor:pointer;" data-bm="' + i + '">' + esc(b.text.slice(0, 50)) + (b.text.length > 50 ? '…' : '') + '</span>' +
-                    '<button class="btn-close" data-delbm="' + i + '" style="font-size:0.7rem;padding:2px 6px;">×</button>' +
-                    '</div>';
-            });
-            html += '</div>' +
-                '<div id="logList" style="max-height:400px;overflow-y:auto;">';
-            // Render grouped entries with item-aware text rendering
-            Object.keys(grouped).sort().reverse().forEach(day => {
-                html += '<div style="background:#f5ead5;padding:4px 8px;font-size:0.78rem;color:#8a6b3a;font-weight:bold;border-bottom:1px solid #c5b9a0;position:sticky;top:0;z-index:1;">📅 ' + day + '</div>';
-                grouped[day].forEach(e => {
-                    const time = new Date(e.time);
-                    const t = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
-                    const typeLabel = {narration:'叙事',npc:'NPC',player:'玩家',system:'系统',craft:'合成',event:'事件',skill:'技能',trauma:'创伤',achievement:'成就',kill:'击杀',seasonal:'季节',npc_encounter:'遭遇'}[e.type] || e.type;
-                    const typeColor = typeColors[e.type] || '#8a6b3a';
-                    const isBookmarked = logBookmarks.some(b => b.text === e.text);
-                    const displayText = e.text.length > 150 ? e.text.slice(0, 150) + '…' : e.text;
-                    const isTruncated = e.text.length > 150;
-                    html += '<div class="log-entry" style="padding:6px 8px;border-bottom:1px dashed #c5b9a0;font-size:0.78rem;display:flex;gap:6px;align-items:flex-start;cursor:pointer;" data-text="' + esc(e.text.replace(/"/g, '&quot;')) + '" data-fulltext="' + esc(e.text.replace(/"/g, '&quot;')) + '">' +
-                        '<span style="color:#b58b5a;font-size:0.7rem;white-space:nowrap;flex-shrink:0;">' + t + '</span>' +
-                        '<span style="background:#e8d8b0;padding:0 4px;border-radius:2px;font-size:0.65rem;color:' + typeColor + ';white-space:nowrap;flex-shrink:0;">' + typeLabel + '</span>' +
-                        '<span class="log-text" style="flex:1;min-width:0;line-height:1.5;">' + abold(displayText) + (isTruncated ? '<span class="log-expand-hint" style="color:#b58b5a;font-size:0.65rem;margin-left:4px;">展开</span>' : '') + '</span>' +
-                        '<span class="bm-btn" style="cursor:pointer;font-size:0.8rem;flex-shrink:0;' + (isBookmarked ? 'color:#d4a03a;' : 'color:#ccc;') + '">⭐</span>' +
-                        '</div>';
-                });
-            });
-            html += '</div>';
-            d.innerHTML = '<div class="modal-panel log-viewer-panel" style="max-width:680px;">' + html + '</div>';
-            document.body.appendChild(d);
-            const listEl = d.querySelector('#logList');
-            const bookmarkList = d.querySelector('#logBookmarkList');
-            const tabBtn = d.querySelector('#tabBookmark');
-            d.querySelector('#logClose').onclick = () => d.remove();
-            // Bind item preview after DOM insertion (PC hover / mobile click)
-            attachLogItemPreview(listEl);
-            // Bookmark tab toggle
-            tabBtn.onclick = () => {
-                bookmarkList.style.display = bookmarkList.style.display === 'none' ? 'block' : 'none';
-            };
-            // Bookmark item click to jump
-            bookmarkList.querySelectorAll('[data-bm]').forEach(el => {
-                el.onclick = () => {
-                    const idx = parseInt(el.dataset.bm);
-                    const bm = logBookmarks[idx];
-                    if (bm) {
-                        const items = listEl.querySelectorAll('[data-text]');
-                        items.forEach(item => {
-                            if (item.dataset.text === bm.text.replace(/"/g, '&quot;')) {
-                                item.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                                item.style.background = '#fff5d6';
-                                setTimeout(() => { item.style.background = ''; }, 1500);
-                            }
-                        });
-                    }
-                };
-            });
-            // Delete bookmark
-            bookmarkList.querySelectorAll('[data-delbm]').forEach(el => {
-                el.onclick = () => {
-                    const idx = parseInt(el.dataset.delbm);
-                    logBookmarks.splice(idx, 1);
-                    try { localStorage.setItem('vn_logBookmarks', JSON.stringify(logBookmarks)); } catch(e) {}
-                    openLogViewer();
-                };
-            });
-            // Star click to bookmark
-            listEl.querySelectorAll('.bm-btn').forEach(btn => {
-                btn.onclick = (ev) => {
-                    ev.stopPropagation();
-                    const parent = btn.closest('[data-text]');
-                    if (!parent) return;
-                    const text = parent.dataset.text;
-                    const existing = logBookmarks.find(b => b.text === text);
-                    if (existing) {
-                        logBookmarks = logBookmarks.filter(b => b.text !== text);
-                        btn.style.color = '#ccc';
-                    } else {
-                        addBookmark(text, '');
-                        btn.style.color = '#d4a03a';
-                        tst('⭐ 已添加书签');
-                    }
-                    try { localStorage.setItem('vn_logBookmarks', JSON.stringify(logBookmarks)); } catch(e) {}
-                };
-            });
-            // Click log entry to expand/collapse full text
-            listEl.querySelectorAll('.log-entry').forEach(entry => {
-                entry.addEventListener('click', () => {
-                    const fullText = entry.dataset.fulltext || '';
-                    const textSpan = entry.querySelector('.log-text');
-                    if (!textSpan) return;
-                    if (entry._expanded) {
-                        // Collapse
-                        entry._expanded = false;
-                        const shortText = fullText.length > 150 ? fullText.slice(0, 150) + '…' : fullText;
-                        textSpan.innerHTML = abold(shortText) + '<span class="log-expand-hint" style="color:#b58b5a;font-size:0.65rem;margin-left:4px;">展开</span>';
-                    } else {
-                        // Expand
-                        entry._expanded = true;
-                        textSpan.innerHTML = abold(fullText) + '<span class="log-expand-hint" style="color:#b58b5a;font-size:0.65rem;margin-left:4px;">收起</span>';
-                    }
-                    attachLogItemPreview(entry);
-                });
-            });
-            // Search with item-aware rendering
-            d.querySelector('#logSearch').oninput = (ev) => {
-                const q = ev.target.value.toLowerCase();
-                listEl.style.display = 'block';
-                if (!q) {
-                    // Reset to grouped view
-                    let resetHtml = '';
-                    Object.keys(grouped).sort().reverse().forEach(day => {
-                        resetHtml += '<div style="background:#f5ead5;padding:4px 8px;font-size:0.78rem;color:#8a6b3a;font-weight:bold;border-bottom:1px solid #c5b9a0;">📅 ' + day + '</div>';
-                        grouped[day].forEach(e => {
-                            const time = new Date(e.time);
-                            const t = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
-                            const typeLabel = {narration:'叙事',npc:'NPC',player:'玩家',system:'系统',craft:'合成',event:'事件',skill:'技能',trauma:'创伤',achievement:'成就',kill:'击杀'}[e.type] || e.type;
-                            const typeColor = typeColors[e.type] || '#8a6b3a';
-                            const displayText = e.text.length > 150 ? e.text.slice(0, 150) + '…' : e.text;
-                            resetHtml += '<div class="log-entry" style="padding:6px 8px;border-bottom:1px dashed #c5b9a0;font-size:0.78rem;display:flex;gap:6px;align-items:flex-start;cursor:pointer;" data-text="' + esc(e.text.replace(/"/g, '&quot;')) + '" data-fulltext="' + esc(e.text.replace(/"/g, '&quot;')) + '">' +
-                                '<span style="color:#b58b5a;font-size:0.7rem;white-space:nowrap;flex-shrink:0;">' + t + '</span>' +
-                                '<span style="background:#e8d8b0;padding:0 4px;border-radius:2px;font-size:0.65rem;color:' + typeColor + ';white-space:nowrap;flex-shrink:0;">' + typeLabel + '</span>' +
-                                '<span class="log-text" style="flex:1;min-width:0;line-height:1.5;">' + abold(displayText) + '</span>' +
-                                '</div>';
-                        });
-                    });
-                    listEl.innerHTML = resetHtml;
-                    attachLogItemPreview(listEl);
-                    // Rebind click handlers
-                    listEl.querySelectorAll('.log-entry').forEach(entry => {
-                        entry.addEventListener('click', () => {
-                            const fullText = entry.dataset.fulltext || '';
-                            const textSpan = entry.querySelector('.log-text');
-                            if (!textSpan) return;
-                            if (entry._expanded) {
-                                entry._expanded = false;
-                                const shortText = fullText.length > 150 ? fullText.slice(0, 150) + '…' : fullText;
-                                textSpan.innerHTML = abold(shortText);
-                            } else {
-                                entry._expanded = true;
-                                textSpan.innerHTML = abold(fullText);
-                            }
-                            attachLogItemPreview(entry);
-                        });
-                    });
-                } else {
-                    const filtered = logEntries.filter(e => e.text.toLowerCase().includes(q)).reverse();
-                    listEl.innerHTML = filtered.map(e => {
-                        const time = new Date(e.time);
-                        const t = time.getHours().toString().padStart(2,'0') + ':' + time.getMinutes().toString().padStart(2,'0');
-                        const typeLabel = {narration:'叙事',npc:'NPC',player:'玩家',system:'系统',craft:'合成',event:'事件',skill:'技能',trauma:'创伤',achievement:'成就',kill:'击杀'}[e.type] || e.type;
-                        const typeColor = typeColors[e.type] || '#8a6b3a';
-                        const displayText = e.text.length > 300 ? e.text.slice(0, 300) + '…' : e.text;
-                        return '<div class="log-entry" style="padding:6px 8px;border-bottom:1px dashed #c5b9a0;font-size:0.78rem;display:flex;gap:6px;align-items:flex-start;cursor:pointer;" data-text="' + esc(e.text.replace(/"/g, '&quot;')) + '" data-fulltext="' + esc(e.text.replace(/"/g, '&quot;')) + '">' +
-                            '<span style="color:#b58b5a;font-size:0.7rem;white-space:nowrap;flex-shrink:0;">' + t + '</span>' +
-                            '<span style="background:#e8d8b0;padding:0 4px;border-radius:2px;font-size:0.65rem;color:' + typeColor + ';white-space:nowrap;flex-shrink:0;">' + typeLabel + '</span>' +
-                            '<span class="log-text" style="flex:1;min-width:0;line-height:1.5;">' + abold(displayText) + '</span>' +
-                            '</div>';
-                    }).join('');
-                    attachLogItemPreview(listEl);
-                    // Rebind click handlers
-                    listEl.querySelectorAll('.log-entry').forEach(entry => {
-                        entry.addEventListener('click', () => {
-                            const fullText = entry.dataset.fulltext || '';
-                            const textSpan = entry.querySelector('.log-text');
-                            if (!textSpan) return;
-                            if (entry._expanded) {
-                                entry._expanded = false;
-                                const shortText = fullText.length > 300 ? fullText.slice(0, 300) + '…' : fullText;
-                                textSpan.innerHTML = abold(shortText);
-                            } else {
-                                entry._expanded = true;
-                                textSpan.innerHTML = abold(fullText);
-                            }
-                            attachLogItemPreview(entry);
-                        });
-                    });
-                }
-            };
-        }
-
-        // ===== 9. 成就系统 =====
-        // 成就数据已迁移至 js/achievements.js
-        const ACHIEVEMENTS = window.ACHIEVEMENTS || [];
-        const ACH_KEY = 'vn_achievements';
-        const unlockedAchievements = new Set();
-        // 从localStorage加载已解锁成就，避免刷新后重复弹出
-        try {
-            const saved = localStorage.getItem(ACH_KEY);
-            if (saved) {
-                JSON.parse(saved).forEach(id => unlockedAchievements.add(id));
-            }
-        } catch(e) {}
-        function saveAchievements() {
-            try {
-                localStorage.setItem(ACH_KEY, JSON.stringify([...unlockedAchievements]));
-            } catch(e) {}
-        }
-        function checkAchievements() {
-            ACHIEVEMENTS.forEach(a => {
-                if (!unlockedAchievements.has(a.id) && a.check()) {
-                    unlockedAchievements.add(a.id);
-                    saveAchievements();
-                    tst('🏆 成就解锁：' + a.name + ' — ' + a.desc);
-                    playSfx('levelup');
-                    addLogEntry('achievement', '成就解锁：' + a.name);
-                    logEvent('achievement', '成就解锁：' + a.name);
-                }
-            });
-        }
-        // 渲染成就面板
-        function renderAchievementsPanel() {
-            const list = $('achievementsList');
-            if (!list) return;
-            list.innerHTML = '';
-            ACHIEVEMENTS.forEach(a => {
-                const unlocked = unlockedAchievements.has(a.id);
-                const el = document.createElement('div');
-                el.className = 'achievement-item' + (unlocked ? '' : ' locked');
-                el.innerHTML = '<div class="ach-icon">' + a.icon + '</div>' +
-                    '<div class="ach-info">' +
-                    '<div class="ach-name">' + esc(a.name) + (unlocked ? ' ✓' : ' 🔒') + '</div>' +
-                    '<div class="ach-desc">' + esc(a.desc) + '</div>' +
-                    '</div>';
-                list.appendChild(el);
-            });
-        }
-        // 事件记录存储（用于事件面板显示）
-        let eventDisplayLog = [];
-        function logEvent(type, text) {
-            const clk = gclk();
-            eventDisplayLog.unshift({ type, text, time: fmtTime(clk.elapsedSec) + ' D' + (clk.day || 1) });
-            if (eventDisplayLog.length > 50) eventDisplayLog.pop();
-        }
-        window.logEvent = logEvent;
-        // 渲染事件面板
-        function renderEventsPanel() {
-            const list = $('eventsList');
-            if (!list) return;
-            if (eventDisplayLog.length === 0) {
-                list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">暂无突发事件记录</div>';
-                return;
-            }
-            list.innerHTML = '';
-            eventDisplayLog.forEach(e => {
-                const el = document.createElement('div');
-                el.className = 'event-item';
-                el.innerHTML = '<div class="ev-time">' + esc(e.time) + '</div>' + esc(e.text);
-                list.appendChild(el);
-            });
-        }
-
-        // Check achievements periodically
-        setInterval(checkAchievements, 15000);
-
-        // ===== 突发事件系统 =====
-        // 事件触发器数据已迁移至 js/events.js
-        const EVENT_TRIGGERS = window.EVENT_TRIGGERS || {};
-
-        function checkRandomEvents() {
-            const s = gst();
-            const clk = gclk();
-            if (!s || cfg().debug) return;
-            Object.values(EVENT_TRIGGERS).forEach(fn => {
-                try { fn(s, clk); } catch(e) {}
-            });
-        }
-
-        // Check events periodically
-        setInterval(checkRandomEvents, 30000);
-
-        // ===== 7. 存档导出/导入 =====
-        function exportSave() {
-            const data = {
-                cfg: cfg(),
-                chr: gch(),
-                sta: gst(),
-                clk: gclk(),
-                sbx: gsbx(),
-                hist: _getHist(),
-                exportTime: new Date().toISOString(),
-                version: '2.0'
-            };
-            const json = JSON.stringify(data, null, 2);
-            const blob = new Blob([json], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'ZDay存档_' + new Date().toISOString().slice(0,10) + '.json';
-            a.click();
-            URL.revokeObjectURL(url);
-            tst('存档已导出');
-            playSfx('success');
-        }
-
-        function importSave(file) {
-            const reader = new FileReader();
-            reader.onload = async (e) => {
-                try {
-                    const data = JSON.parse(e.target.result);
-                    if (!data.cfg || !data.sta) throw new Error('存档文件格式错误');
-                    stopIdle();
-                    // Cross-player detection
-                    const curChr = gch();
-                    const bkChr = data.chr || {};
-                    const bkName = bkChr.cn || bkChr.characterName || '未知角色';
-                    const curName = curChr.cn || curChr.characterName || '当前角色';
-                    if (bkName !== curName) {
-                        if (!await sketchConfirm('⚠️ 检测到这不是当前玩家的存档！\n\n当前角色：' + curName + '\n备份角色：' + bkName + '\n\n这是来自另一个玩家/角色的存档，将完全覆盖当前进度。\n\n确定要继续导入吗？此操作不可撤销！')) return;
-                    }
-                    if (!await sketchConfirm('确定要导入该存档吗？当前所有进度将被覆盖。此操作不可撤销。')) return;
-                    if (data.hist) _setHist(data.hist);
-                    if (data.sta) { sst(migrateSta(data.sta)); }
-                    if (data.chr) sch(migrateChr(data.chr));
-                    if (data.clk) sclk(data.clk);
-                    if (data.sbx) { _setSbx(mergeSbx(data.sbx)); ssbx(_getSbx()); }
-                    if (data.cfg) scf(migrateCfg(data.cfg));
-                    if (data.hist) svh(data.hist);
-                    rbt(); upui();
-                    tst('存档已导入');
-                    playSfx('levelup');
-                } catch(err) {
-                    tst('导入失败：' + err.message);
-                    playSfx('fail');
-                }
-            };
-            reader.readAsText(file);
-        }
-
-        function openImportDialog() {
-            const d = document.createElement('div');
-            d.className = 'modal-overlay';
-            d.style.zIndex = '9998';
-            d.innerHTML = '<div class="modal-panel" style="max-width:360px;text-align:center;">' +
-                '<h3 style="color:#5c4028;margin-bottom:10px;">📥 导入存档</h3>' +
-                '<p style="font-size:0.82rem;margin-bottom:16px;">选择之前导出的 JSON 存档文件</p>' +
-                '<input type="file" id="importFile" accept=".json" style="margin-bottom:16px;">' +
-                '<div style="display:flex;gap:8px;justify-content:center;">' +
-                '<button class="btn-header" id="importCancel">取消</button>' +
-                '<button class="btn-header" id="importOk" style="background:#3a7c3a;color:#fff;">导入</button>' +
-                '</div></div>';
-            document.body.appendChild(d);
-            d.querySelector('#importCancel').onclick = () => d.remove();
-            d.querySelector('#importOk').onclick = () => {
-                const file = d.querySelector('#importFile').files[0];
-                if (!file) { tst('请选择一个JSON文件'); return; }
-                d.remove();
-                importSave(file);
-            };
-        }
-
-        // ===== 11. 多结局系统 =====
-        const ENDING_CONDITIONS = [
-            { id: 'hero', name: '英雄结局', icon: '🏆', color: '#d4a03a',
-                intro: '你成为了末日中的传奇英雄。',
-                detail: '在{days}天的求生中，你消灭了{kills}个敌人，拯救了{trust}名幸存者。你以无畏的勇气和坚定的信念，在废墟中建立起新的秩序。',
-                poem: '"在黑暗中，你是那道最后的光芒。"',
-                requirement: '存活30天以上，信任3个以上NPC，击杀>20' },
-            { id: 'leader', name: '领袖结局', icon: '👑', color: '#3a7c3a',
-                intro: '你成为了幸存者们的领袖。',
-                detail: '在{days}天的磨难中，你身边聚集了{trust}名忠实的伙伴。你的每一个决定都影响着他们的生死。',
-                poem: '"追随你的人不会迷失方向。"',
-                requirement: '存活20天以上，拥有2名以上高信任NPC' },
-            { id: 'solo', name: '独行结局', icon: '🌙', color: '#8a5a3a',
-                intro: '你独自在末日中生存。',
-                detail: '在{days}天的独处中，你学会了只有自己才能依靠。孤独是你的挚友，警觉是你的铠甲。',
-                poem: '"独自一人，也可以是一种力量。"',
-                requirement: '存活15天以上，独自生存' },
-            { id: 'tragedy', name: '悲剧结局', icon: '💀', color: '#5a5a5a',
-                intro: '你的故事在第{days}天戛然而止。',
-                detail: '末日从不怜悯任何人。你的挣扎最终化为尘埃，成为这片废墟中无数沉默的故事之一。',
-                poem: '"我们都是末日的过客。"',
-                requirement: '存活不足15天' },
-            { id: 'escape', name: '逃离结局', icon: '🚁', color: '#3a5a9d',
-                intro: '你成功逃离了这片废墟！',
-                detail: '经过{days}天的艰苦跋涉，你终于抵达了安全区。身上带着{kills}个敌人的战绩和{inv}件珍贵的物资。',
-                poem: '"新生，从今天开始。"',
-                requirement: '发现避难所并存活20天' },
-            { id: 'betrayal', name: '背叛结局', icon: '🗡️', color: '#9d3a3a',
-                intro: '你被最信任的人背叛了。',
-                detail: '在{days}天的共患难后，{betrayer}在关键时刻选择了背叛。这个世界上，信任是最奢侈的东西。',
-                poem: '"地狱空荡荡，恶魔在人间。"',
-                requirement: 'NPC背叛事件' },
-            { id: 'savior', name: '救世主结局', icon: '✨', color: '#d4a03a',
-                intro: '你拯救了整个避难所！',
-                detail: '在{days}天的战斗中，你带领幸存者们击退了尸潮，守住了家园。你的名字将被永远铭记。',
-                poem: '"救世主从未独行。"',
-                requirement: '击退大规模尸潮' }
-        ];
-        function calculateEnding() {
-            const s = gst();
-            const c = gch();
-            const clk = gclk();
-            const days = clk.day || 0;
-            const kills = s.totalKills || 0;
-            const trustCount = Object.values(NPC_DATA).filter(n => n.trust >= 60).length;
-            const morality = c.morality || 'survival-first';
-            const hasBetrayal = s.traumas && s.traumas.some(t => t.includes('背叛'));
-            if (hasBetrayal) return ENDING_CONDITIONS[5];
-            if (days >= 30 && trustCount >= 3 && kills > 20) return ENDING_CONDITIONS[0];
-            if (days >= 20 && trustCount >= 2) return ENDING_CONDITIONS[1];
-            if (days >= 15 && kills > 15) return ENDING_CONDITIONS[6];
-            if (days >= 15) return ENDING_CONDITIONS[2];
-            return ENDING_CONDITIONS[3];
-        }
-
-        function showEndingScreen() {
-            const ending = calculateEnding();
-            const c = gch();
-            const clk = gclk();
-            const s = gst();
-            const days = clk.day || 0;
-            const kills = s.totalKills || 0;
-            const invCount = (s.inv || []).length;
-            const trustCount = Object.values(NPC_DATA).filter(n => n.trust >= 60).length;
-            let detail = ending.detail
-                .replace('{days}', days)
-                .replace('{kills}', kills)
-                .replace('{trust}', trustCount)
-                .replace('{inv}', invCount)
-                .replace('{betrayer}', s.npcRel ? Object.keys(s.npcRel)[0] || '某人' : '某人');
-            const d = document.createElement('div');
-            d.className = 'modal-overlay';
-            d.style.zIndex = '10000';
-            d.innerHTML = '<div class="modal-panel" style="max-width:520px;text-align:center;padding:40px 30px;background:#fffef7;border:2px solid ' + ending.color + ';">' +
-                '<div style="font-size:4rem;margin-bottom:16px;filter:url(#mid);">' + ending.icon + '</div>' +
-                '<h2 style="color:' + ending.color + ';margin-bottom:12px;filter:url(#mid);font-size:1.8rem;">' + ending.name + '</h2>' +
-                '<p style="font-size:1rem;color:#5a4e3e;margin-bottom:8px;font-weight:bold;">' + ending.intro.replace('{days}', days) + '</p>' +
-                '<p style="font-size:0.88rem;color:#6a5e4e;margin-bottom:16px;line-height:1.8;">' + detail + '</p>' +
-                '<blockquote style="border-left:3px solid ' + ending.color + ';padding-left:12px;color:' + ending.color + ';font-style:italic;margin:12px 0;font-size:0.9rem;">' + ending.poem + '</blockquote>' +
-                '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0;font-size:0.82rem;color:#7a6b5a;">' +
-                    '<div>存活天数: <strong>' + days + '</strong></div>' +
-                    '<div>击杀敌人: <strong>' + kills + '</strong></div>' +
-                    '<div>物资收集: <strong>' + invCount + '</strong></div>' +
-                    '<div>信任伙伴: <strong>' + trustCount + '</strong></div>' +
-                '</div>' +
-                '<button class="btn-header" id="endingRestart" style="background:' + ending.color + ';color:#fff;margin-top:12px;">重新开始</button>' +
-                '</div>';
-            document.body.appendChild(d);
-            playSfx('ending');
-            d.querySelector('#endingRestart').onclick = () => {
-                d.remove();
-                stg();
-                location.reload();
-            };
-        }
-
-        // ===== 音效扩展 =====
-        const sfxExt = {
-            'craft': { freq: [440, 660, 880], type: 'triangle', dur: 0.08, vol: 0.35 },
-            'counter': { freq: 330, type: 'square', dur: 0.15, vol: 0.3 },
-            'hurt': { freq: 220, type: 'sawtooth', dur: 0.2, vol: 0.4 },
-            'status': { freq: 880, type: 'sine', dur: 0.08, vol: 0.25 },
-            'success': { freq: [523, 659, 784], type: 'sine', dur: 0.12, vol: 0.35 },
-            'ending': { freq: [262, 330, 392, 523], type: 'sine', dur: 0.3, vol: 0.3 },
-            'ambient_night': { type: 'loop', freq: 80, vol: 0.08 },
-            'ambient_rain': { type: 'noise', vol: 0.1 },
-            'ambient_wind': { type: 'noise', vol: 0.05 },
-            'ambient_thunder': { freq: 80, type: 'sawtooth', dur: 0.8, vol: 0.4 },
-            'ui_click': { freq: 600, type: 'sine', dur: 0.03, vol: 0.2 },
-            'ui_hover': { freq: 1000, type: 'sine', dur: 0.02, vol: 0.1 },
-            'ui_alert': { freq: [600, 800], type: 'sine', dur: 0.1, vol: 0.3 },
-            'footstep': { freq: 200, type: 'triangle', dur: 0.05, vol: 0.15 },
-            'door': { freq: 150, type: 'sawtooth', dur: 0.15, vol: 0.25 },
-            'danger_alarm': { freq: [400, 200, 400, 200], type: 'square', dur: 0.15, vol: 0.4 }
-        };
-
-        // Update original playSfx to route through sfxExt first
-        window.playSfx = function(type) {
-            if (!window.audioCtx) {
-                try { window.audioCtx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return; }
-            }
-            if (!window.audioCtx) return;
-            if (sfxExt[type]) {
-                const conf = sfxExt[type];
-                if (conf.type === 'loop' || conf.type === 'noise') {
-                    playNoiseAmbient(conf);
-                    return;
-                }
-                if (Array.isArray(conf.freq)) {
-                    conf.freq.forEach((f, i) => {
-                        setTimeout(() => playTone(f, conf.dur, conf.type, conf.vol), i * 80);
-                    });
-                } else if (conf.freq !== undefined) {
-                    playTone(conf.freq, conf.dur, conf.type, conf.vol);
-                }
-                return;
-            }
-            // Default sounds
-            const defaults = {
-                'click': () => playTone(800, 0.05, 'sine', 0.4),
-                'send': () => { playTone(600, 0.08, 'triangle', 0.4); setTimeout(() => playTone(800, 0.06, 'triangle', 0.3), 40); },
-                'notify': () => playTone(1200, 0.1, 'sine', 0.35),
-                'warn': () => playTone(300, 0.15, 'sawtooth', 0.4),
-                'danger': () => { playTone(200, 0.25, 'sawtooth', 0.5); setTimeout(() => playTone(150, 0.2, 'sawtooth', 0.4), 100); },
-                'victory': () => { playTone(523, 0.12, 'sine', 0.4); setTimeout(() => playTone(659, 0.12, 'sine', 0.4), 100); setTimeout(() => playTone(784, 0.2, 'sine', 0.4), 200); },
-                'levelup': () => { playTone(440, 0.1, 'sine', 0.4); setTimeout(() => playTone(554, 0.1, 'sine', 0.4), 80); setTimeout(() => playTone(659, 0.15, 'sine', 0.4), 160); setTimeout(() => playTone(880, 0.25, 'sine', 0.4), 240); },
-                'pickup': () => { playTone(1000, 0.06, 'sine', 0.35); setTimeout(() => playTone(1300, 0.08, 'sine', 0.3), 50); },
-                'drop': () => playTone(300, 0.15, 'triangle', 0.35),
-                'heal': () => { playTone(500, 0.2, 'sine', 0.3); setTimeout(() => playTone(700, 0.25, 'sine', 0.3), 100); },
-                'equip': () => { playTone(700, 0.08, 'square', 0.25); setTimeout(() => playTone(500, 0.12, 'square', 0.2), 60); },
-                'fail': () => { playTone(300, 0.15, 'sawtooth', 0.35); setTimeout(() => playTone(200, 0.25, 'sawtooth', 0.3), 100); },
-                'tab': () => playTone(1000, 0.03, 'sine', 0.2),
-                'open': () => playTone(400, 0.06, 'sine', 0.3),
-                'close': () => playTone(300, 0.05, 'sine', 0.25)
-            };
-            if (defaults[type]) defaults[type]();
-        };
-
-        // Noise-based ambient sounds
-        let ambientNode = null;
-        let ambientGain = null;
-        function playNoiseAmbient(conf) {
-            if (!window.audioCtx) return;
-            if (ambientNode) {
-                try { ambientNode.stop(); } catch(e) {}
-                ambientNode = null;
-            }
-            const ctx = window.audioCtx;
-            if (conf.type === 'loop' && conf.freq) {
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = 'sine';
-                osc.frequency.value = conf.freq;
-                gain.gain.value = conf.vol;
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                ambientNode = osc;
-                ambientGain = gain;
-            } else if (conf.type === 'noise') {
-                const bufferSize = ctx.sampleRate * 2;
-                const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-                const data = buffer.getChannelData(0);
-                for (let i = 0; i < bufferSize; i++) {
-                    data[i] = Math.random() * 2 - 1;
-                }
-                const source = ctx.createBufferSource();
-                source.buffer = buffer;
-                source.loop = true;
-                const gain = ctx.createGain();
-                gain.gain.value = conf.vol;
-                const filter = ctx.createBiquadFilter();
-                filter.type = 'lowpass';
-                filter.frequency.value = 800;
-                source.connect(filter);
-                filter.connect(gain);
-                gain.connect(ctx.destination);
-                source.start();
-                ambientNode = source;
-                ambientGain = gain;
-            }
-        }
-        function stopAmbient() {
-            if (ambientNode) {
-                try { ambientNode.stop(); } catch(e) {}
-                ambientNode = null;
-            }
-        }
-
-        function triggerDeathEnding(s) {
-            if (s.deathProcessed) return;
-            s.deathProcessed = true;
-            playSfx('death');
-            // Show death notification
-            const deathReasons = [
-                '你因伤势过重而倒下...',
-                '失血过多，意识逐渐模糊...',
-                '感染的伤口最终夺走了你的生命...',
-                '寒冷的天气让你永远睡去...',
-                '饥饿和疲劳最终击垮了你...'
-            ];
-            const reason = deathReasons[Math.floor(Math.random() * deathReasons.length)];
-            // Add death scene to log
-            addLogEntry('system', '【死亡结局】' + reason + ' 你存活了' + (gclk().day || 1) + '天。');
-            // Show ending modal after delay
-            setTimeout(() => {
-                generateDeathEnding(s, reason);
-            }, 2000);
-        }
-        function generateDeathEnding(s, reason) {
-            // Save death location for easter egg
-            const deathLocation = s.location || '废弃公寓';
-            const deathDay = gclk().day || 1;
-            const deathKills = s.totalKills || 0;
-            const deathClues = (s.clues && s.clues.length) || 0;
-            // Store death info for new character easter egg
-            try {
-                localStorage.setItem('dz_death_info', JSON.stringify({
-                    location: deathLocation,
-                    day: deathDay,
-                    kills: deathKills,
-                    clues: deathClues,
-                    reason: reason,
-                    timestamp: Date.now()
-                }));
-            } catch(e) {}
-
-            const d = document.createElement('div');
-            d.className = 'modal-overlay';
-            d.style.zIndex = '10005';
-            d.innerHTML = '<div class="modal-panel" style="max-width:400px;text-align:center;padding:30px 24px;">' +
-                '<div style="font-size:2.5rem;margin-bottom:12px;">💀</div>' +
-                '<h3 style="color:var(--color-danger);margin-bottom:12px;">末日终结</h3>' +
-                '<p style="font-size:0.82rem;color:var(--ink-soft);line-height:1.6;margin-bottom:16px;">' +
-                    esc(reason) + '<br><br>' +
-                    '存活天数：' + deathDay + ' 天<br>' +
-                    '击杀数：' + deathKills + '<br>' +
-                    '解锁线索：' + deathClues + ' 条<br>' +
-                    '死亡地点：' + esc(deathLocation) +
-                '</p>' +
-                '<div style="font-size:0.7rem;color:var(--text-muted);margin-bottom:16px;">' +
-                    '"在这片废墟中，你的故事画上了句号。但末日仍在继续..."' +
-                '</div>' +
-                '<div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">' +
-                    '<button class="btn-header accent" id="deathNewChar" style="width:100%;">创建新角色</button>' +
-                    '<button class="btn-header" id="deathLoadSave" style="width:100%;">读取最近存档</button>' +
-                    '<button class="btn-header" id="deathViewStats" style="width:100%;font-size:0.7rem;">查看结局统计</button>' +
-                '</div>' +
-            '</div>';
-            document.body.appendChild(d);
-            // Create new character
-            d.querySelector('#deathNewChar').onclick = () => {
-                d.remove();
-                ccb();
-                sst(JSON.parse(JSON.stringify(DSTA)));
-                svh([]);
-                stopIdle();
-                rbt(); upui();
-                // Clear death flag so new character can die
-                const newSta = gst();
-                if (newSta) { newSta.deathShown = false; newSta.deathProcessed = false; sst(newSta); }
-                $('charModal').style.display = 'flex';
-                tst('新角色已创建。前一个角色的死亡地点：' + deathLocation);
-            };
-            // Load most recent save
-            d.querySelector('#deathLoadSave').onclick = () => {
-                d.remove();
-                // Try to load from slot 0 (auto-save) or most recent
-                const saves = [];
-                for (let i = 0; i < 10; i++) {
-                    try {
-                        const data = localStorage.getItem('dz_sav_' + i);
-                        if (data) {
-                            const parsed = JSON.parse(data);
-                            saves.push({ slot: i, data: parsed, time: parsed.saveTime || 0 });
-                        }
-                    } catch(e) {}
-                }
-                if (saves.length === 0) {
-                    tst('没有可用的存档');
-                    return;
-                }
-                // Sort by time descending, get most recent
-                saves.sort((a, b) => (b.time || 0) - (a.time || 0));
-                const recent = saves[0];
-                try {
-                    const data = recent.data;
-                    if (data.sta) {
-                        const loadedSta = JSON.parse(data.sta);
-                        loadedSta.deathShown = false;
-                        loadedSta.deathProcessed = false;
-                        sst(loadedSta);
-                    }
-                    if (data.chr) sch(JSON.parse(data.chr));
-                    if (data.clk) sclk(JSON.parse(data.clk));
-                    if (data.cfg) scf(JSON.parse(data.cfg));
-                    if (data.hist) svh(JSON.parse(data.hist));
-                    rbt(); upui();
-                    tst('已从槽位' + recent.slot + '读取存档');
-                } catch(e) {
-                    tst('读取存档失败：' + e.message);
-                }
-            };
-            // View ending stats
-            d.querySelector('#deathViewStats').onclick = () => {
-                d.remove();
-                showEndingScreen();
-            };
-        }
-
-        // ===== 全局初始化 =====
-        window.GameSystems = {
-            applyStatusEffect, tickStatusEffects, STATUS_EFFECTS,
-            processCombatRound, calculateDamage, WEAPON_DATA,
-            tryCraft, openCraftingModal, getCraftingRecipes, CRAFT_RECIPES,
-            checkForRandomEvent, triggerRandomEvent, checkSeasonalEvent, RANDOM_EVENTS,
-            addNpcRelationship, getNpcDialogue, getNpcDialogueOptions, processNpcInteraction, triggerNpcEncounter, openNpcPanel,
-            NPC_DATA, NPC_RELATIONSHIPS,
-            addKeyMemory, getKeyMemoryContext, validateSummary,
-            getSkillContext, getStatusContext, getNpcContext,
-            skills: NORMAL_SKILLS, abilities: ABILITIES,
-            log: { add: addLogEntry, search: searchLogs, openViewer: openLogViewer, entries: () => logEntries.slice() },
-            achievements: { check: checkAchievements, unlocked: unlockedAchievements, list: ACHIEVEMENTS },
-            exportSave, openImportDialog, importSave,
-            calculateEnding, showEndingScreen, ENDING_CONDITIONS,
-            sfx: { play: window.playSfx, stopAmbient }
-        };
-        // Expose actual implementations to window._xxx so the first script block's forwarders can call them
-        window._addLogEntry = addLogEntry;
-        window._addKeyMemory = addKeyMemory;
-        window._triggerRandomEvent = triggerRandomEvent;
-        window._checkSeasonalEvent = checkSeasonalEvent;
-        window._checkForRandomEvent = checkForRandomEvent;
-        window._openLogViewer = openLogViewer;
-        window._searchLogs = searchLogs;
-        window._processNpcInteraction = processNpcInteraction;
-        window._triggerNpcEncounter = triggerNpcEncounter;
-        window._addNpcRelationship = addNpcRelationship;
-        window._applyStatusEffect = applyStatusEffect;
-        window._tickStatusEffects = tickStatusEffects;
-        window._checkAchievements = checkAchievements;
-        window.renderAchievementsPanel = renderAchievementsPanel;
-        window.renderEventsPanel = renderEventsPanel;
-
-        // Add buttons to settings panel
-        setTimeout(() => {
-            const btnBar = document.querySelector('.settings-buttons') || document.getElementById('settingsActions');
-            if (btnBar) {
-                const craftBtn = document.createElement('button');
-                craftBtn.className = 'btn-header';
-                craftBtn.innerHTML = '🔨 合成';
-                craftBtn.onclick = openCraftingModal;
-                btnBar.appendChild(craftBtn);
-                const exportBtn = document.createElement('button');
-                exportBtn.className = 'btn-header';
-                exportBtn.innerHTML = '📤 导出存档';
-                exportBtn.onclick = exportSave;
-                btnBar.appendChild(exportBtn);
-                const importBtn = document.createElement('button');
-                importBtn.className = 'btn-header';
-                importBtn.innerHTML = '📥 导入存档';
-                importBtn.onclick = openImportDialog;
-                btnBar.appendChild(importBtn);
-                const logBtn = document.createElement('button');
-                logBtn.className = 'btn-header';
-                logBtn.innerHTML = '📜 日志';
-                logBtn.onclick = openLogViewer;
-                btnBar.appendChild(logBtn);
-                const endBtn = document.createElement('button');
-                endBtn.className = 'btn-header';
-                endBtn.innerHTML = '🎬 查看结局';
-                endBtn.onclick = showEndingScreen;
-                btnBar.appendChild(endBtn);
-                const npcBtn = document.createElement('button');
-                npcBtn.className = 'btn-header';
-                npcBtn.innerHTML = '👥 NPC关系';
-                npcBtn.onclick = openNpcPanel;
-                btnBar.appendChild(npcBtn);
-            }
-            // Add craft button to backpack
-            const bpActions = document.querySelector('.backpack-actions');
-            if (bpActions) {
-                const bpCraft = document.createElement('button');
-                bpCraft.className = 'btn-header';
-                bpCraft.style.width = '100%';
-                bpCraft.style.marginTop = '8px';
-                bpCraft.innerHTML = '🔨 打开合成界面';
-                bpCraft.onclick = openCraftingModal;
-                bpActions.appendChild(bpCraft);
-            }
-            // Init auto BGM playback
-            initAutoBGM();
-        }, 1000);
-
-        // Hook into AI response processing for events and features
-        const origMds = window.mds;
-        if (origMds) {
-            window.mds = function(ch) {
-                if (origMds) origMds(ch);
-                if (ch && ch.kill) {
-                    const s = gst();
-                    s.totalKills = (s.totalKills || 0) + 1;
-                    sst(s);
-                    addLogEntry('kill', '击杀敌人');
-                    playSfx('victory');
-                }
-                if (ch && ch.abilityLevel !== undefined) {
-                    const c = gch();
-                    addKeyMemory(c.cn + ' 异能等级提升', 'ability');
-                }
-            };
-        }
-
-        // Hook into AI text output for logging and post-processing
-        const origPai = window.pai;
-        let lastLoggedBubbleCount = 0;
-        let eventTimer = null, npcTimer = null;
-        // Reset log counter at the start of each AI turn (called by hin())
-        window._resetPaiLog = function() { lastLoggedBubbleCount = 0; };
-        // TurnId 机制：防止 AI 随机事件/ NPC 相遇跨回合触发
-        let _currentTurnId = 0;
-        window._paiSetTurn = function(tid) { _currentTurnId = tid; };
-        window._paiGetTurn = function() { return _currentTurnId; };
-        window._paiClearEventTimers = function() {
-            if (eventTimer) { clearTimeout(eventTimer); eventTimer = null; }
-            if (npcTimer) { clearTimeout(npcTimer); npcTimer = null; }
-        };
-        if (origPai) {
-            window.pai = function(raw, silent) {
-                const bubbles = origPai(raw, silent);
-                if (bubbles && bubbles.length) {
-                    // Only log NEW bubbles (avoids duplicate logging during streaming mode
-                    // where pai() is called repeatedly with growing `raw`)
-                    for (let i = lastLoggedBubbleCount; i < bubbles.length; i++) {
-                        const b = bubbles[i];
-                        if (b.ty === 'narration' || b.ty === 'npc' || b.ty === 'player') {
-                            addLogEntry(b.ty, b.tx || b.content || '');
-                        }
-                    }
-                    lastLoggedBubbleCount = bubbles.length;
-                    // Debounce random event & NPC encounter triggers so streaming mode
-                    // (which calls pai() many times) only fires them once per AI turn.
-                    let _lastEventTurnId = window._paiGetTurn();
-                    clearTimeout(eventTimer);
-                    eventTimer = setTimeout(() => {
-                        if (window._paiGetTurn() !== _lastEventTurnId || Math.random() >= 0.3) return;
-                        triggerRandomEvent();
-                        eventTimer = null;
-                    }, 2000);
-                    const _lastNpcTurnId = window._paiGetTurn();
-                    clearTimeout(npcTimer);
-                    npcTimer = setTimeout(() => {
-                        if (window._paiGetTurn() !== _lastNpcTurnId || Math.random() >= 0.15) return;
-                        const enc = triggerNpcEncounter();
-                        if (enc) addLogEntry('npc_encounter', '遇到' + enc.name);
-                        npcTimer = null;
-                    }, 2500);
-                }
-                // Auto-save after major events
-                const clk = gclk();
-                if (clk && clk.elapsedSec && clk.elapsedSec > 0 && clk.elapsedSec % 3600 < 30) {
-                    checkSeasonalEvent();
-                }
-                // Periodic key memory save
-                if (keyMemories.length > 0) {
-                    try { localStorage.setItem('vn_keyMemories', JSON.stringify(keyMemories)); } catch(e) {}
-                }
-                return bubbles;
-            };
-        }
-
-        // Start ambient environment system
-        let ambientStarted = false;
-        function updateAmbient() {
-            if (!window.audioCtx) return;
-            const clk = gclk();
-            const hour = (clk.elapsedSec || 0) / 3600;
-            const weather = clk.weather || '晴';
-            let targetAmbient = null;
-            if (weather === '雨') targetAmbient = 'ambient_rain';
-            else if (weather === '雷暴') targetAmbient = 'ambient_rain';
-            else if (weather === '雪') targetAmbient = 'ambient_wind';
-            else if (hour >= 20 || hour < 6) targetAmbient = 'ambient_night';
-            else targetAmbient = 'ambient_wind';
-            const conf = sfxExt[targetAmbient];
-            if (conf && conf.type === 'loop' && conf.freq) {
-                if (!ambientStarted || ambientNode && ambientNode.frequency && Math.abs(ambientNode.frequency.value - conf.freq) > 5) {
-                    playNoiseAmbient(conf);
-                    ambientStarted = true;
-                }
-            }
-        }
-        setInterval(updateAmbient, 60000);
-        updateAmbient();
-
-        // Periodic status effects ticker (already exists at 5s interval)
-        // Periodic random event checks during gameplay
-        setInterval(() => {
-            if (gst().hp > 0) triggerRandomEvent();
-        }, 120000); // Check every 2 minutes
-
-    })();
 
