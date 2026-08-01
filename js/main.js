@@ -6290,10 +6290,163 @@ ${sumContent}
                 document.addEventListener('touchcancel', onPointerUp);
             }
 
-            // toggle button 保留原逻辑，但需要考虑拖拽状态
+            // toggle button 保留原逻辑，另外支持【长按触发拖拽 → 可自由移动按钮位置】
+            // 存储键：localStorage 中存按钮的 {left, top}（统一 left/top 坐标系，避免 right/left 混用导致按下瞬间跳变）
             if (clueToggle) {
+                (function attachClueToggleLongPressDrag() {
+                    const STORAGE_KEY = 'vn_clueBtnPos';
+                    const LONG_PRESS_MS = 450; // 触发拖拽的长按时长（毫秒）
+                    const MOVE_TOLERANCE = 4; // 按下期间如果移动超过这个像素，视为用户在滑动，取消长按
+
+                    let pressTimer = null;
+                    let isDragActive = false;
+                    let startPointer = { x: 0, y: 0, id: 0 };
+                    let dragOffset = { x: 0, y: 0 };
+                    let movedInPress = 0;
+                    let startRect = null;
+
+                    // ---------- 恢复上次用户的拖拽位置 ----------
+                    function applySavedPosition() {
+                        try {
+                            const raw = localStorage.getItem(STORAGE_KEY);
+                            if (!raw) return;
+                            const pos = JSON.parse(raw);
+                            if (pos && typeof pos.left === 'number' && typeof pos.top === 'number') {
+                                applyLeftTop(pos.left, pos.top, /*persist*/ false);
+                            }
+                        } catch (e) { /* ignore corrupted storage */ }
+                    }
+
+                    // ---------- 把按钮当前定位换算/重置为 left/top，避免 right/left/transform 混用导致拖动按下瞬间跳变 ----------
+                    // 经验 291676：统一用 left/top 存储，拖拽 offset 也用 left/top 坐标，按下无跳变
+                    function convertToLeftTopIfNeeded() {
+                        if (!clueToggle) return;
+                        const rect = clueToggle.getBoundingClientRect();
+                        // 清除默认 CSS 给定的 right/top/transform（这些会压制 left，导致按下拖第一帧跳）
+                        clueToggle.style.setProperty('right', 'auto', 'important');
+                        clueToggle.style.setProperty('bottom', 'auto', 'important');
+                        clueToggle.style.setProperty('transform', 'none', 'important');
+                        clueToggle.style.setProperty('left', rect.left + 'px', 'important');
+                        clueToggle.style.setProperty('top', rect.top + 'px', 'important');
+                    }
+
+                    function clamp(val, min, max) {
+                        return Math.max(min, Math.min(max, val));
+                    }
+
+                    function applyLeftTop(left, top, persist) {
+                        if (!clueToggle) return;
+                        const w = clueToggle.offsetWidth || 44;
+                        const h = clueToggle.offsetHeight || 44;
+                        const safeX = clamp(left, 0, window.innerWidth - w);
+                        const safeY = clamp(top, 0, window.innerHeight - h);
+                        clueToggle.style.setProperty('right', 'auto', 'important');
+                        clueToggle.style.setProperty('bottom', 'auto', 'important');
+                        clueToggle.style.setProperty('transform', 'none', 'important');
+                        clueToggle.style.setProperty('left', safeX + 'px', 'important');
+                        clueToggle.style.setProperty('top', safeY + 'px', 'important');
+                        if (persist) {
+                            try {
+                                localStorage.setItem(STORAGE_KEY, JSON.stringify({ left: safeX, top: safeY }));
+                            } catch (e) { /* ignore */ }
+                        }
+                    }
+
+                    function clearPressTimer() {
+                        if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+                    }
+
+                    function fireLongPressAndStartDrag() {
+                        clearPressTimer();
+                        if (isDragActive) return;
+                        // 进入拖拽：1) 先换算到 left/top 坐标系  2) 计算按下点相对按钮左上角的偏移
+                        convertToLeftTopIfNeeded();
+                        const rect = clueToggle.getBoundingClientRect();
+                        dragOffset.x = startPointer.x - rect.left;
+                        dragOffset.y = startPointer.y - rect.top;
+                        isDragActive = true;
+                        clueToggle.classList.add('dragging');
+                        clueToggle._suppressNextClick = true;
+                        try {
+                            clueToggle.setPointerCapture(startPointer.id);
+                        } catch (e) { /* ignore if not supported */ }
+                        // 触觉反馈：振动一下（移动端）
+                        try {
+                            if (navigator.vibrate) navigator.vibrate(15);
+                        } catch (e) {}
+                    }
+
+                    // ---------- Pointer Events 统一处理（触摸/鼠标/笔）----------
+                    clueToggle.addEventListener('pointerdown', (e) => {
+                        if (isDragActive) return;
+                        startPointer = { x: e.clientX, y: e.clientY, id: e.pointerId };
+                        movedInPress = 0;
+                        startRect = clueToggle.getBoundingClientRect();
+                        clearPressTimer();
+                        pressTimer = setTimeout(fireLongPressAndStartDrag, LONG_PRESS_MS);
+                    });
+
+                    clueToggle.addEventListener('pointermove', (e) => {
+                        if (!pressTimer && !isDragActive) return;
+                        const dx = Math.abs(e.clientX - startPointer.x);
+                        const dy = Math.abs(e.clientY - startPointer.y);
+                        movedInPress = Math.max(movedInPress, dx, dy);
+                        if (!isDragActive) {
+                            // 未进入拖拽态：如果在长按等待时间内移动超过阈值 → 取消长按等待
+                            if (pressTimer && movedInPress > MOVE_TOLERANCE) clearPressTimer();
+                            return;
+                        }
+                        // 已进入拖拽态：按 left/top 跟手移动（经验 291676 路径A）
+                        const newLeft = e.clientX - dragOffset.x;
+                        const newTop = e.clientY - dragOffset.y;
+                        applyLeftTop(newLeft, newTop, /*persist*/ false);
+                        // 阻止页面滚动/文本选择
+                        if (e.cancelable) e.preventDefault();
+                    });
+
+                    function endDrag(e, cancelled) {
+                        clearPressTimer();
+                        if (!isDragActive) return;
+                        isDragActive = false;
+                        clueToggle.classList.remove('dragging');
+                        // 保存最终位置
+                        const rect = clueToggle.getBoundingClientRect();
+                        applyLeftTop(rect.left, rect.top, /*persist*/ true);
+                        try {
+                            if (clueToggle.hasPointerCapture && clueToggle.hasPointerCapture(startPointer.id)) {
+                                clueToggle.releasePointerCapture(startPointer.id);
+                            }
+                        } catch (e) { /* ignore */ }
+                        // 点击抑制：再等一小会，避免"拖拽刚结束 pointerup → 冒泡 click 就 toggle"
+                        setTimeout(() => { if (clueToggle) clueToggle._suppressNextClick = false; }, 120);
+                    }
+
+                    clueToggle.addEventListener('pointerup', endDrag);
+                    clueToggle.addEventListener('pointercancel', (e) => endDrag(e, true));
+                    clueToggle.addEventListener('lostpointercapture', (e) => {
+                        // 某些移动浏览器会主动 revoke capture，保险起见结束拖拽并保存
+                        if (isDragActive) endDrag(e, false);
+                    });
+
+                    // 旋转 / 窗口尺寸变化：重新夹取边界（保持按钮不出屏）
+                    window.addEventListener('resize', () => {
+                        const rect = clueToggle.getBoundingClientRect();
+                        applyLeftTop(rect.left, rect.top, /*persist*/ true);
+                    });
+                    window.addEventListener('orientationchange', () => {
+                        setTimeout(() => {
+                            const rect = clueToggle.getBoundingClientRect();
+                            applyLeftTop(rect.left, rect.top, /*persist*/ true);
+                        }, 200);
+                    });
+
+                    // ---------- 启动时恢复上次按钮位置 ----------
+                    applySavedPosition();
+                })();
+
+                // ---------- 原本的点击 toggle 逻辑 ----------
                 clueToggle.addEventListener('click', (e) => {
-                    // 拖拽或长按结束时，误触发 toggle click 的抑制
+                    // 长按拖拽刚结束/进行中，抑制一次 click（避免拖拽结束意外打开/关闭便签）
                     if (clueToggle._suppressNextClick) {
                         clueToggle._suppressNextClick = false;
                         e.stopPropagation();
@@ -6301,8 +6454,7 @@ ${sumContent}
                         return;
                     }
                     if (clueSb.classList.contains('dragging')) return;
-                    // Clear any drag-position inline styles before toggling
-                    // so CSS class-based positioning works correctly
+                    // Clear any drag-position inline styles before toggling (so CSS class-based positioning works correctly)
                     if (clueSb.style.left) clueSb.style.left = '';
                     if (clueSb.style.top) clueSb.style.top = '';
                     if (clueSb.style.right) clueSb.style.right = '';
@@ -7349,7 +7501,7 @@ ${sumContent}
                         '  .btn-send { padding: 4px 10px; font-size: 0.78rem; }',
                         '  /* 更多菜单：移动端贴顶更宽，避免切屏溢出（仅 .open 时生效） */',
                         '  .nav-more-menu.open { top: 52px !important; right: 8px !important; left: 8px !important; width: auto !important; max-width: none !important; }',
-                        '  /* 线索浮动按钮：移动端右侧纯emoji方形，不盖顶栏按钮/发送区 */',
+                        '  /* 线索浮动按钮：移动端默认贴右侧垂直居中；如用户已通过长按拖拽保存位置，则由 JS inline style 覆盖（left/top），此处作为兜底默认 */',
                         '  #btnToggleClueSidebar {',
                         '    position: fixed !important;',
                         '    right: 0 !important; top: 44vh !important; transform: translateY(-50%) !important;',
@@ -7361,20 +7513,23 @@ ${sumContent}
                         '    writing-mode: initial !important; font-size: 0.68rem !important;',
                         '    box-shadow: -2px 3px 10px rgba(60,40,12,0.18) !important;',
                         '    background: linear-gradient(180deg, #fffef7 0%, #f5e7c0 100%) !important;',
+                        '    touch-action: none !important;',
+                        '  }',
+                        '  #btnToggleClueSidebar.dragging {',
+                        '    transition: none !important;',
+                        '    transform: translateY(-50%) scale(1.12) !important;',
+                        '    z-index: 10000 !important;',
+                        '    box-shadow: 0 6px 18px rgba(60,40,12,0.28) !important;',
                         '  }',
                         '  #btnToggleClueSidebar .clue-btn-icon { font-size: 1.25rem; display: inline-flex !important; align-items: center; justify-content: center; line-height: 1; }',
                         '  #btnToggleClueSidebar .clue-btn-text { display: none !important; }',
-                        '  /* 线索便签面板：移动端留足线索按钮 + 安全边距，不被 notch/header 剪切',
-                        '     注意：.clue-sidebar 基础选择器不写 right/left，避免默认就显示在屏幕上（导致"自动弹出"），',
-                        '     只在 .open/.docked-*（且无拖拽 inline style 覆盖）时写定位，保证拖拽设置的 inline left/right 优先 */',
+                        '  /* 线索便签面板（<680px）：仅保留定位/层级/最小安全边距，不覆盖纸张质感/头部/按钮字号/空提示/列表/动作栏，和 PC 端视觉保持完全一致 */',
+                        '  /*   - 注意 .clue-sidebar 基础选择器不写 right/left（避免默认显示=自动弹出），仅在 .open/docked 且无拖拽 inline 时才定位 */',
                         '  .clue-sidebar {',
-                        '    width: min(82vw, 320px) !important; max-width: 320px !important;',
-                        '    max-height: calc(100dvh - 104px) !important; min-height: 240px;',
                         '    top: 56px !important;',
                         '    z-index: 610 !important; pointer-events: auto !important;',
-                        '    filter: drop-shadow(-3px 6px 0 rgba(80,52,20,0.12));',
+                        '    max-height: calc(100dvh - 96px) !important;',
                         '  }',
-                        '  /* 显示状态：仅在 open/docked 时才定位到屏幕上；无 inline 拖拽样式时使用如下值，inline 优先 */',
                         '  .clue-sidebar:not([style*="left"]):not([style*="right"]).open { right: 48px; left: auto; }',
                         '  .clue-sidebar:not([style*="left"]):not([style*="right"]).docked-left { right: auto; left: 12px; }',
                         '  .clue-sidebar:not([style*="left"]):not([style*="right"]).docked-right { right: 48px; left: auto; }',
@@ -7386,12 +7541,6 @@ ${sumContent}
                         '  .chat-area { padding: 8px 6px; }',
                         '  .input-text { font-size: 0.78rem; }',
                         '  .nav-more-menu.open { top: 48px !important; right: 6px !important; left: 6px !important; }',
-                        '  /* 线索便签：<420px 尺寸压缩（仅宽度；定位仍由 open/docked + 无 inline 才应用） */',
-                        '  .clue-sidebar {',
-                        '    width: min(84vw, 300px) !important;',
-                        '    max-height: calc(100dvh - 96px) !important;',
-                        '  }',
-                        '  /* <420px 下的 open/docked 显示位置仍遵循上一条规则；不在此重复 right，避免默认可见 */',
                         '}'
                     ].join('\n');
                     document.head.appendChild(st);
