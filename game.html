@@ -60,38 +60,38 @@
             </div>
             <div class="header-actions">
                 <div class="nav-group nav-primary">
-                    <button class="btn-header" id="btnProfile">👤 个人</button>
-                    <button class="btn-header" id="btnBackpack">🎒 背包</button>
-                    <button class="btn-header" id="btnEquipment">⚔️ 装备</button>
-                    <button class="btn-header" id="btnSidePanel">📊 面板</button>
+                    <button class="btn-header" id="btnProfile">个人</button>
+                    <button class="btn-header" id="btnBackpack">背包</button>
+                    <button class="btn-header" id="btnEquipment">装备</button>
+                    <button class="btn-header" id="btnSidePanel">面板</button>
                 </div>
                 <div class="nav-group nav-secondary">
-                    <button class="btn-header" id="btnSave">💾 存档</button>
-                    <button class="btn-header" id="btnCodex" title="图鉴">📖 图鉴</button>
-                    <button class="btn-header accent" id="btnNewGame">🎮 开局</button>
+                    <button class="btn-header" id="btnSave">存档</button>
+                    <button class="btn-header" id="btnCodex" title="图鉴">图鉴</button>
+                    <button class="btn-header accent" id="btnNewGame">开局</button>
                 </div>
                 <div class="nav-group nav-more-wrap">
-                    <button class="btn-header nav-more-toggle" id="btnNavMore" title="更多功能">☰ 更多</button>
+                    <button class="btn-header nav-more-toggle" id="btnNavMore" title="更多功能">更多</button>
                     <div class="nav-more-menu" id="navMoreMenu">
                         <div class="nav-menu-section">
                             <div class="nav-menu-title">系统设置</div>
                             <div class="nav-menu-row">
-                                <button class="btn-header" id="btnSettings">⚙️ 设置</button>
-                                <button class="btn-header" id="btnTheme">🎨 浅色</button>
+                                <button class="btn-header" id="btnSettings">设置</button>
+                                <button class="btn-header" id="btnTheme">浅色</button>
                             </div>
                             <div class="nav-menu-row">
-                                <button class="btn-header" id="btnSfx" title="音效开关">🔊 音效</button>
-                                <button class="btn-header" id="btnBgm" title="背景音乐">🎵 音乐</button>
+                                <button class="btn-header" id="btnSfx" title="音效开关">音效</button>
+                                <button class="btn-header" id="btnBgm" title="背景音乐">音乐</button>
                             </div>
                         </div>
                         <div class="nav-menu-section">
                             <div class="nav-menu-title">进度与记录</div>
                             <div class="nav-menu-row">
-                                <button class="btn-header" id="btnAchievements" title="成就">🏆 成就</button>
-                                <button class="btn-header" id="btnEvents" title="突发事件">⚡ 事件</button>
+                                <button class="btn-header" id="btnAchievements" title="成就">成就</button>
+                                <button class="btn-header" id="btnEvents" title="突发事件">事件</button>
                             </div>
                             <div class="nav-menu-row">
-                                <button class="btn-header" id="btnIdle">💤 挂机</button>
+                                <button class="btn-header" id="btnIdle">挂机</button>
                             </div>
                         </div>
                     </div>
@@ -114,8 +114,8 @@
                     <button class="btn-quick" data-action="决策建议" id="btnDecision">决策</button>
                 </div>
                 <div class="bottom-actions-bar">
-                    <button class="btn-quick" id="btnUndoTurn" title="回退到上一步">↩ 回退</button>
-                    <button class="btn-quick" id="btnRegenTurn" title="重新生成AI上一次回复">↻ 重生成</button>
+                    <button class="btn-quick" id="btnUndoTurn" title="回退到上一步">回退</button>
+                    <button class="btn-quick" id="btnRegenTurn" title="重新生成AI上一次回复">重生成</button>
                 </div>
             </div>
             <div class="input-row">
@@ -127,12 +127,12 @@
         <!-- Floating clue sidebar (hand-drawn note style) -->
         <div class="clue-sidebar" id="clueSidebar">
             <div class="clue-sidebar-header">
-                <span>📌 线索便签</span>
+                <span>线索便签</span>
                 <span style="cursor:pointer;font-size:1rem;" id="btnCloseClueSidebar">×</span>
             </div>
             <div class="clue-note" id="clueNoteContent"></div>
         </div>
-        <button class="clue-sidebar-toggle" id="btnToggleClueSidebar" title="展开线索便签">📋</button>
+        <button class="clue-sidebar-toggle" id="btnToggleClueSidebar" title="展开线索便签">线索</button>
         <div class="side-panel" id="sidePanel">
             <!-- Profile view content -->
             <div id="sideProfileView">
@@ -161,7 +161,7 @@
     <div class="modal-overlay" id="achievementsModal" style="display:none;">
         <div class="modal-panel" style="max-width:420px;">
             <button class="modal-close" id="modalCloseAchievements">x</button>
-            <h3>🏆 成就系统</h3>
+            <h3>成就系统</h3>
             <div id="achievementsList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
         </div>
     </div>
@@ -170,7 +170,7 @@
     <div class="modal-overlay" id="eventsModal" style="display:none;">
         <div class="modal-panel" style="max-width:420px;">
             <button class="modal-close" id="modalCloseEvents">x</button>
-            <h3>⚡ 突发事件记录</h3>
+            <h3>突发事件记录</h3>
             <div id="eventsList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
         </div>
     </div>
@@ -179,7 +179,7 @@
     <div class="modal-overlay" id="codexModal" style="display:none;">
         <div class="modal-panel" style="max-width:560px;">
             <button class="modal-close" id="modalCloseCodex">x</button>
-            <h3>📖 幸存者图鉴</h3>
+            <h3>幸存者图鉴</h3>
             <div class="codex-filters" id="codexFilters" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
             <div id="codexList" style="display:flex;flex-direction:column;gap:6px;max-height:500px;overflow-y:auto;"></div>
             <div class="codex-empty" id="codexEmpty" style="display:none;text-align:center;color:var(--text-muted);padding:20px;font-style:italic;">
@@ -189,7 +189,7 @@
     </div>
 
     <div class="idle-badge" id="idleBadge">挂机中</div>
-    <div class="god-badge" id="godBadge" style="display:none;">⚡ 上帝模式</div>
+    <div class="god-badge" id="godBadge" style="display:none;">上帝模式</div>
 
     <!-- Welcome Modal -->
     <div class="modal-overlay" id="welcomeModal"><div class="modal-panel" style="max-width:380px;">

@@ -610,8 +610,26 @@
                             return fb;
                         }
                     }
+                    // 关键修复：只有 fallback 是数组时，obj 也必须是数组才保留；否则直接返回 fb（防止 [...fb, ...obj] 导致 Array→Object 的污染）
+                    const fbIsArray = Array.isArray(fb);
+                    if (fbIsArray) {
+                        // 数组型存储（历史记录等）：obj 不是数组一律丢弃，用 fb
+                        if (!Array.isArray(obj)) {
+                            console.warn('[Storage] Key', k, 'is not array in storage, fallback. Reset to fallback.');
+                            return fb;
+                        }
+                        return obj;
+                    }
+                    // 字符串型存储（theme=字符串：K.THM）：obj 不是字符串则 fallback
+                    if (typeof fb === 'string') {
+                        return typeof obj === 'string' ? obj : fb;
+                    }
+                    if (typeof fb === 'number' || typeof fb === 'boolean') {
+                        if (typeof obj === typeof fb) return obj;
+                        return fb;
+                    }
+                    // 对象型 fallback：保持原有的 merge 逻辑
                     if (!obj || typeof obj !== 'object') return fb;
-                    // Merge with fallback to preserve any stored keys even if some fields are missing
                     return { ...fb, ...obj };
                 } catch { return fb; }
             }
@@ -3070,140 +3088,151 @@
             async function hin(inp, isIdle, displayText, systemPromptExtra) {
                 if (busy) { tst('正在演算中，请稍候…'); return false; }
                 if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return false; }
-                const tx = inp.trim(); if (!tx) return false;
-                // Use displayText for player bubble if provided, otherwise use tx
-                const showText = displayText ? displayText.trim() : tx;
-                // Hide any visible choice bubbles when player sends custom input
-                if (!isIdle) {
-                    document.querySelectorAll('.vn-choice-container').forEach(el => {
-                        if (el.style.display !== 'none' && el.style.opacity !== '0') {
-                            el.style.opacity = '0';
-                            el.style.maxHeight = '0';
-                            el.style.overflow = 'hidden';
-                            el.style.margin = '0';
-                            setTimeout(() => { el.style.display = 'none'; }, 400);
-                        }
-                    });
+                const tx = inp ? inp.trim() : ''; if (!tx) return false;
+                // 进入即兜底：确保 hist 绝对是数组，任何污染都会立刻重置，防止 undo/h.push 直接炸
+                if (!Array.isArray(hist)) {
+                    try { console.warn('[hin] hist was not array, reset'); } catch(_) {}
+                    hist = []; try { svh([]); } catch(_) {}
                 }
-                undo = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), ach: _getUnlockedAchievements().size ? [..._getUnlockedAchievements()] : [], bubbleCount: $('chatArea') ? $('chatArea').children.length : 0, turnId: Date.now() };
-                snotifyStartBatch();
-                // 重置 pai 事件触发的 turn 标记（防止跨回合误触发）
-                if (typeof window._paiSetTurn === 'function') window._paiSetTurn(undo.turnId);
-                // Reset pai() log counter so new AI turn doesn't skip log entries
-                if (typeof window._resetPaiLog === 'function') window._resetPaiLog();
-                busy = true;
-                // 清除上一回合遗留的随机事件/NPC 定时器（跨回合保护）
-                if (typeof window._paiClearEventTimers === 'function') window._paiClearEventTimers();
-                if (!isIdle) $('btnSend').disabled = true;
-                $('inputText').classList.add('busy');
-                // 玩家气泡不渲染item-ref样式，将{{物品名}}转为纯文本【物品名】
-                const playerDisplayText = (isIdle ? '[自主] ' : '') + showText.replace(/\{\{([^}]+)\}\}/g, '【$1】');
-                apb({ ty: 'player', tx: playerDisplayText }, 0);
-                hist.push({ role: 'user', content: tx });
-
-                // If player is asking about clues, sync the clue sidebar immediately
-                if (/线索|回顾|总结|整理/.test(tx)) {
-                    renderClueSidebar();
-                }
-
-                // Auto-summarize when history exceeds threshold
-                const cfgt = cfg();
-                if (!summaryLock && hist.length > (cfgt.ctx || 24) * 2 && hist.length % 8 === 0) {
-                    generateContextSummary();
-                }
-                
-                // 代理请求辅助函数（使用全局定义的版本）
-                const sendProxyRequest = window._sendProxyRequest;
-
-                // ===== 上下文溢出保护：估算总字符数，超阈值强制先摘要 =====
-                const FORCE_SUMMARIZE_CHARS = 32000; // 约 8K tokens 前强制摘要（1中文字≈2.5tokens）
-                let estimatedTotalChars = sysPrompt.length;
-                hist.slice(-f.ctx * 2).forEach(m => { estimatedTotalChars += (m.content || '').length + 8; });
-                if (estimatedTotalChars > FORCE_SUMMARIZE_CHARS && !summaryLock) {
-                    try {
-                        tst('上下文较大，正在压缩记忆...');
-                        await generateContextSummary();
-                    } catch(e) { /* 摘要失败也继续，用原对话 */ }
-                }
-
-                // ===== 带指数退避重试 + 超时的安全请求函数 =====
-                async function requestWithRetry(targetUrl, body, key, signal, isStream, maxRetries, timeoutMs) {
-                    let lastError = null;
-                    for (let attempt = 0; attempt <= maxRetries; attempt++) {
-                        if (attempt > 0) {
-                            const waitMs = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 500, 5000);
-                            if (typeof tst === 'function') tst('第 ' + attempt + ' 次重试，等待 ' + Math.round(waitMs) + 'ms...');
-                            await new Promise(res => setTimeout(res, waitMs));
-                        }
-                        const innerAbort = new AbortController();
-                        let timeoutId = null;
-                        let alreadyAborted = false;
-                        if (timeoutMs > 0) {
-                            timeoutId = setTimeout(() => {
-                                alreadyAborted = true;
-                                try { innerAbort.abort(); } catch(_) {}
-                            }, timeoutMs);
-                        }
-                        // 同时监听外部 signal
-                        if (signal) {
-                            try {
-                                if (signal.aborted) innerAbort.abort();
-                                else signal.addEventListener('abort', () => innerAbort.abort(), { once: true });
-                            } catch(_) {}
-                        }
-                        try {
-                            const response = await sendProxyRequest(targetUrl, body, key, innerAbort.signal, isStream);
-                            if (timeoutId) clearTimeout(timeoutId);
-                            // 2xx 成功直接返回
-                            if (response.ok) return response;
-                            // 只对以下情况重试：429 限流、5xx 服务端错误、0 网络错误
-                            const shouldRetry = response.status === 429 || response.status >= 500;
-                            const et = await response.text().catch(() => '');
-                            let friendlyMsg = 'HTTP ' + response.status;
-                            if (response.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
-                            else if (response.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
-                            else if (response.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
-                            else if (response.status === 429) friendlyMsg = '请求过于频繁（429）';
-                            else if (response.status >= 500) friendlyMsg = '服务器错误（' + response.status + '）';
-                            try {
-                                const ej = JSON.parse(et);
-                                let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
-                                if (m) {
-                                    m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
-                                    friendlyMsg += '：' + m;
-                                }
-                            } catch(_) {}
-                            friendlyMsg = friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg;
-                            if (shouldRetry && attempt < maxRetries) continue;
-                            const err = new Error(friendlyMsg);
-                            err.httpStatus = response.status;
-                            err.final = true;
-                            throw err;
-                        } catch (e) {
-                            if (timeoutId) clearTimeout(timeoutId);
-                            if (alreadyAborted && (!e || e.name === 'AbortError')) {
-                                lastError = new Error('请求超时（> ' + timeoutMs + 'ms），请检查网络或降低上下文长度后重试');
-                                lastError.timeout = true;
-                            } else if (signal && signal.aborted) {
-                                throw e; // 用户手动取消，不重试
-                            } else {
-                                lastError = e;
-                            }
-                            const isRetriable = !lastError.final && !lastError.httpStatus || (lastError.httpStatus && (lastError.httpStatus === 429 || lastError.httpStatus >= 500));
-                            if (isRetriable && attempt < maxRetries) continue;
-                            throw lastError;
-                        }
-                    }
-                    throw lastError || new Error('未知请求错误');
-                }
-
-                const f = cfg();
-                const indicatorEl = document.createElement('div');
-                indicatorEl.className = 'typing-indicator';
-                indicatorEl.innerHTML = '<span>' + (isIdle ? '挂机演算中' : '演算中') + '</span><div class="typing-dots"><span></span><span></span><span></span></div>';
-                $('chatArea').appendChild(indicatorEl);
-                scb();
+                let indicatorEl = null;
                 try {
+                    // Use displayText for player bubble if provided, otherwise use tx
+                    const showText = displayText ? displayText.trim() : tx;
+                    // Hide any visible choice bubbles when player sends custom input
+                    if (!isIdle) {
+                        document.querySelectorAll('.vn-choice-container').forEach(el => {
+                            if (el.style.display !== 'none' && el.style.opacity !== '0') {
+                                el.style.opacity = '0';
+                                el.style.maxHeight = '0';
+                                el.style.overflow = 'hidden';
+                                el.style.margin = '0';
+                                setTimeout(() => { try { el.style.display = 'none'; } catch(_) {} }, 400);
+                            }
+                        });
+                    }
+                    undo = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), ach: _getUnlockedAchievements().size ? [..._getUnlockedAchievements()] : [], bubbleCount: $('chatArea') ? $('chatArea').children.length : 0, turnId: Date.now() };
+                    snotifyStartBatch();
+                    // 重置 pai 事件触发的 turn 标记（防止跨回合误触发）
+                    if (typeof window._paiSetTurn === 'function') window._paiSetTurn(undo.turnId);
+                    // Reset pai() log counter so new AI turn doesn't skip log entries
+                    if (typeof window._resetPaiLog === 'function') window._resetPaiLog();
+                    busy = true;
+                    // 清除上一回合遗留的随机事件/NPC 定时器（跨回合保护）
+                    if (typeof window._paiClearEventTimers === 'function') window._paiClearEventTimers();
+                    if (!isIdle && $('btnSend')) $('btnSend').disabled = true;
+                    try { $('inputText').classList.add('busy'); } catch(_) {}
+                    // 玩家气泡不渲染item-ref样式，将{{物品名}}转为纯文本【物品名】
+                    const playerDisplayText = (isIdle ? '[自主] ' : '') + showText.replace(/\{\{([^}]+)\}\}/g, '【$1】');
+                    try { apb({ ty: 'player', tx: playerDisplayText }, 0); } catch(_) {}
+                    hist.push({ role: 'user', content: tx });
+
+                    // If player is asking about clues, sync the clue sidebar immediately
+                    if (/线索|回顾|总结|整理/.test(tx)) {
+                        try { renderClueSidebar(); } catch(_) {}
+                    }
+
+                    // Auto-summarize when history exceeds threshold
+                    const cfgt = cfg();
+                    if (!summaryLock && hist.length > (cfgt.ctx || 24) * 2 && hist.length % 8 === 0) {
+                        try { generateContextSummary(); } catch(_) {}
+                    }
+                    
+                    // 代理请求辅助函数（使用全局定义的版本）
+                    const sendProxyRequest = window._sendProxyRequest;
+
+                    // ===== 上下文溢出保护：估算总字符数，超阈值强制先摘要 =====
+                    const FORCE_SUMMARIZE_CHARS = 32000; // 约 8K tokens 前强制摘要（1中文字≈2.5tokens）
+                    const _f2 = cfg();
+                    let estimatedTotalChars = 0;
+                    try { estimatedTotalChars = gsp().length; } catch(_) {}
+                    const _ctxWin = Math.max(1, (_f2.ctx || 24) * 2);
+                    hist.slice(-_ctxWin).forEach(m => { estimatedTotalChars += (m.content || '').length + 8; });
+                    if (estimatedTotalChars > FORCE_SUMMARIZE_CHARS && !summaryLock) {
+                        try {
+                            tst('上下文较大，正在压缩记忆...');
+                            await generateContextSummary();
+                        } catch(e) { /* 摘要失败也继续，用原对话 */ }
+                    }
+
+                    // ===== 带指数退避重试 + 超时的安全请求函数 =====
+                    async function requestWithRetry(targetUrl, body, key, signal, isStream, maxRetries, timeoutMs) {
+                        let lastError = null;
+                        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+                            if (attempt > 0) {
+                                const waitMs = Math.min(1000 * Math.pow(2, attempt - 1) + Math.random() * 500, 5000);
+                                if (typeof tst === 'function') tst('第 ' + attempt + ' 次重试，等待 ' + Math.round(waitMs) + 'ms...');
+                                await new Promise(res => setTimeout(res, waitMs));
+                            }
+                            const innerAbort = new AbortController();
+                            let timeoutId = null;
+                            let alreadyAborted = false;
+                            if (timeoutMs > 0) {
+                                timeoutId = setTimeout(() => {
+                                    alreadyAborted = true;
+                                    try { innerAbort.abort(); } catch(_) {}
+                                }, timeoutMs);
+                            }
+                            // 同时监听外部 signal
+                            if (signal) {
+                                try {
+                                    if (signal.aborted) innerAbort.abort();
+                                    else signal.addEventListener('abort', () => innerAbort.abort(), { once: true });
+                                } catch(_) {}
+                            }
+                            try {
+                                const response = await sendProxyRequest(targetUrl, body, key, innerAbort.signal, isStream);
+                                if (timeoutId) clearTimeout(timeoutId);
+                                // 2xx 成功直接返回
+                                if (response.ok) return response;
+                                // 只对以下情况重试：429 限流、5xx 服务端错误、0 网络错误
+                                const shouldRetry = response.status === 429 || response.status >= 500;
+                                const et = await response.text().catch(() => '');
+                                let friendlyMsg = 'HTTP ' + response.status;
+                                if (response.status === 401) friendlyMsg = '认证失败：API密钥无效或已过期，请检查密钥';
+                                else if (response.status === 403) friendlyMsg = '访问被拒绝：权限不足或服务未开通';
+                                else if (response.status === 404) friendlyMsg = '接口不存在：请检查端点地址是否正确';
+                                else if (response.status === 429) friendlyMsg = '请求过于频繁（429）';
+                                else if (response.status >= 500) friendlyMsg = '服务器错误（' + response.status + '）';
+                                try {
+                                    const ej = JSON.parse(et);
+                                    let m = ej.error && ej.error.message ? ej.error.message : (ej.message || '');
+                                    if (m) {
+                                        m = m.replace(/(api[\s_-]?key[\s:="'`]+|sk-|Bearer\s+)[^\s"'`<>&]{4,}/gi, (match) => match.slice(0,4) + '****');
+                                        friendlyMsg += '：' + m;
+                                    }
+                                } catch(_) {}
+                                friendlyMsg = friendlyMsg.length > 120 ? friendlyMsg.substring(0, 120) + '…' : friendlyMsg;
+                                if (shouldRetry && attempt < maxRetries) continue;
+                                const err = new Error(friendlyMsg);
+                                err.httpStatus = response.status;
+                                err.final = true;
+                                throw err;
+                            } catch (e) {
+                                if (timeoutId) clearTimeout(timeoutId);
+                                if (alreadyAborted && (!e || e.name === 'AbortError')) {
+                                    lastError = new Error('请求超时（> ' + timeoutMs + 'ms），请检查网络或降低上下文长度后重试');
+                                    lastError.timeout = true;
+                                } else if (signal && signal.aborted) {
+                                    throw e; // 用户手动取消，不重试
+                                } else {
+                                    lastError = e;
+                                }
+                                const isRetriable = !lastError.final && !lastError.httpStatus || (lastError.httpStatus && (lastError.httpStatus === 429 || lastError.httpStatus >= 500));
+                                if (isRetriable && attempt < maxRetries) continue;
+                                throw lastError;
+                            }
+                        }
+                        throw lastError || new Error('未知请求错误');
+                    }
+
+                    const f = cfg();
+                    try {
+                        indicatorEl = document.createElement('div');
+                        indicatorEl.className = 'typing-indicator';
+                        indicatorEl.innerHTML = '<span>' + (isIdle ? '挂机演算中' : '演算中') + '</span><div class="typing-dots"><span></span><span></span><span></span></div>';
+                        if ($('chatArea')) $('chatArea').appendChild(indicatorEl);
+                    } catch(_) {}
+                    try { scb(); } catch(_) {}
                     let sysPrompt = gsp();
                     if (isIdle) {
                         const _isRealFlow = (gclk().dayLenSec === 86400);
@@ -3214,11 +3243,24 @@
                         sysPrompt += '\n\n' + systemPromptExtra;
                     }
                     const msgs = [{ role: 'system', content: sysPrompt }, ...hist.slice(-f.ctx * 2)];
+                    // 关键：必填字段完整性校验（部分服务商 400 可能是 max_tokens/ctx/model 无效，或 messages 为空）
+                    if (!msgs.length) {
+                        throw new Error('上下文为空，请重新生成角色或从存档载入');
+                    }
+                    if (!f.model || typeof f.model !== 'string' || !f.model.trim()) {
+                        throw new Error('未设置模型：请在设置中选择或输入模型名');
+                    }
+                    // 校验并裁剪安全的 max_tokens（0/NaN/过大都可能被 400）
+                    const clampInt = (v, min, max) => { const n = parseInt(v, 10); if (isNaN(n)) return min; return Math.max(min, Math.min(max, n)); };
+                    const safeMaxTokens = clampInt(isIdle ? Math.min(f.maxT, 512) : f.maxT, 64, 32000);
+                    const safeTemp = (() => { let n = parseFloat(f.temp); if (isNaN(n)) return 0.7; n = Math.max(0, Math.min(2, n)); return n; })();
+                    const safeModel = f.model.trim();
+                    // 不同服务商兼容修正：避免不必要字段导致 400（DeepSeek 不需要额外兼容；Ollama 对 max_tokens 有时更宽容）
                     let full = '';
                     if (f.strm && f.key) {
                         const ct = new AbortController();
                         ctrl = ct;
-                        const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: true };
+                        const requestBody = { model: safeModel, messages: msgs, max_tokens: safeMaxTokens, temperature: safeTemp, stream: true };
                         // 流式：重试2次（共3次尝试），超时60秒（流式更宽容）
                         const rp = await requestWithRetry(f.ep, requestBody, f.key, ct.signal, true, 2, 60000);
                         const rd = rp.body.getReader();
@@ -3276,47 +3318,48 @@
                                     lastDOM._bolded = true;
                                 }
                             }
-                            checkChatFold();
-                            scb();
+                            try { checkChatFold(); } catch(_) {}
+                            try { scb(); } catch(_) {}
                         }
-                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
+                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; try { snotify('warn', 'AI回复', '内容超长已截断'); } catch(_) {} }
                         // Fallback: 如果不是SSE格式，尝试解析为普通JSON
                         if (!isSSE && buf) {
                             try {
                                 const d = JSON.parse(buf);
                                 full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
-                                if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
+                                if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; try { snotify('warn', 'AI回复', '内容超长已截断'); } catch(_) {} }
                                 if (full) {
                                     const bb = (window.pai || pai)(full, false);
                                     for (const b of bb) apb(b, f.tspd);
-                                    checkChatFold();
+                                    try { checkChatFold(); } catch(_) {}
                                 }
                             } catch {
                                 full = '[system]无法解析AI响应';
-                                apb({ ty: 'system', tx: full }, 0);
+                                try { apb({ ty: 'system', tx: full }, 0); } catch(_) {}
                             }
                         } else {
                             bubblesInDOM.forEach(el => applyBoldToBubble(el));
                             // 流式渲染期间使用silent模式跳过了mds状态变更，此处统一应用一次
-                            if (full) (window.pai || pai)(full, false);
+                            if (full) try { (window.pai || pai)(full, false); } catch(_) {}
                         }
                     } else if (!f.strm && f.key) {
-                        const requestBody = { model: f.model, messages: msgs, max_tokens: isIdle ? Math.min(f.maxT, 512) : f.maxT, temperature: f.temp, stream: false };
+                        const requestBody = { model: safeModel, messages: msgs, max_tokens: safeMaxTokens, temperature: safeTemp, stream: false };
                         // 非流式：重试3次（共4次尝试），超时30秒
                         const rp = await requestWithRetry(f.ep, requestBody, f.key, null, false, 3, 30000);
                         const d = await rp.json();
                         full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
-                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
+                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; try { snotify('warn', 'AI回复', '内容超长已截断'); } catch(_) {} }
                         const bb = (window.pai || pai)(full, false);
                         for (const b of bb) apb(b, f.tspd);
-                        checkChatFold();
+                        try { checkChatFold(); } catch(_) {}
                     } else {
                         full = '[system]未配置API密钥。请点击右上角「设置」配置。';
-                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; snotify('warn', 'AI回复', '内容超长已截断'); }
-                        (window.pai || pai)(full, false).forEach(b => apb(b, 0));
-                        checkChatFold();
+                        if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; try { snotify('warn', 'AI回复', '内容超长已截断'); } catch(_) {} }
+                        try { (window.pai || pai)(full, false).forEach(b => apb(b, 0)); } catch(_) {}
+                        try { checkChatFold(); } catch(_) {}
                     }
-                    if (indicatorEl && indicatorEl.parentNode) indicatorEl.remove();
+                    if (indicatorEl && indicatorEl.parentNode) try { indicatorEl.remove(); } catch(_) {}
+                    indicatorEl = null;
                     if (full && full.length > 60000) { full = full.slice(0, 60000) + '\n\n[系统：回复超长严重截断]'; }
                     if (full) {
                         // 补充缺失的属性/时间标签（挂机模式也补充）
@@ -3324,78 +3367,79 @@
                         const defTags = generateDefaultTags(s0, full);
                         if (defTags) {
                             full = defTags + '\n' + full;
-                            try { (window.pai || pai)(defTags, false); } catch(e) {}
+                            try { (window.pai || pai)(defTags, false); } catch(_) {}
                         }
                         // For idle mode, ensure the response has monologue wrapper
                         if (isIdle && !/\[monologue\]/i.test(full)) {
                             full = '[monologue]' + full + '[/monologue]';
                         }
-                        // Note: ptg() is already called inside pai() above,
-                        // which handles tag parsing, mds() state update, and snotify() notifications.
-                        // Do NOT call ptg() again here — it would double-process state changes.
                         // 检查AI是否输出了互动选项，缺失则补充默认选项（挂机模式除外）
                         if (!isIdle && !/\[choice\]/i.test(full)) {
                             const defaultOpts = generateDefaultChoices();
-                            apb({ ty: 'choice', opts: defaultOpts }, 0);
+                            try { apb({ ty: 'choice', opts: defaultOpts }, 0); } catch(_) {}
                             full += '\n[choice]' + defaultOpts.join('|') + '[/choice]';
                         }
                         hist.push({ role: 'assistant', content: full });
                         svh(hist);
                     }
                 } catch (e) {
-                    if (indicatorEl && indicatorEl.parentNode) indicatorEl.remove();
-                    let errMsg = '错误：' + e.message;
-                    if (/认证失败|密钥|API.*key/i.test(e.message)) {
+                    // 出现任何异常先清除 indicator，防止永远显示"演算中"
+                    if (indicatorEl && indicatorEl.parentNode) try { indicatorEl.remove(); } catch(_) {}
+                    indicatorEl = null;
+                    let errMsg = '错误：' + (e && e.message ? e.message : String(e));
+                    if (/认证失败|密钥|API.*key/i.test(errMsg)) {
                         errMsg += '\n（可点击右上角「设置」按钮修改API配置）';
                     }
-                    if (/服务器错误|服务商暂时不可用|429|频繁|网络|超时|timeout|fetch|abort|Failed to fetch/i.test(e.message)) {
+                    if (/服务器错误|服务商暂时不可用|429|频繁|网络|超时|timeout|fetch|abort|Failed to fetch/i.test(errMsg)) {
                         errMsg += '\n\n💡 API服务商暂时不可用，请稍后重新发送本次行动，系统将重新生成推演结果。';
                         if (!isIdle && tx) {
                             const inpEl = $('inputText');
-                            if (inpEl && inpEl.tagName === 'TEXTAREA') inpEl.value = tx;
+                            if (inpEl && inpEl.tagName === 'TEXTAREA') try { inpEl.value = tx; } catch(_) {}
                             else if (inpEl) {
-                                inpEl.textContent = '';
-                                inpEl.appendChild(document.createTextNode(tx));
+                                try { inpEl.textContent = ''; } catch(_) {}
+                                try { inpEl.appendChild(document.createTextNode(tx)); } catch(_) {}
                             }
                         }
                     }
-                    apb({ ty: 'system', tx: errMsg }, 0);
-                    if (/服务器错误|服务商暂时不可用|429|频繁|网络|超时|timeout|fetch|abort|Failed to fetch/i.test(e.message) && !isIdle && tx) {
+                    try { apb({ ty: 'system', tx: errMsg }, 0); } catch(_) {}
+                    if (/服务器错误|服务商暂时不可用|429|频繁|网络|超时|timeout|fetch|abort|Failed to fetch/i.test(errMsg) && !isIdle && tx) {
                         const retryFn = function() {
                             const inpEl2 = $('inputText');
-                            if (inpEl2 && inpEl2.tagName === 'TEXTAREA') inpEl2.value = tx;
+                            if (inpEl2 && inpEl2.tagName === 'TEXTAREA') try { inpEl2.value = tx; } catch(_) {}
                             else if (inpEl2) {
-                                inpEl2.textContent = '';
-                                inpEl2.appendChild(document.createTextNode(tx));
+                                try { inpEl2.textContent = ''; } catch(_) {}
+                                try { inpEl2.appendChild(document.createTextNode(tx)); } catch(_) {}
                             }
                             if (!busy) hin(tx, false);
                         };
                         window._retryLastAction = retryFn;
-                        apb({ ty: 'choice', opts: ['🔄 重新发送本次行动', '✕ 取消，手动输入'] }, 0);
+                        try { apb({ ty: 'choice', opts: ['重新发送本次行动', '取消，手动输入'] }, 0); } catch(_) {}
                         setTimeout(() => {
-                            const choices = document.querySelectorAll('.vn-choice-bubble');
-                            if (!choices || !choices.length) return;
-                            const last = choices[choices.length - 1];
-                            const btns = last.querySelectorAll('button, .vn-choice-item');
-                            if (btns[0]) btns[0].onclick = (ev) => { ev.stopPropagation(); if (window._retryLastAction) window._retryLastAction(); };
-                            if (btns[1]) btns[1].onclick = (ev) => { ev.stopPropagation(); const ie = $('inputText'); if (ie) ie.focus(); };
+                            try {
+                                const choices = document.querySelectorAll('.vn-choice-bubble');
+                                if (!choices || !choices.length) return;
+                                const last = choices[choices.length - 1];
+                                const btns = last.querySelectorAll('button, .vn-choice-item');
+                                if (btns[0]) btns[0].onclick = (ev) => { try { ev.stopPropagation(); } catch(_) {} if (window._retryLastAction) window._retryLastAction(); };
+                                if (btns[1]) btns[1].onclick = (ev) => { try { ev.stopPropagation(); } catch(_) {} const ie = $('inputText'); if (ie) try { ie.focus(); } catch(_) {} };
+                            } catch(_) {}
                         }, 100);
                     }
-                    if (isIdle) stopIdle();
-                    snotifyEndBatch();
+                    if (isIdle) try { stopIdle(); } catch(_) {}
+                    try { snotifyEndBatch(); } catch(_) {}
                 } finally {
                     try { busy = false; } catch(e) {}
                     try { snotifyEndBatch(); } catch(e) {}
-                    try { if (!isIdle && !idleLocked) $('btnSend').disabled = false; } catch(e) {}
+                    try { if (!isIdle && !idleLocked && $('btnSend')) $('btnSend').disabled = false; } catch(e) {}
                     try { if (!isIdle) $('inputText').classList.remove('busy'); } catch(e) {}
                     try { if (!isIdle && !idleLocked && !isMobile()) $('inputText').focus(); } catch(e) {}
-                    try { upui(); } catch(e) { console.error('[hin] upui failed in finally:', e); }
+                    try { upui(); } catch(e) { try { console.error('[hin] upui failed in finally:', e); } catch(_) {} }
                     try { checkChatFold(); } catch(e) {}
                     try { scb(); } catch(e) {}
                     // Auto-save after each game action (keep auto-slot in sync)
                     // ALWAYS save, even during idle mode, to prevent data loss on refresh
                     // IMPORTANT: NEVER save empty API key into auto-save slot
-                    if (hist.length > 0) {
+                    if (Array.isArray(hist) && hist.length > 0) {
                         try {
                             const curSvs = gsv();
                             const curCfg = cfg();
@@ -5484,11 +5528,11 @@
                 if (p.md.length) $('apiModel').value = p.md[0];
             });
             $('btnTheme').addEventListener('click', () => { cycleTheme(); });
-            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled() ? '🔊 音效' : '🔇 音效'; });
-            $('btnSfx').textContent = sfxEnabled() ? '🔊 音效' : '🔇 音效';
+            $('btnSfx').addEventListener('click', () => { toggleSfx(); $('btnSfx').textContent = sfxEnabled() ? '音效' : '音效(关)'; });
+            $('btnSfx').textContent = sfxEnabled() ? '音效' : '音效(关)';
             $('btnBgm').addEventListener('click', () => { bgmToggle(); });
             const _bgm = BGM();
-            $('btnBgm').textContent = _bgm.enabled ? '🎵 音乐' : '🔇 音乐';
+            $('btnBgm').textContent = _bgm.enabled ? '音乐' : '音乐(关)';
             $('btnBgm').title = _bgm.enabled ? '背景音乐（开启）' : '背景音乐（已关闭）';
             // ===== 导航栏「更多」收纳菜单 =====
             (function initNavMore() {
@@ -5929,7 +5973,7 @@
                     const autoD = document.createElement('div');
                     autoD.className = 'save-slot-auto';
                     autoD.style.cssText = 'padding:10px 12px;margin:14px 0 10px;border-radius:10px;display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;font-size:0.68rem;';
-                    const autoSlotInfo = '<span class="slot-info" style="flex:1;min-width:140px;">⚡ AUTO 自动存档 ' + (autoSn ? '| ' + new Date(autoSn.tm).toLocaleString() + ' | 第' + ((autoSn.clk && autoSn.clk.day) || 0) + '天' : '| 尚未生成') + '</span>';
+                    const autoSlotInfo = '<span class="slot-info" style="flex:1;min-width:140px;">AUTO 自动存档 ' + (autoSn ? '| ' + new Date(autoSn.tm).toLocaleString() + ' | 第' + ((autoSn.clk && autoSn.clk.day) || 0) + '天' : '| 尚未生成') + '</span>';
                     autoD.innerHTML = autoSlotInfo + '<div style="display:flex;gap:4px;flex-wrap:wrap;">' +
                         '<button class="btn-header" data-act="autosave">立即存档</button>' +
                         (autoSn ? '<button class="btn-header" data-act="load" style="color:var(--accent);">读取</button>' : '') +
@@ -6798,13 +6842,103 @@
                     ].join('\n');
                     document.head.appendChild(st3);
                 }
-                ath(localStorage.getItem(K.THM) || 'light');
+                // ===== 移动端 UI + 层级修复（防变形、防「更多」被线索按钮遮挡）=====
+                if (!document.getElementById('mobileLayoutFix_inline')) {
+                    const st = document.createElement('style');
+                    st.id = 'mobileLayoutFix_inline';
+                    st.textContent = [
+                        // 层级基准：确保 header / nav-more 按钮永远在线索浮层之上；线索浮层及其开关位置固定且不盖住重要控件
+                        'header.app-header { position: relative; z-index: 50; }',
+                        '.header-actions { position: relative; z-index: 60; }',
+                        '.nav-more-wrap, #btnNavMore { position: relative; z-index: 80 !important; }',
+                        '.nav-more-menu.open { z-index: 90 !important; }',
+                        '#btnToggleClueSidebar { z-index: 40 !important; }',
+                        '.clue-sidebar { z-index: 70; }',
+                        '.side-panel { z-index: 65; }',
+                        '.modal-overlay, .modal-panel { z-index: 200; }',
+                        '.notify-container { z-index: 300; }',
+                        '#notifyContainer.notify-mobile { z-index: 300; }',
+                        // 防止按钮/状态栏在窄屏上溢出或挤扁变形
+                        '.header-actions { flex-wrap: wrap; row-gap: 4px; }',
+                        '.nav-group { flex-wrap: wrap; }',
+                        '.btn-header { min-width: 0; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }',
+                        '.status-bar { flex-wrap: wrap; gap: 4px 8px; }',
+                        '.status-item { flex: 0 0 auto; min-width: 0; }',
+                        // 响应式：< 680px 顶栏按钮缩短+堆叠，更多按钮放到最右侧且保持可点击
+                        '@media (max-width: 680px) {',
+                        '  .header-actions { justify-content: flex-start; gap: 4px; }',
+                        '  .nav-group.nav-primary .btn-header,',
+                        '  .nav-group.nav-secondary .btn-header { padding: 4px 6px; font-size: 0.72rem; }',
+                        '  #btnNavMore { padding: 4px 8px !important; }',
+                        '  .nav-more-wrap { margin-left: auto; }',
+                        '  .nav-primary { order: 1; }',
+                        '  .nav-secondary { order: 2; }',
+                        '  .nav-more-wrap { order: 3; }',
+                        '  .status-bar { padding: 4px 8px; font-size: 0.66rem; }',
+                        '  .status-item .st-label { display: inline; }',
+                        '  .code-name { font-size: 0.72rem; padding: 2px 6px; }',
+                        '  .quick-actions > div:first-child { flex-wrap: wrap; }',
+                        '  .btn-quick { padding: 4px 8px; font-size: 0.7rem; }',
+                        '  #inputArea { gap: 4px; padding: 6px; }',
+                        '  .bottom-actions-bar { gap: 4px; }',
+                        '  .input-row { gap: 4px; }',
+                        '  .input-text { min-height: 36px; padding: 6px 8px; font-size: 0.82rem; }',
+                        '  .btn-send { padding: 4px 10px; font-size: 0.78rem; }',
+                        '  /* 线索浮动按钮：移动端默认移到右侧中部，避免覆盖顶部 header/发送按钮 */',
+                        '  #btnToggleClueSidebar {',
+                        '    position: fixed !important;',
+                        '    right: 6px !important; top: 50% !important; transform: translateY(-50%) !important;',
+                        '    bottom: auto !important; left: auto !important;',
+                        '    writing-mode: vertical-rl; padding: 10px 4px; font-size: 0.7rem; border-radius: 8px 0 0 8px;',
+                        '    max-width: 28px; opacity: 0.85;',
+                        '  }',
+                        '  .clue-sidebar {',
+                        '    max-width: min(86vw, 320px) !important;',
+                        '    max-height: 80vh !important;',
+                        '    right: 40px !important; left: auto !important;',
+                        '  }',
+                        '}',
+                        // 超窄屏 (< 400px)：顶栏文字进一步压缩
+                        '@media (max-width: 420px) {',
+                        '  .btn-header { font-size: 0.68rem; padding: 4px 5px; }',
+                        '  .code-name { font-size: 0.68rem; }',
+                        '  .chat-area { padding: 8px 6px; }',
+                        '  .input-text { font-size: 0.78rem; }',
+                        '}'
+                    ].join('\n');
+                    document.head.appendChild(st);
+                }
+                // 主题值安全加载：localStorage 损坏（如 '"1", "light"'）时解析会抛异常，兜底为 'light'
+                (function loadThemeSafely() {
+                    try {
+                        const rawThm = localStorage.getItem(K.THM);
+                        if (!rawThm) { ath('light'); return; }
+                        // 先直接尝试匹配合法主题名
+                        const validKeys = THEMES.map(t => t.key);
+                        if (validKeys.indexOf(rawThm) >= 0) { ath(rawThm); return; }
+                        // 否则走 JSON 解析（兼容 JSON 编码的字符串存储）
+                        try {
+                            const parsed = JSON.parse(rawThm);
+                            if (typeof parsed === 'string' && validKeys.indexOf(parsed) >= 0) { ath(parsed); localStorage.setItem(K.THM, parsed); return; }
+                        } catch(_) {}
+                        // 都失败：清除损坏值并兜底
+                        localStorage.removeItem(K.THM);
+                        try { localStorage.removeItem(K.THM + '_bak'); } catch(_) {}
+                        ath('light');
+                    } catch(_) { ath('light'); }
+                })();
                 afs(cfg().fsz);
                 // CRITICAL: Snapshot the API key from localStorage BEFORE any save-loading might interfere
                 const _savedCfgRaw = localStorage.getItem(K.CFG);
                 let _persistedKey = '';
                 try { const _p = JSON.parse(_savedCfgRaw); if (_p && _p.key) _persistedKey = _p.key; } catch {}
                 hist = ldh();
+                // 二次兜底：确保 hist 绝对是数组，防止任何路径污染导致 hin() 中 hist.push 炸掉
+                if (!Array.isArray(hist)) {
+                    console.warn('[Init] hist was not array, reset to []');
+                    hist = [];
+                    try { svh([]); } catch(_) {}
+                }
                 contextSummary = ld(K.SUM, '');
                 chr = gch();
                 sta = gst();
