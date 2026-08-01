@@ -762,24 +762,25 @@
             return '【玩家技能】' + skills;
         }
         function getStatusContext() {
-            const s = gst();
-            if (!s.statusEffects || Object.keys(s.statusEffects).length === 0) return '';
+            const s = (typeof gst === 'function') ? gst() : null;
+            if (!s || !s.statusEffects || Object.keys(s.statusEffects).length === 0) return '';
             const effects = Object.values(s.statusEffects).map(se => {
-                const e = STATUS_EFFECTS[se.name];
+                if (!se) return '';
+                const e = STATUS_EFFECTS ? STATUS_EFFECTS[se.name] : null;
                 if (!e) return '';
-                const timeLeft = Math.ceil(se.remaining / 60);
+                const timeLeft = Math.ceil((se.remaining || 0) / 60);
                 return e.icon + e.name + '(' + timeLeft + 'm)';
             }).filter(Boolean).join('、');
             if (!effects) return '';
             return '【当前状态效果】' + effects + '，叙事中请体现状态影响。';
         }
         function getNpcContext() {
-            const s = gst();
-            if (!s.npcRel || Object.keys(s.npcRel).length === 0) return '';
+            const s = (typeof gst === 'function') ? gst() : null;
+            if (!s || !s.npcRel || Object.keys(s.npcRel).length === 0) return '';
             const rels = Object.entries(s.npcRel).map(([name, data]) => {
-                const trust = data.trust || 0;
-                const aff = data.affinity || 0;
-                const npc = NPC_DATA[name];
+                const trust = (data && data.trust) || 0;
+                const aff = (data && data.affinity) || 0;
+                const npc = (typeof NPC_DATA !== 'undefined') ? NPC_DATA[name] : null;
                 const info = npc ? '（' + npc.personality + '，' + npc.occupation + '）' : '';
                 let level = '陌生人';
                 if (trust >= 80) level = '挚友';

@@ -4231,6 +4231,9 @@
 
             function openEquipment() { renderEquipment(); $('equipmentModal').style.display = 'flex'; }
 
+            // 记录当前装备详情面板正在展示的槽位（用于装备/卸下后自动重显刷新后详情，避免"必须重开面板才看到更新"）
+            let _equipDetailSlot = null;
+
             function renderEquipment() {
                 const s = gst();
                 const ch = gch();
@@ -4261,6 +4264,7 @@
                     const typeClass = ' equip-slot--' + sl.type;
                     const slotEl = document.createElement('div');
                     slotEl.className = 'equip-slot' + emptyClass + typeClass;
+                    slotEl.dataset.slot = sl.key;
                     slotEl.innerHTML =
                         '<div class="equip-slot__header">' +
                             '<span class="equip-slot__icon">' + sl.icon + '</span>' +
@@ -4269,7 +4273,10 @@
                         '<div class="equip-slot__value">' + (val ? esc(val) : '— 空 —') + '</div>' +
                         (itemInfo && itemInfo.durability ? '<div class="equip-slot__dur">耐久 ' + itemInfo.durability + '</div>' : '') +
                         (itemInfo && itemInfo.subCategory ? '<div class="equip-slot__tag">' + esc(itemInfo.subCategory) + '</div>' : '');
-                    slotEl.addEventListener('click', () => showSlotDetail(sl.key, val, itemInfo));
+                    slotEl.addEventListener('click', () => {
+                        _equipDetailSlot = sl.key;
+                        showSlotDetail(sl.key, val, itemInfo);
+                    });
                     container.appendChild(slotEl);
                 });
 
@@ -4317,6 +4324,7 @@
                                         checkAchievements();
                                         playSfx('equip');
                                         snotify('add', '装备', item.name + ' → ' + slotLabel(chosenSlot));
+                                        _equipDetailSlot = chosenSlot;
                                         renderEquipment();
                                         upui();
                                     } finally { _equipBusy = false; }
@@ -4336,6 +4344,7 @@
                             checkAchievements();
                             playSfx('equip');
                             snotify('add', '装备', item.name + ' → ' + slotLabel(slot));
+                            _equipDetailSlot = slot;
                             renderEquipment();
                             upui();
                             } finally { _equipBusy = false; }
@@ -4358,6 +4367,17 @@
                     } else {
                         abSection.style.display = 'none';
                     }
+                }
+
+                // 自动重显当前选中的槽位详情（装备/卸下后不丢失焦点，不需要重开面板）
+                if (_equipDetailSlot) {
+                    const eq2 = s.equip || {};
+                    const newVal = eq2[_equipDetailSlot] || '';
+                    const newInfo = newVal ? getItemInfo(newVal) : null;
+                    const slotEl2 = container.querySelector('.equip-slot[data-slot="' + _equipDetailSlot + '"]');
+                    if (slotEl2) slotEl2.classList.add('equip-slot--selected');
+                    if (newVal) showSlotDetail(_equipDetailSlot, newVal, newInfo);
+                    else showSlotDetail(_equipDetailSlot, '', null);
                 }
             }
 
@@ -4403,6 +4423,7 @@
                                 checkAchievements();
                                 playSfx('equip');
                                 snotify('remove', '装备', itemName);
+                                _equipDetailSlot = slotKey;
                                 renderEquipment();
                                 upui();
                             } else {
@@ -4416,6 +4437,7 @@
                                         checkAchievements();
                                         playSfx('equip');
                                         snotify('remove', '装备', itemName);
+                                        _equipDetailSlot = foundSlot;
                                         renderEquipment();
                                         upui();
                                     } else {
@@ -5689,9 +5711,9 @@
             $('btnIdle').addEventListener('click', toggleIdle);
             // ===== 压缩上下文记忆（Rikkahub 式对话框）：目标 token / 保留最近 N 条 / 附加说明 =====
             (function bindCompressCtxDialog() {
-                const btn = $('btnCompressCtx');
-                if (!btn) return;
-                btn.addEventListener('click', openCompressCtxDialog);
+                // 压缩记忆功能：既可在顶部"更多"菜单（btnCompressCtx，若保留），也在设置→上下文记忆区块（btnCompressCtxInSetting）
+                const btns = [ $('btnCompressCtx'), $('btnCompressCtxInSetting') ].filter(Boolean);
+                btns.forEach(btn => btn.addEventListener('click', openCompressCtxDialog));
 
                 function openCompressCtxDialog() {
                     if (summaryLock) { tst('正在生成摘要，请稍候…'); return; }
@@ -7268,12 +7290,14 @@ ${sumContent}
                     st.id = 'mobileLayoutFix_inline';
                     st.textContent = [
                         // ============== 层级基准（关键：不要再用 header/app-container 的 relative z-index 压浮层，会导致 fixed 子级被剪切）==============
-                        // header 不设全局 z-index，只让它的弹层（nav-more-menu）高；clue 浮层与更多菜单同阶，用可预测的 z-index
+                        // 更多菜单 z-index 应低于 side-panel(800)，高于 clue-sidebar(610)，避免盖住侧边栏
                         'header.app-header { position: static; z-index: auto; }',
                         '.header-actions { position: static; z-index: auto; }',
-                        // 更多按钮 + 菜单：设到独立定位，z-index 900 可覆盖 clue
                         '.nav-more-wrap { position: relative; z-index: auto; }',
-                        '#btnNavMore { position: relative; z-index: 901 !important; isolation: isolate; pointer-events: auto !important; }',
+                        '#btnNavMore { position: relative; z-index: 781 !important; isolation: isolate; pointer-events: auto !important; }',
+                        // 更多菜单 z-index = 780 < side-panel 800，但仍 > clue-sidebar 610
+                        '.nav-more-menu { z-index: 780 !important; }',
+                        '.nav-more-menu.open { z-index: 780 !important; }',
                         // 线索按钮和浮层：z-index 600/610，独立于 header、不被其剪切；强制 pointer-events: auto
                         '#btnToggleClueSidebar {',
                         '  z-index: 600 !important; pointer-events: auto !important;',
