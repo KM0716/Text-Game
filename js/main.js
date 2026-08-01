@@ -18,6 +18,9 @@
             const SUB_ICONS = (window.SUB_ICONS != null) ? window.SUB_ICONS : {};
             const ITEM_EMOJI = (window.ITEM_EMOJI != null) ? window.ITEM_EMOJI : {};
             const ITEM_PRESETS = (window.ITEM_PRESETS != null) ? window.ITEM_PRESETS : {};
+            const POS_TRAITS = (window.POS_TRAITS != null) ? window.POS_TRAITS : {};
+            const NEG_TRAITS = (window.NEG_TRAITS != null) ? window.NEG_TRAITS : {};
+            const PROFESSIONS = (window.PROFESSIONS != null) ? window.PROFESSIONS : {};
             // audio.js 暴露的 —— 使用安全包装，延迟读取 window，避免与 audio.js 加载时序的耦合问题
             const playSfx = (...a) => { if (typeof window.playSfx === 'function') return window.playSfx(...a); };
             const playTone = (...a) => { if (typeof window.playTone === 'function') return window.playTone(...a); };
@@ -486,6 +489,17 @@
                             raw = backup;
                         }
                     }
+                    // 末级兜底：若主存+备份均空且为配置键，尝试 sessionStorage（隐私模式/异常清空时）
+                    if (!raw && k === K.CFG) {
+                        try {
+                            const sess = sessionStorage.getItem(k);
+                            if (sess) {
+                                console.warn('[Storage] Restore from sessionStorage for CFG');
+                                localStorage.setItem(k, sess);
+                                raw = sess;
+                            }
+                        } catch {}
+                    }
                     if (!raw) return fb;
                     let obj;
                     try { obj = JSON.parse(raw); }
@@ -594,6 +608,10 @@
                         try { localStorage.setItem(k + '_bak', json); }
                         catch (e) { console.warn('[Storage] Backup save failed:', k); }
                     }, 50);
+                    // 同步到 sessionStorage（仅配置键，作为隐私模式/异常清空时的兜底）
+                    if (k === K.CFG) {
+                        try { sessionStorage.setItem(k, json); } catch {}
+                    }
                 } catch {}
             }
             // Storage health check on load
@@ -4654,11 +4672,8 @@
             $('inputText').addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); $('btnSend').click(); } });
             $('inputText').addEventListener('input', function() { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 140) + 'px'; });
             
-            // ===== 仅移动端启用软键盘适配 =====
-            const isMobileDevice = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
-                || !window.matchMedia('(hover: hover) and (pointer: fine)').matches;
-            
-            if (isMobileDevice) {
+            // ===== 仅移动端启用软键盘适配（统一使用 isMobile() 检测）=====
+            if (isMobile()) {
                 // 移动端软键盘适配：focus/blur 滚动兜底 + VisualViewport 动态调整容器
                 function vvApply() {
                     const av = document.querySelector('.app-container');
@@ -4724,6 +4739,41 @@
                 set('charBackground', c.bg); set('charMental', c.mental); set('charFears', c.fear);
                 set('charTraitsPos', (c.tp || []).join('\n')); set('charTraitsNeg', (c.tn || []).join('\n'));
                 set('charItems', c.it); set('charSpawn', c.sp);
+                // ===== 特质快速选择按钮（基于 POS_TRAITS / NEG_TRAITS 数据集）=====
+                (function fillTraitsQuickBtns() {
+                    const buildBtns = (containerId, traitsMap, textareaId) => {
+                        const cont = $(containerId);
+                        if (!cont) return;
+                        cont.innerHTML = '';
+                        const curTraits = ($(textareaId).value || '').split('\n').map(s => s.trim()).filter(Boolean);
+                        Object.keys(traitsMap).forEach(name => {
+                            const t = traitsMap[name];
+                            const btn = document.createElement('span');
+                            btn.className = 'preset-btn trait-quick-btn' + (curTraits.includes(name) ? ' selected' : '');
+                            btn.textContent = name;
+                            btn.title = t.desc || '';
+                            btn.style.fontSize = '0.62rem';
+                            btn.style.padding = '2px 6px';
+                            btn.addEventListener('click', () => {
+                                const ta = $(textareaId);
+                                const list = ta.value.split('\n').map(s => s.trim()).filter(Boolean);
+                                const idx = list.indexOf(name);
+                                if (idx >= 0) {
+                                    list.splice(idx, 1);
+                                    btn.classList.remove('selected');
+                                } else {
+                                    if (list.length >= 15) { tst('特质最多15项'); return; }
+                                    list.push(name);
+                                    btn.classList.add('selected');
+                                }
+                                ta.value = list.join('\n');
+                            });
+                            cont.appendChild(btn);
+                        });
+                    };
+                    buildBtns('posTraitsBtns', POS_TRAITS || {}, 'charTraitsPos');
+                    buildBtns('negTraitsBtns', NEG_TRAITS || {}, 'charTraitsNeg');
+                })();
                 set('charExtraFeature', c.extraFeature || '');
                 set('charAbilityPreset', c.abilityPreset || '');
                 set('charAbilityName', c.abilityName || '');
@@ -5118,6 +5168,10 @@
             }
             $('btnResetPrompt').addEventListener('click', () => { $('promptEditor').value = DPROMPT; tst('已恢复默认Prompt'); });
             // ===== Quick Restart: generate death ending then restart with same character =====
+            $('btnShowTutorial') && $('btnShowTutorial').addEventListener('click', () => {
+                $('settingsModal').style.display = 'none';
+                setTimeout(() => launchTutorial(), 100);
+            });
             $('btnQuickRestart') && $('btnQuickRestart').addEventListener('click', async () => {
                 if (!await sketchConfirm('确定要重新开始吗？\n将生成一个死亡结局，然后以当前角色设定从头开始游戏。\n\n当前游戏进度将丢失！')) return;
                 $('settingsModal').style.display = 'none';
@@ -6335,28 +6389,36 @@
                 upui();
                 startClock();
 
-                // ===== Priority: API key first → save → character creation =====
+                // ===== Priority: 新手教程 → API key → save → character creation =====
                 const finalCfg = cfg();
                 const chrData = gch();
 
+                // ===== 预判是否需要先播放新手教程（避免欢迎模态闪烁后再被隐藏）=====
+                // 用户期望流程：新手指引 → API配置 → 角色创建 → 开始游戏
+                const tutDone = localStorage.getItem('vn_tutorial');
+                const needsTutFirst = !tutDone && !finalCfg.key && !hasCustomCharacter();
+
                 if (!finalCfg.key) {
-                    // Step 1: No API key - show welcome modal for configuration, UNCONDITIONALLY 回填所有字段
-                    if ($('welEndpointPreset')) {
-                        $('welEndpointPreset').value = finalCfg.preset || 'openai';
-                        // 触发 change 事件以刷新 welModelSelect 选项
-                        try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
+                    if (!needsTutFirst) {
+                        // Step 1: No API key (教程已完成) - show welcome modal for configuration, UNCONDITIONALLY 回填所有字段
+                        if ($('welEndpointPreset')) {
+                            $('welEndpointPreset').value = finalCfg.preset || 'openai';
+                            // 触发 change 事件以刷新 welModelSelect 选项
+                            try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
+                        }
+                        $('welEndpoint').value = finalCfg.ep || '';
+                        const sl = $('welModelSelect');
+                        if (finalCfg.model && sl) {
+                            const hasOpt = [...sl.options].some(o => o.value === finalCfg.model);
+                            if (hasOpt) sl.value = finalCfg.model;
+                            else { $('welModel').value = finalCfg.model; sl.style.display='none'; $('welModel').style.display=''; }
+                        } else if (finalCfg.model) {
+                            $('welModel').value = finalCfg.model;
+                        }
+                        $('welKey').value = finalCfg.key || '';
+                        $('welcomeModal').style.display = 'flex';
                     }
-                    $('welEndpoint').value = finalCfg.ep || '';
-                    const sl = $('welModelSelect');
-                    if (finalCfg.model && sl) {
-                        const hasOpt = [...sl.options].some(o => o.value === finalCfg.model);
-                        if (hasOpt) sl.value = finalCfg.model;
-                        else { $('welModel').value = finalCfg.model; sl.style.display='none'; $('welModel').style.display=''; }
-                    } else if (finalCfg.model) {
-                        $('welModel').value = finalCfg.model;
-                    }
-                    $('welKey').value = finalCfg.key || '';
-                    $('welcomeModal').style.display = 'flex';
+                    // 若需要先播教程，则不显示欢迎模态，由下方教程回调中显示
                 } else if (loadedFromSave) {
                     // Step 2: Has API key + loaded from save - restore silently
                     rbt();
@@ -6381,9 +6443,31 @@
                 if (wmHidden && cmHidden && !isMobile()) {
                     setTimeout(() => $('inputText').focus(), 100);
                 }
-                // Show tutorial on first launch
-                if (!localStorage.getItem('vn_tutorial')) {
-                    setTimeout(() => launchTutorial(), 800);
+                // ===== 新手教程触发（needsTutFirst 已在上方预判）=====
+                if (needsTutFirst) {
+                    // 教程独占顶层（欢迎模态未显示，无需隐藏）
+                    setTimeout(() => {
+                        launchTutorial(() => {
+                            // 教程结束后再回填并显示 API 配置模态
+                            try {
+                                if ($('welEndpointPreset')) {
+                                    $('welEndpointPreset').value = finalCfg.preset || 'openai';
+                                    try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
+                                }
+                                $('welEndpoint').value = finalCfg.ep || '';
+                                const sl = $('welModelSelect');
+                                if (finalCfg.model && sl) {
+                                    const hasOpt = [...sl.options].some(o => o.value === finalCfg.model);
+                                    if (hasOpt) sl.value = finalCfg.model;
+                                    else { $('welModel').value = finalCfg.model; sl.style.display='none'; $('welModel').style.display=''; }
+                                } else if (finalCfg.model) {
+                                    $('welModel').value = finalCfg.model;
+                                }
+                                $('welKey').value = finalCfg.key || '';
+                                if (wm) wm.style.display = 'flex';
+                            } catch {}
+                        });
+                    }, 300);
                 }
                 // ===== BGM: 首次用户交互后启动，遵循浏览器自动播放策略 =====
                 const _bgmState = BGM();

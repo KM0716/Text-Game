@@ -103,15 +103,23 @@ function playSfx(type) {
     if (sePath) {
         try {
             if (!window._seCache) window._seCache = {};
+            // 缓存容量限制：超过 24 项时清理最早未使用的条目，避免内存膨胀
+            const cacheKeys = Object.keys(window._seCache);
+            if (cacheKeys.length >= 24 && !window._seCache[type]) {
+                const oldest = cacheKeys[0];
+                try { window._seCache[oldest].pause(); } catch {}
+                delete window._seCache[oldest];
+            }
             let audio = window._seCache[type];
             if (!audio) {
                 audio = new Audio(sePath);
                 audio.preload = 'auto';
-                audio.volume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.6');
                 window._seCache[type] = audio;
             } else {
                 try { audio.currentTime = 0; } catch(e) {}
             }
+            // 每次播放同步音量（用户可能在运行时调整了音量设置）
+            audio.volume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.6');
             const p = audio.play();
             if (p && p.catch) p.catch(err => {
                 if (window._seCache[type]) delete window._seCache[type];
@@ -380,17 +388,22 @@ function showTutorialStep(steps, idx, onComplete) {
     if (prev) prev.onclick = () => { d.remove(); showTutorialStep(steps, idx - 1, onComplete); };
 }
 
-function launchTutorial() {
+function launchTutorial(onComplete) {
     const steps = [
         { icon: '🎮', title: '欢迎来到末日世界', content: '这是一个文字模拟生存游戏。你将扮演幸存者，在末日废墟中求生、探索、战斗。' },
-        { icon: '⌨️', title: '基本操作', content: '在底部输入框输入你的行动，如「前往医院搜索药品」「与旁边的幸存者交谈」「使用绷带包扎伤口」等。' },
+        { icon: '🔑', title: '配置 AI 服务', content: '接下来你需要配置一个 AI 服务商（OpenAI / DeepSeek / Ollama 等）。填入 API 密钥后，所有叙事将由 AI 实时驱动。密钥仅保存在你的浏览器本地，不会上传。' },
+        { icon: '👤', title: '创建角色', content: '配置完成后，请填写角色与世界设定：姓名、职业、特质、背景故事、出生地点等。特质分正面和负面，会直接影响你的生存能力与剧情走向。' },
+        { icon: '⌨️', title: '基本操作', content: '在底部输入框输入行动，如「前往医院搜索药品」「与幸存者交谈」「使用绷带包扎伤口」等。' },
         { icon: '🎒', title: '背包与物品', content: '点击顶部「背包」查看物品。点击物品可以使用、丢弃、装备或加入收藏。物品会根据AI叙事自动增减。' },
-        { icon: '⚔️', title: '战斗与状态', content: '战斗中你的血量会同步显示。武器会损耗耐久，消耗弹药。注意伤势和精神状态，过低时会影响行动。' },
+        { icon: '⚔️', title: '战斗与状态', content: '战斗中血量会同步显示。武器会损耗耐久，消耗弹药。注意伤势和精神状态，过低时会影响行动。' },
         { icon: '🗺️', title: '探索与地图', content: '随着探索，新地点会在地图上解锁。面板视图可以看到小地图和已发现的区域。' },
-        { icon: '💾', title: '存档与设置', content: '随时可以存档（最多10个槽位）。设置中可调整沙盒参数、字体大小等。点击「开局」创建新角色。' },
-        { icon: '🤖', title: 'AI驱动', content: '所有叙事由AI驱动，你的选择影响故事走向。尽量描述具体行动，获得更真实的体验。祝好运，幸存者！' }
+        { icon: '💾', title: '存档与设置', content: '随时可以存档（最多10个槽位）。设置中可调整沙盒参数、字体大小等。API 配置会自动保存到本地，刷新不丢失。' },
+        { icon: '🤖', title: '开始你的旅程', content: '所有叙事由 AI 驱动，你的选择影响故事走向。尽量描述具体行动，获得更真实的体验。祝好运，幸存者！' }
     ];
-    showTutorialStep(steps, 0, () => { localStorage.setItem('vn_tutorial', 'done'); });
+    showTutorialStep(steps, 0, () => {
+        localStorage.setItem('vn_tutorial', 'done');
+        if (typeof onComplete === 'function') try { onComplete(); } catch {}
+    });
 }
 
 function toggleSfx() {

@@ -287,7 +287,7 @@
             <label>过往职业</label>
             <p class="field-hint">职业影响初始技能和知识储备。可选择下方预设职业快速填充，或手动输入</p>
             <input id="charJob" placeholder="机械师 / 学生 / 消防员…" list="jobList">
-            <datalist id="jobList"><option>学生</option><option>白领</option><option>消防员</option><option>医护人员</option><option>机械修理工</option><option>厨师</option><option>木工</option><option>猎人</option><option>保安</option><option>司机</option><option>退伍军人</option><option>程序员</option><option>拳击手</option></datalist>
+            <datalist id="jobList"><option>学生</option><option>白领</option><option>消防员</option><option>医生</option><option>护士</option><option>机械师</option><option>厨师</option><option>木工</option><option>猎人</option><option>保安</option><option>司机</option><option>退伍军人</option><option>程序员</option><option>拳击手</option><option>警察</option><option>工程师</option><option>记者</option><option>科学家</option><option>教师</option><option>飞行员</option><option>电工</option><option>农民</option><option>律师</option></datalist>
             <div id="jobPresetSection" style="margin-top:6px;display:none;">
                 <label>预设职业</label>
                 <div id="jobPresetBtns" style="display:flex;flex-wrap:wrap;gap:3px;margin-top:4px;"></div>
@@ -312,10 +312,12 @@
 
             <h4>特质</h4>
             <label>正面特质（一行一个，最多15项）</label>
-            <p class="field-hint">如：强健体魄、敏捷灵活、急救知识、潜行习惯、钢铁意志</p>
+            <p class="field-hint">如：强健体魄、敏捷灵活、急救知识、潜行习惯、钢铁意志。点击下方按钮快速添加（可叠加）</p>
+            <div id="posTraitsBtns" class="traits-quick-row" style="margin-bottom:6px;"></div>
             <textarea id="charTraitsPos" rows="2" placeholder="擅长修理机械&#10;动手能力强"></textarea>
             <label>负面特质（一行一个）</label>
-            <p class="field-hint">如：胆小、失眠、烟瘾、方向感差、旧伤未愈</p>
+            <p class="field-hint">如：胆小、失眠、烟瘾、方向感差、旧伤未愈。负面特质会带来挑战，但让角色更立体</p>
+            <div id="negTraitsBtns" class="traits-quick-row" style="margin-bottom:6px;"></div>
             <textarea id="charTraitsNeg" rows="2" placeholder="轻微烟瘾&#10;右膝旧伤"></textarea>
             <label>恐惧与弱点</label>
             <p class="field-hint">幽闭恐惧、恐血、不擅游泳等，影响特定场景行为</p>
@@ -493,6 +495,13 @@
             <p class="field-hint">生成一个死亡结局后直接从头开始游戏，保留当前角色设定和世界设定不变。</p>
             <div class="btn-row">
                 <button type="button" class="btn-modal" id="btnQuickRestart" style="color:var(--notify-remove);border-color:var(--notify-remove);">快速重开（死亡结局）</button>
+            </div>
+        </div>
+        <div class="setting-group">
+            <h4>帮助与教程</h4>
+            <p class="field-hint">第一次进入游戏会自动播放新手教程。如需回顾，点击下方按钮重新查看。</p>
+            <div class="btn-row">
+                <button type="button" class="btn-modal" id="btnShowTutorial" style="font-size:0.7rem;">📖 重新查看新手教程</button>
             </div>
         </div>
         <div class="btn-row"><button class="btn-modal primary" id="btnSaveSettings">保存设置</button></div>

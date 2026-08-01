@@ -715,12 +715,15 @@
                 display: none;
             }
             .nav-group {
-                gap: 2px;
+                gap: 3px;
                 flex-shrink: 0;
             }
             .btn-header {
-                padding: 3px 6px;
-                font-size: 0.56rem;
+                padding: 5px 8px;
+                font-size: 0.64rem;
+                min-height: 36px;
+                touch-action: manipulation;
+                -webkit-tap-highlight-color: transparent;
             }
             .nav-more-menu {
                 top: calc(100% + 4px);
@@ -2333,6 +2336,33 @@
             border-color: var(--accent);
         }
         .preset-btn:hover { border-color: var(--accent); }
+        /* 特质快速选择按钮（基于 POS_TRAITS/NEG_TRAITS 数据动态生成）*/
+        .traits-quick-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            max-width: 100%;
+            margin-bottom: 6px;
+        }
+        .trait-quick-btn {
+            display: inline-block;
+            padding: 3px 8px;
+            font-size: 0.66rem;
+            background: var(--button-bg);
+            border: 1.5px solid var(--border-light);
+            border-radius: 6px 3px 7px 4px;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s;
+            color: var(--ink);
+            -webkit-tap-highlight-color: transparent;
+        }
+        .trait-quick-btn.selected {
+            background: var(--accent);
+            color: #fffef9;
+            border-color: var(--accent);
+        }
+        .trait-quick-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
 
         /* ===== Settings field groups ===== */
         .setting-group {
@@ -2812,21 +2842,21 @@
         }
         @media (max-width: 480px) {
             .bp-grid { gap: 5px; min-height: 240px; }
-            .bp-cell { padding: 3px 2px; touch-action: manipulation; }
+            .bp-cell { padding: 4px 3px; touch-action: manipulation; min-height: 44px; }
             .bp-cell .bp-icon-cell { font-size: 1.1rem; }
             .bp-cell .bp-name { font-size: 0.65rem; }
-            .bp-cat-btn { padding: 3px 7px; font-size: 0.72rem; }
+            .bp-cat-btn { padding: 6px 9px; font-size: 0.74rem; min-height: 36px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
             .app-title { font-size: 0.78rem; }
-            .status-item { font-size: 0.6rem; padding: 1px 3px; white-space: nowrap; border-width: 1px; }
+            .status-item { font-size: 0.7rem; padding: 4px 6px; border-width: 1px; min-height: 30px; }
             .st-label { font-size: 0.82em; opacity: 0.65; }
-            .status-bar { flex-wrap: wrap; gap: 2px; }
-            .header-actions { gap: 1px; }
-            .btn-header { font-size: 0.65rem; padding: 3px 5px; min-height: 32px; min-width: 32px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
-            .btn-quick { font-size: 0.72rem; padding: 5px 8px; }
+            .status-bar { flex-wrap: wrap; gap: 3px; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+            .header-actions { gap: 2px; }
+            .btn-header { font-size: 0.68rem; padding: 6px 8px; min-height: 40px; min-width: 40px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+            .btn-quick { font-size: 0.74rem; padding: 7px 10px; min-height: 40px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
             .modal-panel { max-width: 95vw !important; max-height: 92vh; overflow-y: auto; padding: 14px 10px; }
             .side-panel { width: 88%; max-width: 340px; padding: 10px; }
             .side-panel h4 { font-size: 0.8rem; margin: 8px 0 4px; }
-            .side-panel .btn-header { width: 100%; margin-top: 6px; min-height: 38px; }
+            .side-panel .btn-header { width: 100%; margin-top: 6px; min-height: 42px; }
             .input-text { font-size: 0.85rem; min-height: 44px; padding: 10px 12px; }
             .chat-area { padding: 8px 10px; gap: 6px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
             .input-area { padding: 6px 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); gap: 4px; }
@@ -2841,7 +2871,7 @@
             .vn-choice { font-size: 0.85rem; padding: 0.65rem 1rem; }
             .vn-choice-container { max-width: 95%; }
             .equip-backpack-link__items { gap: 4px; }
-            .equip-bp-item { font-size: 0.65rem; padding: 3px 8px; }
+            .equip-bp-item { font-size: 0.65rem; padding: 4px 8px; min-height: 36px; }
             .bp-sub-bar { overflow-x: auto; flex-wrap: nowrap; }
             .bp-context-menu { position: fixed; left: 50% !important; top: 50% !important; transform: translate(-50%, -50%); }
             /* Mobile bubble optimization */
@@ -2864,9 +2894,9 @@
             .modal-panel h4 { font-size: 0.82rem; }
             .modal-panel label { font-size: 0.72rem; }
             .modal-panel .field-hint { font-size: 0.65rem; }
-            .modal-panel input, .modal-panel select, .modal-panel textarea { font-size: 0.8rem; padding: 7px 8px; }
-            .tab-btn { padding: 5px 8px; font-size: 0.68rem; }
-            .btn-modal { font-size: 0.75rem; padding: 7px 12px; min-height: 40px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+            .modal-panel input, .modal-panel select, .modal-panel textarea { font-size: 0.8rem; padding: 8px 9px; min-height: 40px; }
+            .tab-btn { padding: 7px 9px; font-size: 0.7rem; min-height: 38px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+            .btn-modal { font-size: 0.78rem; padding: 8px 13px; min-height: 42px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
             .sandbox-field-row .sandbox-field { flex: 1 1 100%; min-width: 0; }
             .sandbox-subgroup { padding: 6px; }
             .sp-card { padding: 6px 8px; }
@@ -2874,11 +2904,16 @@
             .sp-lbl { font-size: 0.78rem; }
             .sp-val { font-size: 0.78rem; }
             .notify-bubble { max-width: 92vw; font-size: 0.72rem; }
+            /* 特质快速按钮移动端触摸优化 */
+            .trait-quick-btn { padding: 5px 9px !important; min-height: 34px; font-size: 0.68rem !important; touch-action: manipulation; }
+            .traits-quick-row { gap: 4px !important; }
+            /* 预设按钮触摸优化 */
+            .preset-btn { padding: 6px 10px; min-height: 36px; touch-action: manipulation; }
         }
         @media (max-width: 360px) {
             .header-actions { flex-wrap: wrap; }
-            .btn-header { font-size: 0.6rem; padding: 2px 4px; }
-            .status-item { font-size: 0.56rem; padding: 0px 2px; }
+            .btn-header { font-size: 0.62rem; padding: 4px 6px; min-height: 36px; min-width: 36px; }
+            .status-item { font-size: 0.62rem; padding: 3px 5px; min-height: 28px; }
             .st-label { font-size: 0.8em; }
             .app-title { font-size: 0.7rem; }
             .vn-bubble--npc, .vn-bubble--player { max-width: 90%; font-size: 13px; }
@@ -2889,7 +2924,7 @@
             .input-text { font-size: 0.8rem; min-height: 40px; }
             .btn-send { min-width: 48px; font-size: 0.75rem; }
             .quick-actions { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
-            .btn-quick { white-space: nowrap; flex-shrink: 0; }
+            .btn-quick { white-space: nowrap; flex-shrink: 0; min-height: 38px; }
         }
         /* Tablet optimization */
         @media (min-width: 481px) and (max-width: 840px) {
@@ -2913,7 +2948,7 @@
     z-index: 10001;
     max-width: 340px;
     width: 90%;
-    animation: sketch-pop 0.25s ease-out;
+    animation: sketch-pop-center 0.25s ease-out;
     font-family: var(--font-main);
 }
 .idle-config-panel::before {
@@ -3045,7 +3080,7 @@
     50% { box-shadow: 2px 3px 10px rgba(139, 69, 19, 0.4); }
 }
 
-@keyframes sketch-pop {
+@keyframes sketch-pop-center {
     from { transform: translate(-50%, -50%) rotate(-0.5deg) scale(0.9); opacity: 0; }
     to { transform: translate(-50%, -50%) rotate(-0.5deg) scale(1); opacity: 1; }
 }
@@ -3199,16 +3234,17 @@
     }
 }
 
-/* 移动端属性栏优化 */
+/* 移动端属性栏优化（中等屏幕，480-600px）*/
 @media (max-width: 600px) {
     .status-bar {
-        gap: 2px;
-        font-size: 0.52rem;
+        gap: 3px;
+        font-size: 0.6rem;
     }
     .status-item {
-        padding: 1px 3px;
-        font-size: 0.5rem;
+        padding: 3px 5px;
+        font-size: 0.62rem;
         border-width: 1px;
+        min-height: 28px;
     }
     .status-item .st-label {
         font-size: 0.75em;
