@@ -614,20 +614,19 @@
                     }
                 } catch {}
             }
-            // Storage health check on load
+            // Storage health check on load（仅在发现损坏或接近容量上限时输出日志，减少控制台噪音）
             (function storageHealthCheck() {
                 try {
-                    const report = [];
+                    const issues = [];
                     Object.values(K).forEach(key => {
                         const raw = localStorage.getItem(key);
                         if (!raw) return;
-                        try { JSON.parse(raw); report.push('✓ ' + key); }
-                        catch (e) { report.push('✗ ' + key + ': ' + e.message); localStorage.removeItem(key); }
+                        try { JSON.parse(raw); }
+                        catch (e) { issues.push('✗ ' + key + ': ' + e.message); localStorage.removeItem(key); }
                     });
                     const usedKB = Math.round(JSON.stringify(localStorage).length / 1024);
-                    report.push('Storage used: ~' + usedKB + 'KB');
-                    if (usedKB > 4500) report.push('⚠️ Warning: Approaching 5MB localStorage limit');
-                    console.log('[Storage Health]\n' + report.join('\n'));
+                    if (usedKB > 4500) issues.push('⚠️ Storage used ~' + usedKB + 'KB (approaching 5MB limit)');
+                    if (issues.length) console.warn('[Storage Health]\n' + issues.join('\n'));
                 } catch {}
             })();
 
@@ -3264,9 +3263,11 @@
             // Expose core functions for cross-script access
             window.gch = gch; window.gst = gst; window.gclk = gclk; window.cfg = cfg;
             window.sch = sch; window.sst = sst; window.sclk = sclk; window.scf = scf;
-            window.hasCustomCharacter = hasCustomCharacter; window.playSfx = playSfx;
+            window.hasCustomCharacter = hasCustomCharacter;
+            // 注：playSfx / tst / esc / scb 不在此处覆盖 window —— 它们在 main.js 中是 audio.js 同名函数的代理，
+            // 若覆盖会导致代理函数调用自己形成无限循环（栈溢出）。audio.js 已暴露独立实现。
             window.hasHover = hasHover;
-            window.mds = mds; window.pai = pai; window.hin = hin; window.tst = tst;
+            window.mds = mds; window.pai = pai; window.hin = hin;
             window.buildInvAndEquipFromItems = buildInvAndEquipFromItems;
             window.getItemInfo = getItemInfo; window.getItemBaseName = getItemBaseName;
             window.stopIdle = stopIdle; window.startClock = startClock;
@@ -3276,12 +3277,12 @@
             // are defined in the second script block and exposed there via window.GameSystems
             // Additional functions needed by second script block
             window.rbt = rbt; window.upui = upui; window.stg = stg;
-            window.ccb = ccb; window.svh = svh; window.apb = apb; window.scb = scb;
+            window.ccb = ccb; window.svh = svh; window.apb = apb;
             window.migrateSta = migrateSta; window.migrateChr = migrateChr; window.migrateCfg = migrateCfg;
             window.mergeSbx = mergeSbx; window.ssbx = ssbx; window.gsbx = gsbx;
             window.ldh = ldh; window.ssv = ssv; window.gsv = gsv; window.validateSaveData = validateSaveData;
             window.gsp = gsp;
-            window.esc = esc; window.abold = abold; window.spBar = spBar;
+            window.abold = abold; window.spBar = spBar;
             window.buildItemTooltipHTML = buildItemTooltipHTML;
             window.mentalityLabel = mentalityLabel; window.itemEmoji = itemEmoji;
             window.fmtTime = fmtTime; window.dayPhase = dayPhase;
@@ -3937,8 +3938,6 @@
                 $('backpackModal').style.display = 'flex';
             }
             // 根据物品名称/信息推断装备槽位（用于本地装备操作）
-            // 旧名兼容，内部统一走 getEquipSlot
-            function guessEquipSlot(name, info) { return getEquipSlot(name, info); }
             function slotLabel(slot) {
                 const labels = { head: '头部', body: '躯干', legs: '腿部', feet: '足部', weapon: '主手', offhand: '副手', backpack: '背包', accessory: '饰品' };
                 return labels[slot] || slot;
@@ -4016,7 +4015,7 @@
                         btn.title = item.info.desc || '点击装备';
                         btn.addEventListener('click', async () => {
                             if (busy) { tst('正在演算中'); return; }
-                            let slot = guessEquipSlot(item.name, item.info);
+                            let slot = getEquipSlot(item.name, item.info);
                             if (!slot) {
                                 showEquipSlotSelector(item.name, item.info, (chosenSlot) => {
                                     const s2 = gst();
