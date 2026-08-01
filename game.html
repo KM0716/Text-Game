@@ -67,6 +67,7 @@
                 </div>
                 <div class="nav-group nav-secondary">
                     <button class="btn-header" id="btnSave">💾 存档</button>
+                    <button class="btn-header" id="btnCodex" title="图鉴">📖 图鉴</button>
                     <button class="btn-header accent" id="btnNewGame">🎮 开局</button>
                 </div>
                 <div class="nav-group nav-more-wrap">
@@ -118,7 +119,7 @@
                 </div>
             </div>
             <div class="input-row">
-                <textarea class="input-text" id="inputText" rows="1" placeholder="输入行动… (Ctrl+Enter 发送)"></textarea>
+                <div class="input-text contenteditable-input" id="inputText" contenteditable="true" data-placeholder="输入行动… (Ctrl+Enter 发送)"></div>
                 <button class="btn-send" id="btnSend">发送</button>
             </div>
         </div>
@@ -171,6 +172,19 @@
             <button class="modal-close" id="modalCloseEvents">x</button>
             <h3>⚡ 突发事件记录</h3>
             <div id="eventsList" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto;"></div>
+        </div>
+    </div>
+
+    <!-- Codex/NPC Encyclopedia Panel -->
+    <div class="modal-overlay" id="codexModal" style="display:none;">
+        <div class="modal-panel" style="max-width:560px;">
+            <button class="modal-close" id="modalCloseCodex">x</button>
+            <h3>📖 幸存者图鉴</h3>
+            <div class="codex-filters" id="codexFilters" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
+            <div id="codexList" style="display:flex;flex-direction:column;gap:6px;max-height:500px;overflow-y:auto;"></div>
+            <div class="codex-empty" id="codexEmpty" style="display:none;text-align:center;color:var(--text-muted);padding:20px;font-style:italic;">
+                尚未遇到任何幸存者。继续探索以发现更多人物。
+            </div>
         </div>
     </div>
 

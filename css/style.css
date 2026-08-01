@@ -3307,6 +3307,68 @@
     font-style: italic;
 }
 
+/* ContentEditable 输入框样式 */
+.input-text.contenteditable-input {
+    display: block;
+    min-height: 52px;
+    max-height: 140px;
+    overflow-y: auto;
+    word-break: break-word;
+    white-space: pre-wrap;
+    outline: none;
+    caret-color: var(--accent);
+}
+.input-text.contenteditable-input:empty::before {
+    content: attr(data-placeholder);
+    color: var(--text-muted);
+    pointer-events: none;
+    font-style: italic;
+}
+.input-text.contenteditable-input .item-chip {
+    display: inline-block;
+    background: linear-gradient(180deg, #e8d5b7 0%, #d4b896 100%);
+    border: 1.5px solid #8b4513;
+    border-radius: 4px;
+    padding: 1px 8px;
+    margin: 0 2px;
+    font-weight: bold;
+    color: #3a2614;
+    font-size: 0.88em;
+    line-height: 1.4;
+    white-space: nowrap;
+    user-select: all;
+    -webkit-user-select: all;
+    cursor: pointer;
+    box-shadow: 1px 1px 2px rgba(0,0,0,0.15);
+    transition: transform 0.1s;
+}
+.input-text.contenteditable-input .item-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+}
+.input-text.contenteditable-input .item-chip::before {
+    content: '📦 ';
+    font-size: 0.9em;
+}
+.input-text.contenteditable-input .item-chip.busy {
+    opacity: 0.5;
+    pointer-events: none;
+}
+.input-text.contenteditable-input.busy {
+    background: var(--bg-paper-alt);
+    opacity: 0.6;
+    pointer-events: none;
+}
+.input-text.contenteditable-input.idle-locked {
+    opacity: 0.5;
+    pointer-events: none;
+    background: repeating-linear-gradient(45deg, var(--bg-paper) 0px, var(--bg-paper) 6px, var(--bg-paper-alt) 6px, var(--bg-paper-alt) 12px);
+}
+.input-text.contenteditable-input.idle-locked::before {
+    color: var(--text-muted);
+    content: '挂机中...';
+}
+
 /* 移动端挂机面板适配 */
 @media (max-width: 480px) {
     .idle-config-panel {
@@ -3342,4 +3404,188 @@
     .status-item .st-label {
         font-size: 0.75em;
     }
+}
+
+/* ========== 图鉴(Codex)样式 ========== */
+#codexModal .modal-panel {
+    max-width: 720px;
+    width: 92%;
+}
+.codex-filters {
+    padding: 6px;
+    background: var(--bg-paper-alt);
+    border: 1px solid var(--divider);
+    border-radius: 6px;
+}
+.btn-codex-filter {
+    font-size: 0.7rem;
+    padding: 3px 10px;
+    background: var(--button-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 14px;
+    cursor: pointer;
+    color: var(--text);
+    transition: all 0.15s;
+}
+.btn-codex-filter:hover {
+    background: var(--button-hover);
+}
+.btn-codex-filter.active {
+    background: var(--accent);
+    color: #fff;
+    border-color: var(--accent);
+    box-shadow: 0 1px 3px rgba(139,69,19,0.3);
+}
+.codex-faction-section {
+    margin-bottom: 10px;
+    padding: 6px 8px;
+    background: var(--bg-paper-alt);
+    border-left: 3px solid var(--accent);
+    border-radius: 4px;
+}
+.codex-faction-header {
+    font-size: 0.8rem;
+    color: var(--ink);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 4px;
+}
+.codex-faction-header strong {
+    color: var(--accent);
+    font-size: 0.85rem;
+}
+.codex-faction-count {
+    margin-left: auto;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+    font-weight: normal;
+}
+.codex-faction-desc {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    padding: 2px 4px 6px 24px;
+    font-style: italic;
+}
+.codex-npc-entry {
+    background: var(--bg-paper);
+    border: 1px solid var(--border-light);
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 6px 0;
+    box-shadow: 0 1px 2px var(--shadow);
+}
+.codex-npc-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px dashed var(--divider);
+    padding-bottom: 4px;
+    margin-bottom: 4px;
+}
+.codex-npc-name {
+    font-size: 0.9rem;
+    font-weight: bold;
+    color: var(--accent);
+}
+.codex-trust {
+    font-size: 0.7rem;
+    font-weight: bold;
+}
+.codex-npc-info {
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    margin: 3px 0;
+}
+.codex-npc-backstory {
+    font-size: 0.7rem;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin: 3px 0;
+    line-height: 1.4;
+}
+.codex-npc-notes {
+    margin: 4px 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+}
+.codex-tag {
+    display: inline-block;
+    font-size: 0.65rem;
+    padding: 1px 7px;
+    background: var(--tag-bg);
+    border: 1px solid var(--border-light);
+    border-radius: 10px;
+    color: var(--ink-light);
+}
+.codex-npc-dialogue {
+    font-size: 0.7rem;
+    color: var(--ink);
+    background: var(--bg-paper-alt);
+    border-left: 2px solid var(--accent);
+    padding: 4px 8px;
+    margin: 4px 0;
+    font-style: italic;
+    border-radius: 0 4px 4px 0;
+}
+.codex-npc-stats {
+    font-size: 0.68rem;
+    color: var(--text-muted);
+    margin-top: 4px;
+    padding-top: 3px;
+    border-top: 1px dotted var(--divider);
+}
+.codex-empty {
+    font-size: 0.85rem;
+}
+
+/* AUTO 存档槽特殊样式 */
+.save-slot-auto {
+    background: linear-gradient(135deg, #fff8e7 0%, #fef0d4 100%) !important;
+    border: 2px solid var(--accent) !important;
+    border-radius: 10px !important;
+    position: relative;
+    padding: 10px 12px !important;
+    box-shadow: 0 2px 8px rgba(139,69,19,0.18);
+}
+.save-slot-auto::before {
+    content: '⚡ 自动存档';
+    position: absolute;
+    top: -9px;
+    left: 12px;
+    background: var(--accent);
+    color: #fff;
+    font-size: 0.62rem;
+    padding: 2px 10px;
+    border-radius: 10px;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.save-slot-auto .slot-info {
+    font-weight: bold;
+    color: var(--accent);
+}
+.save-slot-badge {
+    display: inline-block;
+    font-size: 0.6rem;
+    padding: 1px 6px;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 3px;
+    margin-left: 4px;
+}
+
+/* 移动端图鉴适配 */
+@media (max-width: 480px) {
+    #codexModal .modal-panel {
+        width: 96%;
+        max-height: 92vh;
+        padding: 14px;
+    }
+    .codex-faction-header { font-size: 0.75rem; }
+    .codex-npc-header { flex-wrap: wrap; gap: 4px; }
+    .codex-npc-name { font-size: 0.85rem; }
+    .codex-npc-backstory { font-size: 0.65rem; }
 }

@@ -30,7 +30,9 @@ function ensureAudio() {
 }
 
 function playTone(freq, dur, type, vol) {
-    if (!sfxEnabled) return;
+    let enabled = localStorage.getItem('vn_sfx');
+    if (enabled === null) enabled = '1';
+    if (enabled === '0') return;
     const ctx = ensureAudio(); if (!ctx) return;
     try {
         const osc = ctx.createOscillator();
@@ -94,37 +96,19 @@ const SE_FILES = {
 };
 
 function playSfx(type) {
-    if (!window._sfxEnabled) {
-        const stored = localStorage.getItem('vn_sfx');
-        window._sfxEnabled = stored !== '0';
-    }
-    if (!window._sfxEnabled) return;
+    let enabled = localStorage.getItem('vn_sfx');
+    if (enabled === null) enabled = '1';
+    if (enabled === '0') return;
     const sePath = SE_FILES[type];
     if (sePath) {
         try {
-            if (!window._seCache) window._seCache = {};
-            // 缓存容量限制：超过 24 项时清理最早未使用的条目，避免内存膨胀
-            const cacheKeys = Object.keys(window._seCache);
-            if (cacheKeys.length >= 24 && !window._seCache[type]) {
-                const oldest = cacheKeys[0];
-                try { window._seCache[oldest].pause(); } catch {}
-                delete window._seCache[oldest];
-            }
-            let audio = window._seCache[type];
-            if (!audio) {
-                audio = new Audio(sePath);
-                audio.preload = 'auto';
-                window._seCache[type] = audio;
-            } else {
-                try { audio.currentTime = 0; } catch(e) {}
-            }
-            // 每次播放同步音量（用户可能在运行时调整了音量设置）
+            const audio = new Audio(sePath);
+            audio.preload = 'auto';
             audio.volume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.6');
+            audio.playbackRate = 1;
             const p = audio.play();
-            if (p && p.catch) p.catch(err => {
-                if (window._seCache[type]) delete window._seCache[type];
-                playToneSfx(type);
-            });
+            if (p && p.catch) p.catch(() => { playToneSfx(type); });
+            setTimeout(() => { try { audio.pause(); audio.src = ''; } catch(e) {} }, 3000);
             return;
         } catch(e) {}
     }
@@ -132,7 +116,9 @@ function playSfx(type) {
 }
 
 function playToneSfx(type) {
-    if (!sfxEnabled) return;
+    let enabled = localStorage.getItem('vn_sfx');
+    if (enabled === null) enabled = '1';
+    if (enabled === '0') return;
     switch(type) {
         case 'click': playTone(800, 0.05, 'sine', 0.4); break;
         case 'send': playTone(600, 0.08, 'triangle', 0.4); setTimeout(() => playTone(800, 0.06, 'triangle', 0.3), 40); break;
@@ -336,10 +322,10 @@ function bgmToggle() {
     if (!BGM.enabled) {
         bgmStop();
         const btn = $('btnBgm');
-        if (btn) { btn.textContent = '🔇'; btn.title = '背景音乐（已关闭）'; }
+        if (btn) { btn.textContent = '🔇 音乐'; btn.title = '背景音乐（已关闭）'; }
     } else {
         const btn = $('btnBgm');
-        if (btn) { btn.textContent = '🎵'; btn.title = '背景音乐（开启）'; }
+        if (btn) { btn.textContent = '🎵 音乐'; btn.title = '背景音乐（开启）'; }
         bgmPlayCategory(BGM._currentCategory || 'title');
     }
     _safeSnotify('info', 'BGM', BGM.enabled ? '背景音乐已开启' : '背景音乐已关闭');

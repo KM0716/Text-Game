@@ -490,6 +490,77 @@
             let bpCat = 'food', bpSub = 'solid', bpPage = 0, bpView = 'cat'; // 'cat' | 'all' | 'star'
             let idleTimer = null, clockTimer = null;
 
+            // ===== ContentEditable 输入框辅助函数 =====
+            function getInputText() {
+                const el = $('inputText');
+                if (!el) return '';
+                if (el.tagName === 'TEXTAREA') return el.value;
+                let text = '';
+                function walkNode(node) {
+                    if (node.nodeType === Node.TEXT_NODE) {
+                        text += node.textContent;
+                    } else if (node.nodeType === Node.ELEMENT_NODE) {
+                        if (node.classList && node.classList.contains('item-chip')) {
+                            text += '{{' + (node.dataset.itemName || node.textContent.trim()) + '}}';
+                        } else if (node.tagName === 'BR') {
+                            text += '\n';
+                        } else if (node.tagName === 'DIV' || node.tagName === 'P') {
+                            if (text && !text.endsWith('\n')) text += '\n';
+                            for (const child of node.childNodes) walkNode(child);
+                        } else {
+                            for (const child of node.childNodes) walkNode(child);
+                        }
+                    }
+                }
+                for (const child of el.childNodes) walkNode(child);
+                return text.trim();
+            }
+            function setInputText(html) {
+                const el = $('inputText');
+                if (!el) return;
+                if (el.tagName === 'TEXTAREA') { el.value = html; return; }
+                el.innerHTML = '';
+            }
+            function insertItemChip(itemName) {
+                const el = $('inputText');
+                if (!el) return;
+                if (el.tagName === 'TEXTAREA') {
+                    const start = el.selectionStart || el.value.length;
+                    const end = el.selectionEnd || el.value.length;
+                    el.value = el.value.slice(0, start) + '{{' + itemName + '}}' + el.value.slice(end);
+                    return;
+                }
+                const chip = document.createElement('span');
+                chip.className = 'item-chip';
+                chip.contentEditable = 'false';
+                chip.dataset.itemName = itemName;
+                chip.textContent = itemName;
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(chip);
+                    const spaceAfter = document.createTextNode(' ');
+                    chip.parentNode.insertBefore(spaceAfter, chip.nextSibling);
+                    selection.removeAllRanges();
+                    const newRange = document.createRange();
+                    newRange.setStartAfter(spaceAfter);
+                    newRange.collapse(true);
+                    selection.addRange(newRange);
+                } else {
+                    el.appendChild(chip);
+                    el.appendChild(document.createTextNode(' '));
+                }
+                el.focus();
+            }
+            function clearInput() {
+                const el = $('inputText');
+                if (!el) return;
+                if (el.tagName === 'TEXTAREA') { el.value = ''; el.style.height = ''; return; }
+                el.innerHTML = '';
+                el.style.height = '';
+            }
+
             function ld(k, fb) {
                 try {
                     let raw = localStorage.getItem(k);
@@ -3192,14 +3263,22 @@
                         errMsg += '\n\n💡 API服务商暂时不可用，请稍后重新发送本次行动，系统将重新生成推演结果。';
                         if (!isIdle && tx) {
                             const inpEl = $('inputText');
-                            if (inpEl) inpEl.value = tx;
+                            if (inpEl && inpEl.tagName === 'TEXTAREA') inpEl.value = tx;
+                            else if (inpEl) {
+                                inpEl.textContent = '';
+                                inpEl.appendChild(document.createTextNode(tx));
+                            }
                         }
                     }
                     apb({ ty: 'system', tx: errMsg }, 0);
                     if (/服务器错误|服务商暂时不可用|429|频繁|网络|超时|timeout|fetch|abort|Failed to fetch/i.test(e.message) && !isIdle && tx) {
                         const retryFn = function() {
                             const inpEl2 = $('inputText');
-                            if (inpEl2) inpEl2.value = tx;
+                            if (inpEl2 && inpEl2.tagName === 'TEXTAREA') inpEl2.value = tx;
+                            else if (inpEl2) {
+                                inpEl2.textContent = '';
+                                inpEl2.appendChild(document.createTextNode(tx));
+                            }
                             if (!busy) hin(tx, false);
                         };
                         window._retryLastAction = retryFn;
@@ -3401,7 +3480,7 @@
                 }
                 upui();
                 const ee = $('chatEmpty'); if (ee) ee.style.display = 'flex';
-                $('inputText').value = '';
+                clearInput();
                 busy = false;
                 $('btnSend').disabled = false;
                 $('inputText').classList.remove('busy');
@@ -4141,19 +4220,17 @@
                             if (_equipBusy) return;
                             _equipBusy = true;
                             try {
-                            // 实际执行卸下操作
                             const s = gst();
                             if (s.equip && s.equip[slotKey] && s.equip[slotKey] === itemName) {
                                 s.equip[slotKey] = '';
-                                // 放回背包
                                 invAdd(itemName, 1);
                                 addLogEntry('system', '卸下了 ' + itemName);
                                 checkAchievements();
                                 playSfx('equip');
                                 snotify('remove', '装备', itemName);
                                 renderEquipment();
+                                upui();
                             } else {
-                                // 本地卸下操作，不触发AI对话
                                 const s2 = gst();
                                 if (s2.equip) {
                                     const foundSlot = Object.keys(s2.equip).find(k => s2.equip[k] === itemName);
@@ -4599,12 +4676,8 @@
                             playSfx('drop');
                         } else if (act === 'refinput') {
                             $('backpackModal').style.display = 'none';
-                            const inp = $('inputText');
                             const baseName = getItemBaseName(item);
-                            const insertText = '{{' + baseName + '}}';
-                            inp.value = inp.value + (inp.value && !inp.value.endsWith(' ') ? ' ' : '') + insertText + ' ';
-                            inp.focus();
-                            inp.setSelectionRange(inp.value.length, inp.value.length);
+                            insertItemChip(baseName);
                             tst('已引用「' + baseName + '」到输入框');
                             playSfx('pickup');
                         } else if (act === 'bookmark') {
@@ -4650,11 +4723,10 @@
             // ===== Event Listeners =====
             $('btnSend').addEventListener('click', () => {
                 try {
-                    const inputEl = $('inputText');
-                    if (!inputEl) return;
-                    const v = inputEl.value.trim();
+                    const v = getInputText();
                     if (!v) return;
                     if (busy) { tst('正在演算中，请稍候…'); return; }
+                    if (idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return; }
                     // Cheat code detection
                     if (v === 'worldlock') {
                         try {
@@ -4662,7 +4734,7 @@
                             scf({ ...cfgs, worldLock: !cfgs.worldLock });
                             tst(cfgs.worldLock ? '作弊码已关闭：角色锁定已启用' : '作弊码已激活：角色解锁中（可自由修改创建角色）');
                         } catch(e) { tst('作弊码切换失败'); }
-                        inputEl.value = '';
+                        clearInput();
                         return;
                     }
                     if (v === 'toggledebug' || v === 'godmode' || v === 'god' || v === 'debug') {
@@ -4672,7 +4744,7 @@
                             tst(!cur ? '⚡ 上帝模式已激活：你无所不能、永不死亡、可获取任何物资、进入任何地点、操控任何NPC' : '上帝模式已关闭');
                             if (typeof upui === 'function') upui();
                         } catch(e) { tst('调试模式切换失败'); }
-                        inputEl.value = '';
+                        clearInput();
                         return;
                     }
                     if (v === 'showdebug' || v === 'showsandbox' || v === 'secretpanel') {
@@ -4684,17 +4756,14 @@
                             gdGrp.style.display = hidden ? 'block' : 'none';
                             tst(hidden ? '开发者面板已显示' : '开发者面板已隐藏');
                         }
-                        inputEl.value = '';
+                        clearInput();
                         return;
                     }
-                    // ===== DEBUG MODE: Command prefix "/" =====
                     if ((cfg() || {}).debug && (v.startsWith('/') || v.startsWith('debug:') || v.startsWith('调试:'))) {
                         try { if (typeof runDebugCmd === 'function') runDebugCmd(v); } catch(e) { console.error('[Send] runDebugCmd err:', e); }
-                        inputEl.value = '';
-                        inputEl.style.height = '';
+                        clearInput();
                         return;
                     }
-                    // ===== CHEAT DETECTION: Block unrealistic/cheating behavior =====
                     if (!(cfg() || {}).debug) {
                         const cheatPatterns = [
                             { re: /瞬移|传送|瞬间移动|直接出现在|瞬间到达/, msg: '不可以作弊！末世世界没有瞬移能力，请选择现实可行的移动方式。' },
@@ -4708,7 +4777,7 @@
                         for (const cp of cheatPatterns) {
                             if (cp.re.test(v)) {
                                 tst(cp.msg);
-                                inputEl.value = '';
+                                clearInput();
                                 return;
                             }
                         }
@@ -4721,8 +4790,7 @@
                     }
                     hin(v);
                     if (!busy) return;
-                    inputEl.value = '';
-                    inputEl.style.height = '';
+                    clearInput();
                     try { playSfx('send'); } catch(e) {}
                 } catch(e) {
                     console.error('[Send] 发送按钮出错：', e);
@@ -4730,8 +4798,52 @@
                     try { $('btnSend').disabled = false; } catch {}
                 }
             });
-            $('inputText').addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); $('btnSend').click(); } });
-            $('inputText').addEventListener('input', function() { this.style.height = 'auto'; this.style.height = Math.min(this.scrollHeight, 140) + 'px'; });
+            $('inputText').addEventListener('keydown', e => {
+                const el = $('inputText');
+                if (!el) return;
+                const isCE = el.classList.contains('contenteditable-input');
+                if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
+                    e.preventDefault();
+                    $('btnSend').click();
+                    return;
+                }
+                if (isCE && e.key === 'Enter' && !e.shiftKey) {
+                    if (e.shiftKey) return;
+                    e.preventDefault();
+                    document.execCommand('insertText', false, '\n');
+                    return;
+                }
+                if (isCE && e.key === 'Backspace') {
+                    const sel = window.getSelection();
+                    if (sel && sel.rangeCount > 0) {
+                        const range = sel.getRangeAt(0);
+                        if (range.collapsed) {
+                            const prevNode = range.startContainer;
+                            if (prevNode && prevNode.nodeType === Node.TEXT_NODE && range.startOffset === 0) {
+                                const prevSibling = prevNode.previousSibling;
+                                if (prevSibling && prevSibling.classList && prevSibling.classList.contains('item-chip')) {
+                                    e.preventDefault();
+                                    prevSibling.remove();
+                                    return;
+                                }
+                            }
+                        }
+                        if (!range.collapsed) {
+                            const frag = range.cloneContents();
+                            const hasChip = frag.querySelector('.item-chip');
+                            if (hasChip) {
+                                e.preventDefault();
+                                range.deleteContents();
+                                return;
+                            }
+                        }
+                    }
+                }
+            });
+            $('inputText').addEventListener('input', function() {
+                this.style.height = 'auto';
+                this.style.height = Math.min(this.scrollHeight, 140) + 'px';
+            });
             
             // ===== 仅移动端启用软键盘适配（统一使用 isMobile() 检测）=====
             if (isMobile()) {
@@ -5260,7 +5372,8 @@
                         openState = false;
                     }, delay);
                 };
-                // 点击按钮切换（支持桌面和移动端）
+                // 点击按钮切换（桌面用 click，移动端用 pointerup 避免双重触发）
+                const _isMobile = () => /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 480;
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
                     e.preventDefault();
@@ -5270,16 +5383,6 @@
                         openMenu();
                     }
                 });
-                // 移动端：touch 增强
-                btn.addEventListener('touchend', (e) => {
-                    e.stopPropagation();
-                    e.preventDefault();
-                    if (openState) closeMenu(0);
-                    else openMenu();
-                }, { passive: false });
-                // 菜单内部点击不冒泡
-                menu.addEventListener('click', (e) => e.stopPropagation());
-                menu.addEventListener('touchend', (e) => e.stopPropagation());
                 // 桌面端：mouseenter/mouseleave 悬浮展开
                 btn.addEventListener('mouseenter', openMenu);
                 menu.addEventListener('mouseenter', openMenu);
@@ -5313,6 +5416,93 @@
             $('modalCloseEvents') && $('modalCloseEvents').addEventListener('click', () => {
                 $('eventsModal').style.display = 'none';
             });
+            $('btnCodex') && $('btnCodex').addEventListener('click', () => {
+                renderCodexPanel();
+                $('codexModal').style.display = 'flex';
+            });
+            $('modalCloseCodex') && $('modalCloseCodex').addEventListener('click', () => {
+                $('codexModal').style.display = 'none';
+            });
+            function renderCodexPanel(filterFaction) {
+                const list = $('codexList');
+                const empty = $('codexEmpty');
+                const filters = $('codexFilters');
+                if (!list || !empty) return;
+                const s = gst();
+                const npcRel = (s && s.npcRel) || {};
+                const metNames = Object.keys(npcRel);
+                const NPC_DATA = window.NPC_DATA || {};
+                const NPC_FACTIONS = window.NPC_FACTIONS || {};
+                if (metNames.length === 0) {
+                    list.innerHTML = '';
+                    empty.style.display = 'block';
+                    return;
+                }
+                empty.style.display = 'none';
+                // Render faction filter
+                const factionsInUse = new Set();
+                metNames.forEach(name => {
+                    const data = NPC_DATA[name];
+                    if (data && data.faction) factionsInUse.add(data.faction);
+                });
+                filters.innerHTML = '<span style="font-size:0.7rem;color:var(--text-muted);margin-right:4px;">势力筛选:</span>' +
+                    '<button class="btn-codex-filter' + (!filterFaction ? ' active' : '') + '" data-faction="all">全部</button>';
+                factionsInUse.forEach(f => {
+                    const fac = NPC_FACTIONS[f];
+                    if (fac) {
+                        filters.innerHTML += '<button class="btn-codex-filter' + (filterFaction === f ? ' active' : '') + '" data-faction="' + f + '">' + fac.icon + ' ' + fac.name + '</button>';
+                    }
+                });
+                filters.querySelectorAll('.btn-codex-filter').forEach(btn => {
+                    btn.addEventListener('click', () => renderCodexPanel(btn.dataset.faction === 'all' ? null : btn.dataset.faction));
+                });
+                // Group by faction
+                const grouped = {};
+                metNames.forEach(name => {
+                    const data = NPC_DATA[name];
+                    if (!data) return;
+                    if (filterFaction && data.faction !== filterFaction) return;
+                    const facKey = data.faction || 'unknown';
+                    if (!grouped[facKey]) grouped[facKey] = [];
+                    grouped[facKey].push({ name, data, rel: npcRel[name] || {} });
+                });
+                list.innerHTML = '';
+                Object.entries(grouped).forEach(([facKey, npcs]) => {
+                    const fac = NPC_FACTIONS[facKey];
+                    const facName = fac ? fac.name : '未知势力';
+                    const facIcon = fac ? fac.icon : '❓';
+                    const facDesc = fac ? fac.desc : '';
+                    const section = document.createElement('div');
+                    section.className = 'codex-faction-section';
+                    section.innerHTML = '<div class="codex-faction-header">' + facIcon + ' <strong>' + esc(facName) + '</strong><span class="codex-faction-count">' + npcs.length + ' 人</span></div>' +
+                        (facDesc ? '<div class="codex-faction-desc">' + esc(facDesc) + '</div>' : '');
+                    npcs.forEach(({ name, data, rel }) => {
+                        const trust = rel.trust != null ? rel.trust : (data.trust || 0);
+                        const affinity = rel.affinity != null ? rel.affinity : (data.affinity || 0);
+                        const trustLevel = trust >= 80 ? '亲密' : trust >= 60 ? '友好' : trust >= 40 ? '普通' : trust >= 20 ? '冷淡' : '敌对';
+                        const trustColor = trust >= 80 ? '#4a9a6f' : trust >= 60 ? '#6faa4a' : trust >= 40 ? '#8a7a4a' : trust >= 20 ? '#8a5a3a' : '#8a3a3a';
+                        const notes = data.notes || [];
+                        const noteHtml = notes.length ? '<div class="codex-npc-notes">' + notes.map(n => '<span class="codex-tag">' + esc(n) + '</span>').join('') + '</div>' : '';
+                        const dialogueKey = trust >= data.unlockLevel ? 'high' : trust >= (data.unlockLevel * 0.7) ? 'mid' : 'low';
+                        const sampleDialogue = data.dialogue && data.dialogue[dialogueKey] ? data.dialogue[dialogueKey] : '';
+                        const npcEl = document.createElement('div');
+                        npcEl.className = 'codex-npc-entry';
+                        npcEl.innerHTML = '<div class="codex-npc-header">' +
+                            '<span class="codex-npc-name">' + esc(name) + '</span>' +
+                            '<span class="codex-trust" style="color:' + trustColor + ';">信任: ' + trust + ' (' + trustLevel + ')</span>' +
+                            '</div>' +
+                            '<div class="codex-npc-info">' + esc(data.personality || '') + ' | 前' + esc(data.occupation || '') + '</div>' +
+                            '<div class="codex-npc-backstory">' + esc(data.backstory || '') + '</div>' +
+                            noteHtml +
+                            (sampleDialogue ? '<div class="codex-npc-dialogue">💬 "' + esc(sampleDialogue) + '"</div>' : '') +
+                            '<div class="codex-npc-stats">好感 ' + affinity + ' | 礼物偏好: ' + esc((data.gifts || []).slice(0, 3).join(', ') || '无') + '</div>';
+                        section.appendChild(npcEl);
+                    });
+                    list.appendChild(section);
+                });
+            }
+            // Expose for external calls
+            window.renderCodexPanel = renderCodexPanel;
             // ===== Undo last turn / Regen AI reply =====
             $('btnUndoTurn') && $('btnUndoTurn').addEventListener('click', async () => {
                 if (busy) { tst('演算中，无法回退'); return; }
@@ -5589,6 +5779,82 @@
                     const svs = gsv() || {}, sl = $('saveSlots');
                     if (!sl) return;
                     sl.innerHTML = '';
+                    // AUTO 存档槽（最上）
+                    const autoSn = svs['auto'];
+                    const autoD = document.createElement('div');
+                    autoD.className = 'save-slot-auto';
+                    autoD.style.cssText = 'padding:10px 12px;margin:14px 0 10px;border-radius:10px;display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;font-size:0.68rem;';
+                    const autoSlotInfo = '<span class="slot-info" style="flex:1;min-width:140px;">⚡ AUTO 自动存档 ' + (autoSn ? '| ' + new Date(autoSn.tm).toLocaleString() + ' | 第' + ((autoSn.clk && autoSn.clk.day) || 0) + '天' : '| 尚未生成') + '</span>';
+                    autoD.innerHTML = autoSlotInfo + '<div style="display:flex;gap:4px;flex-wrap:wrap;">' +
+                        '<button class="btn-header" data-act="autosave">立即存档</button>' +
+                        (autoSn ? '<button class="btn-header" data-act="load" style="color:var(--accent);">读取</button>' : '') +
+                        '</div>';
+                    autoD.querySelector('[data-act="autosave"]').addEventListener('click', (e) => {
+                        try {
+                            e.stopPropagation();
+                            const curCfg = cfg() || {};
+                            const cleanCfg = {};
+                            Object.keys(curCfg).forEach(k => {
+                                const v = curCfg[k];
+                                if (v === '' || v === null || v === undefined) return;
+                                try { cleanCfg[k] = JSON.parse(JSON.stringify(v)); } catch(e2) {}
+                            });
+                            svs['auto'] = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), cfg: cleanCfg, tm: Date.now() };
+                            ssv(svs);
+                            scf({ ...(cfg() || {}), lastSlot: 'auto' });
+                            $('btnSave').click();
+                            tst('已更新 AUTO 存档');
+                            playSfx('pickup');
+                        } catch(err) {
+                            console.error('[AutoSave] 失败：', err);
+                            tst('AUTO 存档失败：' + (err.message || '未知错误'), 'warn');
+                        }
+                    });
+                    const autoLoadBtn = autoD.querySelector('[data-act="load"]');
+                    if (autoLoadBtn) autoLoadBtn.addEventListener('click', async (e) => {
+                        try {
+                            e.stopPropagation();
+                            if (!autoSn) { tst('AUTO 存档尚未生成'); return; }
+                            try {
+                                if (!await sketchConfirm('确定读取 AUTO 存档？\n当前进度将被覆盖且无法恢复。')) return;
+                            } catch(ce) {
+                                if (!window.confirm('确定读取 AUTO 存档？当前进度将被覆盖！')) return;
+                            }
+                            if (typeof stopIdle === 'function') stopIdle();
+                            const r = validateSaveData(autoSn, false);
+                            hist = (r.recovered.hi || []).slice();
+                            if (typeof sst === 'function') sst(r.recovered.st);
+                            if (typeof sch === 'function') sch(r.recovered.ch);
+                            if (typeof sclk === 'function') sclk(r.recovered.clk);
+                            if (typeof ssbx === 'function' && typeof mergeSbx === 'function' && r.recovered.sbx) {
+                                sbx = mergeSbx(r.recovered.sbx);
+                                if (typeof ssbx === 'function') ssbx(sbx);
+                            }
+                            if (typeof scf === 'function' && r.recovered.cfg) {
+                                const curCfg = cfg() || {};
+                                const merged = { ...curCfg, ...r.recovered.cfg };
+                                if (!merged.key && curCfg.key) merged.key = curCfg.key;
+                                if (r.recovered.cfg.key === '' || r.recovered.cfg.key === null || r.recovered.cfg.key === undefined) {
+                                    merged.key = curCfg.key;
+                                }
+                                scf(typeof migrateCfg === 'function' ? migrateCfg(merged) : merged);
+                            }
+                            if (r.errs && r.errs.length > 0) {
+                                if (typeof snotify === 'function') snotify('warn', '存档导入', '已自动修复 ' + r.errs.length + ' 处字段缺失');
+                                tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
+                            }
+                            if (typeof rbt === 'function') rbt();
+                            if (typeof upui === 'function') upui();
+                            $('saveModal').style.display = 'none';
+                            tst('已读取 AUTO 存档');
+                            playSfx('pickup');
+                        } catch(err) {
+                            console.error('[LoadAuto] 读档失败：', err);
+                            tst('读档失败：' + (err.message || '未知错误'), 'warn');
+                        }
+                    });
+                    sl.appendChild(autoD);
+                    // 普通槽位 1-10
                     for (let i = 1; i <= 10; i++) {
                         const k = 's' + i, sn = svs[k];
                         const d = document.createElement('div');
