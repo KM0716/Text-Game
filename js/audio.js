@@ -18,7 +18,7 @@ function escAttr(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 // ---------- Sound System (Web Audio + WAV SE) ----------
 window.audioCtx = window.audioCtx || null;
 let sfxEnabled = localStorage.getItem('vn_sfx') !== '0';
-let sfxVolume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.5');
+let sfxVolume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.6');
 
 function ensureAudio() {
     if (!window.audioCtx) {

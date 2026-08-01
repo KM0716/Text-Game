@@ -1192,6 +1192,13 @@
             Object.values(EVENT_TRIGGERS).forEach(fn => {
                 try { fn(s, clk); } catch(e) {}
             });
+            // 同时调用 events.js 的扩展事件触发器（含 onAutoRandomEvent）
+            const extTriggers = window.EVENT_TRIGGERS_EXT;
+            if (extTriggers) {
+                Object.values(extTriggers).forEach(fn => {
+                    try { fn(s, clk); } catch(e) {}
+                });
+            }
         }
 
         // Check events periodically

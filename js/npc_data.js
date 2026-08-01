@@ -88,102 +88,66 @@
     };
 
     /**
-     * NPC 主数据表
-     * 新增 NPC 时直接在此追加即可，无需改动 main.js 业务代码。
+     * NPC 势力信息扩展表
+     * 为 data.js 中已有 NPC 添加 faction 和 notes 字段。
+     * 名称映射：npc_data.js 简称 → data.js 全名
      */
-    const NPC_DATA = {
-        '老张': {
-            trust: 30, affinity: 50, faction: 'military',
-            personality: '谨慎老练', occupation: '前军人',
-            dialogue: { low: '别烦我。', mid: '我们合作吧。', high: '我信你，跟你分享些秘密。' },
-            gifts: ['香烟', '白酒', '水果罐头'], unlockLevel: 60,
-            backstory: '参加过三次战争的老兵，现在只想安稳过日子',
-            notes: ['战术经验', '枪支熟练', '领导力', '爱国', '保守']
-        },
-        '莉莉': {
-            trust: 40, affinity: 60, faction: 'medical',
-            personality: '热情善良', occupation: '前护士',
-            dialogue: { low: '（她对你笑了笑）', mid: '你好，需要帮助吗？', high: '我愿意跟你一起走！' },
-            gifts: ['药品', '绷带', '巧克力'], unlockLevel: 70,
-            backstory: '市立医院外科护士，灾难当天值夜班逃了出来',
-            notes: ['医疗知识', '急救技能', '善良', '乐观', '值得信赖']
-        },
-        '陈默': {
-            trust: 50, affinity: 70, faction: 'engineer',
-            personality: '沉默寡言', occupation: '前工程师',
-            dialogue: { low: '（点头）', mid: '嗯，可以。', high: '我把我的发明给你。' },
-            gifts: ['零件', '工具', '电池'], unlockLevel: 80,
-            backstory: '航天工程师，擅长制作各种设备，女儿在灾难中去世',
-            notes: ['机械天才', '电子专家', '内向', '专注', '丧女之痛']
-        },
-        '小美': {
-            trust: 20, affinity: 40, faction: 'solo',
-            personality: '多疑善变', occupation: '前会计',
-            dialogue: { low: '走开！', mid: '你还可以。', high: '我……只信任你。' },
-            gifts: ['现金', '首饰', '香水'], unlockLevel: 75,
-            backstory: '曾是注册会计师，携款逃离城市时被抢劫一空',
-            notes: ['精明', '不信任人', '金钱至上', '受过伤害', '善变']
-        },
-        '大刘': {
-            trust: 35, affinity: 55, faction: 'military',
-            personality: '豪爽直率', occupation: '前警察',
-            dialogue: { low: '你不是坏人？', mid: '一起干！', high: '兄弟！我的命就是你的！' },
-            gifts: ['白酒', '香烟', '午餐肉罐头'], unlockLevel: 65,
-            backstory: '刑警队队长，救过很多人的命',
-            notes: ['正义感', '武力值高', '豪爽', '重义气', '前刑警']
-        },
-        '老王': {
-            trust: 15, affinity: 25, faction: 'trader',
-            personality: '吝啬油滑', occupation: '杂货店主',
-            dialogue: { low: '想买什么？现金交易！', mid: '老顾客了，给你打个折。', high: '这批货只给你看。' },
-            gifts: ['食盐', '糖', '打火机'], unlockLevel: 70,
-            backstory: '开了三十年杂货铺，末世更是精于算计的商人，存活至今',
-            notes: ['精明商人', '利欲熏心', '信息灵通', '吝啬', '生存智慧']
-        },
-        '小芳': {
-            trust: 25, affinity: 45, faction: 'student',
-            personality: '乐观开朗', occupation: '大学生',
-            dialogue: { low: '（警惕地看着你）', mid: '学长/学姐好！', high: '我把你当亲哥哥/姐姐！' },
-            gifts: ['矿泉水', '巧克力', '笔记本'], unlockLevel: 60,
-            backstory: '医学院大三学生，学医的，懂一些急救知识',
-            notes: ['医学知识', '学生', '乐观', '纯真', '有活力']
-        },
-        '陈医生': {
-            trust: 45, affinity: 55, faction: 'medical',
-            personality: '理性冷静', occupation: '前外科医生',
-            dialogue: { low: '有什么病？', mid: '坐下，我看看。', high: '来吧，我教你手术。' },
-            gifts: ['医疗包', '抗生素', '止痛药'], unlockLevel: 75,
-            backstory: '医院主任级医生，因救了很多幸存者的朋友',
-            notes: ['顶级医术', '冷静', '理性', '救人无数', '权威']
-        },
-        '铁头': {
-            trust: 5, affinity: 15, faction: 'bandit',
-            personality: '凶狠残暴', occupation: '掠夺者头目',
-            dialogue: { low: '滚！小心老子砍你！', mid: '上次的东西留下，这次放过你。', high: '以后跟我混！' },
-            gifts: ['金条', '白酒', '香烟'], unlockLevel: 90,
-            backstory: '原是建筑工人，拉起了一支掠夺者小队，杀人越货无恶不作',
-            notes: ['暴力', '残忍', '犯罪组织', '头目', '极度危险']
-        }
+    const NPC_NAME_MAP = {
+        '小美': '苏梅', '老王': '王金贵', '小芳': '林晓芳', '陈医生': '陈志远'
     };
 
-    /**
-     * NPC 关系网络
-     * 描述 NPC 之间的既有关系，影响剧情互动与派系判定。
-     * level: 关系强度 0-100
-     */
-    const NPC_RELATIONSHIPS = [
-        { from: '老张', to: '大刘', type: '战友', level: 80 },
-        { from: '莉莉', to: '小美', type: '同事', level: 60 },
-        { from: '陈默', to: '老张', type: '邻居', level: 40 },
-        { from: '大刘', to: '陈默', type: '酒友', level: 50 },
-        { from: '陈医生', to: '莉莉', type: '师徒', level: 85 },
-        { from: '小芳', to: '陈医生', type: '救命恩人', level: 70 },
-        { from: '老王', to: '铁头', type: '供货关系', level: 30 },
-        { from: '大刘', to: '铁头', type: '仇人', level: 10 }
-    ];
+    // 为 data.js 的 NPC 添加 faction 和 notes
+    const NPC_FACTION_DATA = {
+        '老张':       { faction: 'military', notes: ['战术经验', '枪支熟练', '领导力', '爱国', '保守'] },
+        '莉莉':       { faction: 'medical',  notes: ['医疗知识', '急救技能', '善良', '乐观', '值得信赖'] },
+        '陈默':       { faction: 'engineer', notes: ['机械天才', '电子专家', '内向', '专注', '丧女之痛'] },
+        '苏梅':       { faction: 'solo',     notes: ['精明', '不信任人', '金钱至上', '受过伤害', '善变'] },
+        '大刘':       { faction: 'military', notes: ['正义感', '武力值高', '豪爽', '重义气', '前刑警'] },
+        '王金贵':     { faction: 'trader',   notes: ['精明商人', '利欲熏心', '信息灵通', '吝啬', '生存智慧'] },
+        '林晓芳':     { faction: 'student',  notes: ['医学知识', '学生', '乐观', '纯真', '有活力'] },
+        '陈志远':     { faction: 'medical',  notes: ['顶级医术', '冷静', '理性', '救人无数', '权威'] },
+        '铁头':       { faction: 'bandit',   notes: ['暴力', '残忍', '犯罪组织', '头目', '极度危险'] },
+        '赵寡妇':     { faction: 'solo',     notes: ['独立', '坚韧', '社区关系', '谨慎', '务实'] },
+        '阿彬':       { faction: 'engineer', notes: ['手艺精湛', '忠厚', '学习能力强', '年轻', '感恩'] },
+        '周老师':     { faction: 'student',  notes: ['知识渊博', '教育者', '温和', '智慧', '文化传承'] }
+    };
+
+    // 合并到 data.js 已有的 NPC_DATA（添加 faction 和 notes，不覆盖已有字段）
+    const NPC_DATA = window.NPC_DATA || {};
+    Object.keys(NPC_FACTION_DATA).forEach(name => {
+        if (NPC_DATA[name]) {
+            // data.js 已有此 NPC，添加 faction 和 notes
+            if (!NPC_DATA[name].faction) NPC_DATA[name].faction = NPC_FACTION_DATA[name].faction;
+            if (!NPC_DATA[name].notes) NPC_DATA[name].notes = NPC_FACTION_DATA[name].notes;
+        } else {
+            // data.js 没有此 NPC，创建基础条目
+            NPC_DATA[name] = {
+                trust: 20, affinity: 30,
+                faction: NPC_FACTION_DATA[name].faction,
+                personality: '未知', occupation: '未知',
+                dialogue: { low: '……', mid: '……', high: '……' },
+                gifts: [], unlockLevel: 60,
+                backstory: '信息未知',
+                notes: NPC_FACTION_DATA[name].notes
+            };
+        }
+    });
 
     // 暴露到全局，供 main.js 读取
+    // NPC_DATA 已在上方合并完成（引用 data.js 的对象，添加了 faction/notes）
+    // NPC_RELATIONSHIPS 保留 data.js 的版本（更详细），仅在 data.js 没有时使用 npc_data.js 的
     window.NPC_FACTIONS = NPC_FACTIONS;
     window.NPC_DATA = NPC_DATA;
-    window.NPC_RELATIONSHIPS = NPC_RELATIONSHIPS;
+    if (!window.NPC_RELATIONSHIPS) {
+        window.NPC_RELATIONSHIPS = [
+            { from: '老张', to: '大刘', type: '战友', level: 80 },
+            { from: '莉莉', to: '苏梅', type: '同事', level: 60 },
+            { from: '陈默', to: '老张', type: '邻居', level: 40 },
+            { from: '大刘', to: '陈默', type: '酒友', level: 50 },
+            { from: '陈志远', to: '莉莉', type: '师徒', level: 85 },
+            { from: '林晓芳', to: '陈志远', type: '救命恩人', level: 70 },
+            { from: '王金贵', to: '铁头', type: '供货关系', level: 30 },
+            { from: '大刘', to: '铁头', type: '仇人', level: 10 }
+        ];
+    }
 })();

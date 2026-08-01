@@ -5389,7 +5389,9 @@
                 btn.addEventListener('mouseleave', () => closeMenu(260));
                 menu.addEventListener('mouseleave', () => closeMenu(200));
                 // 点击文档外部关闭（统一处理，防止重复触发）
-                const outsideHandler = () => {
+                const outsideHandler = (e) => {
+                    // 如果点击/触摸发生在按钮或菜单内部，不关闭（由按钮 click 处理切换）
+                    if (btn.contains(e.target) || menu.contains(e.target)) return;
                     if (openState) closeMenu(0);
                 };
                 document.addEventListener('click', outsideHandler);
@@ -5459,8 +5461,14 @@
                 // Group by faction
                 const grouped = {};
                 metNames.forEach(name => {
-                    const data = NPC_DATA[name];
-                    if (!data) return;
+                    const data = NPC_DATA[name] || {
+                        // 为 AI 叙事中动态出现的 NPC 创建基础条目
+                        trust: 0, affinity: 0, faction: 'unknown',
+                        personality: '未知', occupation: '未知',
+                        dialogue: {}, gifts: [], unlockLevel: 60,
+                        backstory: '通过剧情遭遇的NPC，详细信息未知。',
+                        notes: []
+                    };
                     if (filterFaction && data.faction !== filterFaction) return;
                     const facKey = data.faction || 'unknown';
                     if (!grouped[facKey]) grouped[facKey] = [];
@@ -5483,7 +5491,8 @@
                         const trustColor = trust >= 80 ? '#4a9a6f' : trust >= 60 ? '#6faa4a' : trust >= 40 ? '#8a7a4a' : trust >= 20 ? '#8a5a3a' : '#8a3a3a';
                         const notes = data.notes || [];
                         const noteHtml = notes.length ? '<div class="codex-npc-notes">' + notes.map(n => '<span class="codex-tag">' + esc(n) + '</span>').join('') + '</div>' : '';
-                        const dialogueKey = trust >= data.unlockLevel ? 'high' : trust >= (data.unlockLevel * 0.7) ? 'mid' : 'low';
+                        const unlockLevel = data.unlockLevel || 60;
+                        const dialogueKey = trust >= unlockLevel ? 'high' : trust >= (unlockLevel * 0.7) ? 'mid' : 'low';
                         const sampleDialogue = data.dialogue && data.dialogue[dialogueKey] ? data.dialogue[dialogueKey] : '';
                         const npcEl = document.createElement('div');
                         npcEl.className = 'codex-npc-entry';
@@ -5491,7 +5500,7 @@
                             '<span class="codex-npc-name">' + esc(name) + '</span>' +
                             '<span class="codex-trust" style="color:' + trustColor + ';">信任: ' + trust + ' (' + trustLevel + ')</span>' +
                             '</div>' +
-                            '<div class="codex-npc-info">' + esc(data.personality || '') + ' | 前' + esc(data.occupation || '') + '</div>' +
+                            '<div class="codex-npc-info">' + esc(data.personality || '') + (data.occupation ? ' | 前' + esc(data.occupation) : '') + '</div>' +
                             '<div class="codex-npc-backstory">' + esc(data.backstory || '') + '</div>' +
                             noteHtml +
                             (sampleDialogue ? '<div class="codex-npc-dialogue">💬 "' + esc(sampleDialogue) + '"</div>' : '') +

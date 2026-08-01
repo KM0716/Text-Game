@@ -213,6 +213,8 @@
     };
 
     // 暴露到全局
-    window.RANDOM_EVENTS = RANDOM_EVENTS;
-    window.EVENT_TRIGGERS = EVENT_TRIGGERS;
+    // 注意：不覆盖 data.js 的 window.RANDOM_EVENTS（string-trigger 格式，供 gamesystems.js 使用）
+    // 改用 RANDOM_EVENTS_EXT 暴露 function-trigger 格式的事件
+    window.RANDOM_EVENTS_EXT = RANDOM_EVENTS;
+    window.EVENT_TRIGGERS_EXT = EVENT_TRIGGERS;
 })();
