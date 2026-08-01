@@ -11,7 +11,22 @@
 window.$ = window.$ || function(id) { return document.getElementById(id); };
 const $ = window.$;
 
-function scb() { const ca = $('chatArea'); if (ca) ca.scrollTop = ca.scrollHeight; }
+// scb: 滚动到底部（节流到 16ms 一次，避免逐字滚动时触发大量重排）
+let _scbT = 0, _scbP = false;
+function scb() {
+    const ca = $('chatArea'); if (!ca) return;
+    const now = Date.now();
+    if (now - _scbT < 16) {
+        if (!_scbP) {
+            _scbP = true;
+            setTimeout(() => { _scbP = false; _scbT = Date.now();
+                try { ca.scrollTop = ca.scrollHeight; } catch(_) {} }, 16 - (now - _scbT));
+        }
+        return;
+    }
+    _scbT = now;
+    ca.scrollTop = ca.scrollHeight;
+}
 function esc(s) { const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; }
 function escAttr(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 

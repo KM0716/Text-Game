@@ -2,10 +2,18 @@
             const $ = id => document.getElementById(id);
             const K = { CFG: 'dz_cfg', STA: 'dz_sta', SAV: 'dz_sav', CHR: 'dz_chr', HIS: 'dz_his', THM: 'dz_thm', SBX: 'dz_sbx', CLK: 'dz_clk', SUM: 'dz_sum' };
             const AP = {
-                openai: { ep: 'https://api.openai.com/v1/chat/completions', md: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini'] },
-                deepseek: { ep: 'https://api.deepseek.com/v1/chat/completions', md: ['deepseek-chat', 'deepseek-reasoner'] },
-                ollama: { ep: 'http://localhost:11434/v1/chat/completions', md: ['llama3', 'mistral', 'qwen2.5'] },
-                custom: { ep: '', md: [] }
+                openai:     { ep: 'https://api.openai.com/v1/chat/completions',                md: ['gpt-4o', 'gpt-4o-mini', 'gpt-4.1', 'gpt-4.1-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'] },
+                deepseek:   { ep: 'https://api.deepseek.com/v1/chat/completions',              md: ['deepseek-chat', 'deepseek-reasoner'] },
+                moonshot:   { ep: 'https://api.moonshot.cn/v1/chat/completions',               md: ['moonshot-v1-128k', 'moonshot-v1-32k', 'moonshot-v1-8k'] },
+                zhipu:      { ep: 'https://open.bigmodel.cn/api/paas/v4/chat/completions',    md: ['glm-4-plus', 'glm-4-0520', 'glm-4-air', 'glm-4-airx', 'glm-4-long', 'glm-4-flashx'] },
+                qwen:       { ep: 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions', md: ['qwen-plus', 'qwen-turbo', 'qwen-max', 'qwen2.5-72b-instruct', 'qwen2.5-32b-instruct', 'qwen2.5-14b-instruct', 'qwen2.5-7b-instruct', 'qwen3-max'] },
+                siliconflow:{ ep: 'https://api.siliconflow.cn/v1/chat/completions',            md: ['deepseek-ai/DeepSeek-V3', 'deepseek-ai/DeepSeek-R1', 'Qwen/Qwen2.5-72B-Instruct', 'Qwen/Qwen3-Max', 'meta-llama/Llama-3.1-405B-Instruct', 'meta-llama/Llama-3.3-70B-Instruct', 'google/gemma-3-27b-it'] },
+                groq:       { ep: 'https://api.groq.com/openai/v1/chat/completions',          md: ['llama-3.3-70b-versatile', 'llama-3.1-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it', 'deepseek-r1-distill-llama-70b'] },
+                ernie:      { ep: 'https://qianfan.baidubce.com/v2/chat/completions',         md: ['ernie-4.5-turbo-vl', 'ernie-4.5-turbo', 'ernie-4.0-turbo', 'ernie-3.5-8k', 'ernie-lite-8k'] },
+                minimax:    { ep: 'https://api.minimax.chat/v1/text/chatcompletion_v2',       md: ['abab6.5s-chat', 'abab6.5g-chat', 'abab6.5t-chat', 'abab5.5s-chat'] },
+                doubao:     { ep: 'https://ark.cn-beijing.volces.com/api/v3/chat/completions',md: ['doubao-seed-1-6-251228', 'doubao-1-5-vision-pro-250828', 'doubao-1-5-pro-32k-250715', 'doubao-1-5-pro-250715', 'doubao-1-5-lite-32k-250615', 'ep-20250103173452-w8x2h'] },
+                ollama:     { ep: 'http://localhost:11434/v1/chat/completions',               md: ['llama3', 'mistral', 'qwen2.5', 'qwen3', 'gemma3', 'phi4', 'deepseek-r1', 'deepseek-v3'] },
+                custom:     { ep: '',                                                          md: [] }
             };
 
             // ========== 从 window 读取拆分到其他文件的常量/函数（本地别名）==========
@@ -1967,6 +1975,23 @@
                     if (clueSb.style.top) clueSb.style.top = '';
                 }
             }
+            // upui 渲染缓存：记录各区块上次渲染出的 HTML/文本，未变化时跳过 innerHTML 重建
+            const _upuiCache = {
+                profileHTML: '', profileHash: '',
+                bgHTML: '', bgHash: '',
+                traitsHTML: '', traitsHash: '',
+                propsHTML: '', propsHash: '',
+                locationText: '', locationHash: '',
+                mapHTML: '', mapHash: ''
+            };
+            function _hashObj(v) { try { return JSON.stringify(v); } catch(_) { return ''; } }
+            function _setInnerHTMLIfChanged(el, html, cacheKey, hashVal) {
+                if (!el) return;
+                if (_upuiCache[cacheKey + 'Hash'] === hashVal && _upuiCache[cacheKey + 'HTML'] === html) return;
+                _upuiCache[cacheKey + 'Hash'] = hashVal;
+                _upuiCache[cacheKey + 'HTML'] = html;
+                el.innerHTML = html;
+            }
             function upui() {
                 const s = gst();
                 const ch = gch();
@@ -1979,20 +2004,31 @@
                 // Idle badge - 点击挂机出现，停止挂机消失
                 const ib = $('idleBadge');
                 if (ib) {
-                    if (f.idleOn) { ib.textContent = '挂机中 · ' + (f.idleDir || '休养'); ib.classList.add('show'); }
-                    else { ib.classList.remove('show'); }
+                    if (f.idleOn) {
+                        const txt = '挂机中 · ' + (f.idleDir || '休养');
+                        if (ib.textContent !== txt) ib.textContent = txt;
+                        ib.classList.add('show');
+                    } else {
+                        ib.classList.remove('show');
+                    }
                 }
                 // Ensure idle button text matches state
                 const ibtn = $('btnIdle');
                 if (ibtn) {
-                    if (f.idleOn) { ibtn.textContent = '停止挂机'; ibtn.classList.add('accent'); }
-                    else { ibtn.textContent = '挂机'; ibtn.classList.remove('accent'); }
+                    if (f.idleOn) {
+                        if (ibtn.textContent !== '停止挂机') ibtn.textContent = '停止挂机';
+                        ibtn.classList.add('accent');
+                    } else {
+                        if (ibtn.textContent !== '挂机') ibtn.textContent = '挂机';
+                        ibtn.classList.remove('accent');
+                    }
                 }
-                // Profile section
+                // Profile section（缓存：只有角色字段变化才重写 innerHTML）
                 if (sideMode === 'profile' && $('sideProfile')) {
                     const abilityDisp = ch.extraFeature === '异能' && ch.abilityName;
                     const abName = abilityDisp ? (ABILITIES[ch.abilityName] ? ABILITIES[ch.abilityName].name : ch.abilityName) : '';
-                    $('sideProfile').innerHTML =
+                    const hash = _hashObj([ch.cn, ch.gd, ch.ca, ch.bt, ch.ht, ch.wt, ch.job, ch.pers, ch.app, ch.fear, ch.skl, abName]);
+                    const html =
                         '<div class="sp-card">' +
                         '<div class="sp-row"><span class="sp-lbl">姓名</span><span class="sp-val">' + esc(ch.cn || '幸存者') + '</span></div>' +
                         '<div class="sp-row"><span class="sp-lbl">性别</span><span class="sp-val">' + esc(ch.gd || '未设定') + ' / ' + esc(ch.ca || '未知') + '</span></div>' +
@@ -2007,60 +2043,88 @@
                         '<div style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;padding:2px 0 0;">' + esc(ch.skl || '无') + '</div>' +
                         (abName ? '<div class="sp-row" style="margin-top:4px;color:var(--accent);"><span class="sp-lbl">异能</span><span class="sp-val">' + esc(abName) + '</span></div>' : '') +
                         '</div>';
+                    _setInnerHTMLIfChanged($('sideProfile'), html, 'profile', hash);
                 }
-                // Background story
+                // Background story（缓存）
                 if (sideMode === 'profile' && $('sideBackground')) {
-                    $('sideBackground').innerHTML = '<div class="sp-card" style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;">' + esc(ch.bg || '暂无背景') + '</div>';
+                    const hash = ch.bg || '';
+                    const html = '<div class="sp-card" style="font-size:0.72rem;color:var(--ink-soft);line-height:1.5;">' + esc(ch.bg || '暂无背景') + '</div>';
+                    _setInnerHTMLIfChanged($('sideBackground'), html, 'bg', hash);
                 }
-                // Traits (profile view)
+                // Traits (profile view)（缓存）
                 if (sideMode === 'profile' && $('sideTraits')) {
+                    const hash = _hashObj([ch.tp, ch.tn]);
                     const tp = (ch.tp && ch.tp.length) ? ch.tp.map(t => '<span class="trait-chip positive">' + esc(t) + '</span>').join('') : '';
                     const tn = (ch.tn && ch.tn.length) ? ch.tn.map(t => '<span class="trait-chip negative">' + esc(t) + '</span>').join('') : '';
-                    $('sideTraits').innerHTML = '<div class="sp-card">' + ((tp || tn) ? (tp + tn) : '<span style="font-size:0.7rem;color:var(--ink-soft);">无特殊特质</span>') + '</div>';
+                    const html = '<div class="sp-card">' + ((tp || tn) ? (tp + tn) : '<span style="font-size:0.7rem;color:var(--ink-soft);">无特殊特质</span>') + '</div>';
+                    _setInnerHTMLIfChanged($('sideTraits'), html, 'traits', hash);
                 }
-                if ($('stHunger')) $('stHunger').textContent = Math.round(s.hunger);
-                if ($('stThirst')) $('stThirst').textContent = Math.round(s.thirst);
-                if ($('stFatigue')) $('stFatigue').textContent = Math.round(s.fatigue);
-                if ($('stBodyTemp')) $('stBodyTemp').textContent = (Math.round((s.bodyTemp || 37) * 10) / 10).toFixed(1);
-                if ($('stInjury')) $('stInjury').textContent = s.injury;
-                if ($('stEnc')) $('stEnc').textContent = s.enc;
-                if ($('stMentality')) $('stMentality').textContent = mentalityLabel(s.mentality);
-                if ($('stSpirit')) $('stSpirit').textContent = s.spirit != null ? Math.round(s.spirit) : '--';
-                if ($('stJoy')) { $('stJoy').textContent = (s.pleasureUnlocked && s.joy != null) ? Math.round(s.joy) + '%' : '隐藏'; if ($('stJoyItem')) $('stJoyItem').style.display = s.pleasureUnlocked ? '' : 'none'; }
-                if (sideMode === 'panel' && $('sideProps')) $('sideProps').innerHTML =
-                    '<div class="sp-card">' +
-                        (s.hp != null ? spBar('● 血量', s.hp) : '') +
-                        spBar('● 饱腹', s.hunger) +
-                        spBar('● 口渴', s.thirst) +
-                        spBar('● 疲劳', s.fatigue) +
-                        spBar('● 体温', s.bodyTemp != null ? s.bodyTemp : 36.5, false) +
-                    '</div>' +
-                    '<div class="sp-card">' +
-                        spBar('● 精神', s.spirit != null ? s.spirit : 0) +
-                        spBar('● 心态', mentalityLabel(s.mentality), false) +
-                        (s.pleasureUnlocked ? spBar('● 欢愉', s.joy != null ? s.joy : 0) : '') +
-                    '</div>' +
-                    '<div class="sp-card">' +
-                        '<div class="sp-row"><span class="sp-lbl">● 伤势</span><span class="sp-val">' + esc(s.injury) + '</span></div>' +
-                        '<div class="sp-row"><span class="sp-lbl">● 负重</span><span class="sp-val">' + s.enc + 'kg</span></div>' +
-                        (s.vehicle && s.vehicle !== '无' ? '<div class="sp-row"><span class="sp-lbl">● 载具</span><span class="sp-val">' + esc(s.vehicle) + '</span></div>' : '') +
-                        (s.status && s.status.length ? '<div class="sp-row"><span class="sp-lbl">● 状态</span><span class="sp-val">' + s.status.map(x => esc(x)).join('、') + '</span></div>' : '') +
-                    '</div>' +
-                    (s.weaponDurability && Object.keys(s.weaponDurability).length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">● 武器耐久</div>' + Object.entries(s.weaponDurability).map(([w,d]) => spBar(w, d)).join('') + '</div>' : '') +
-                    (s.ammo && Object.keys(s.ammo).length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">● 弹药</div>' + Object.entries(s.ammo).map(([a,c]) => spBar(a, c)).join('') + '</div>' : '') +
-                    (s.npcRel && Object.keys(s.npcRel).length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">● NPC关系 (' + Object.keys(s.npcRel).length + ')</div>' + Object.entries(s.npcRel).map(([n,r]) => {
-                        const t = Math.max(0, Math.min(100, r.trust||0));
-                        const a = Math.max(0, Math.min(100, r.affinity||0));
-                        const lastMeet = r.lastMeet ? '第' + r.lastMeet + '天' : '未知';
-                        return '<div class="sp-row" style="display:block;margin-bottom:6px;padding:4px 6px;background:var(--bg-paper-alt);border-radius:4px;">' +
-                            '<div style="display:flex;justify-content:space-between;font-weight:bold;color:var(--accent);font-size:0.72rem;margin-bottom:2px;">' + esc(n) + '<span style="font-size:0.6rem;color:var(--text-muted);">上次:' + lastMeet + '</span></div>' +
-                            '<div style="font-size:0.66rem;margin-bottom:1px;">信任 <span style="display:inline-block;width:60px;height:6px;background:var(--bg-paper);border-radius:3px;overflow:hidden;vertical-align:middle;margin:0 4px;"><span style="display:block;height:100%;width:' + t + '%;background:' + (t > 60 ? 'var(--notify-add)' : t > 30 ? 'var(--color-warn)' : 'var(--color-danger)') + ';"></span></span>' + t + '%</div>' +
-                            '<div style="font-size:0.66rem;">好感 <span style="display:inline-block;width:60px;height:6px;background:var(--bg-paper);border-radius:3px;overflow:hidden;vertical-align:middle;margin:0 4px;"><span style="display:block;height:100%;width:' + a + '%;background:' + (a > 60 ? 'var(--accent)' : a > 30 ? 'var(--color-warn)' : 'var(--color-danger)') + ';"></span></span>' + a + '%</div>' +
-                            '</div>';
-                    }).join('') + '</div>' : '') +
-                    (s.bookmarks && s.bookmarks.length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">★ 收藏夹 (' + s.bookmarks.length + ')</div>' + s.bookmarks.slice(-5).reverse().map(b => '<div class="sp-row" style="font-size:0.68rem;"><span class="sp-lbl" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(b.text) + '</span><span class="sp-val" style="font-size:0.58rem;color:var(--text-muted);">' + esc(b.time || '') + '</span></div>').join('') + '</div>' : '');
+                // 顶部状态数字：仅在数值实际变化时更新 textContent（减少 DOM 写入）
+                if ($('stHunger')) { const v = Math.round(s.hunger); if ($('stHunger')._v !== v) { $('stHunger').textContent = v; $('stHunger')._v = v; } }
+                if ($('stThirst')) { const v = Math.round(s.thirst); if ($('stThirst')._v !== v) { $('stThirst').textContent = v; $('stThirst')._v = v; } }
+                if ($('stFatigue')) { const v = Math.round(s.fatigue); if ($('stFatigue')._v !== v) { $('stFatigue').textContent = v; $('stFatigue')._v = v; } }
+                if ($('stBodyTemp')) { const v = (Math.round((s.bodyTemp || 37) * 10) / 10).toFixed(1); if ($('stBodyTemp')._v !== v) { $('stBodyTemp').textContent = v; $('stBodyTemp')._v = v; } }
+                if ($('stInjury')) { if ($('stInjury')._v !== s.injury) { $('stInjury').textContent = s.injury; $('stInjury')._v = s.injury; } }
+                if ($('stEnc')) { if ($('stEnc')._v !== s.enc) { $('stEnc').textContent = s.enc; $('stEnc')._v = s.enc; } }
+                if ($('stMentality')) { const v = mentalityLabel(s.mentality); if ($('stMentality')._v !== v) { $('stMentality').textContent = v; $('stMentality')._v = v; } }
+                if ($('stSpirit')) { const v = s.spirit != null ? Math.round(s.spirit) : '--'; if ($('stSpirit')._v !== v) { $('stSpirit').textContent = v; $('stSpirit')._v = v; } }
+                if ($('stJoy')) {
+                    const v = (s.pleasureUnlocked && s.joy != null) ? Math.round(s.joy) + '%' : '隐藏';
+                    if ($('stJoy')._v !== v) { $('stJoy').textContent = v; $('stJoy')._v = v; }
+                    if ($('stJoyItem')) {
+                        const d = s.pleasureUnlocked ? '' : 'none';
+                        if ($('stJoyItem')._d !== d) { $('stJoyItem').style.display = d; $('stJoyItem')._d = d; }
+                    }
+                }
+                if (sideMode === 'panel' && $('sideProps')) {
+                    // 面板 props：大段 HTML，只有相关状态字段变化才重写
+                    const hash = _hashObj([
+                        s.hp, s.maxHp, s.hunger, s.thirst, s.fatigue, s.bodyTemp, s.spirit,
+                        s.mentality, s.pleasureUnlocked, s.joy,
+                        s.injury, s.enc, s.vehicle, s.status && s.status.join('|'),
+                        s.weaponDurability, s.ammo, s.npcRel,
+                        s.bookmarks && s.bookmarks.slice(-5).map(b => b.text + b.time)
+                    ]);
+                    const html =
+                        '<div class="sp-card">' +
+                            (s.hp != null ? spBar('● 血量', s.hp) : '') +
+                            spBar('● 饱腹', s.hunger) +
+                            spBar('● 口渴', s.thirst) +
+                            spBar('● 疲劳', s.fatigue) +
+                            spBar('● 体温', s.bodyTemp != null ? s.bodyTemp : 36.5, false) +
+                        '</div>' +
+                        '<div class="sp-card">' +
+                            spBar('● 精神', s.spirit != null ? s.spirit : 0) +
+                            spBar('● 心态', mentalityLabel(s.mentality), false) +
+                            (s.pleasureUnlocked ? spBar('● 欢愉', s.joy != null ? s.joy : 0) : '') +
+                        '</div>' +
+                        '<div class="sp-card">' +
+                            '<div class="sp-row"><span class="sp-lbl">● 伤势</span><span class="sp-val">' + esc(s.injury) + '</span></div>' +
+                            '<div class="sp-row"><span class="sp-lbl">● 负重</span><span class="sp-val">' + s.enc + 'kg</span></div>' +
+                            (s.vehicle && s.vehicle !== '无' ? '<div class="sp-row"><span class="sp-lbl">● 载具</span><span class="sp-val">' + esc(s.vehicle) + '</span></div>' : '') +
+                            (s.status && s.status.length ? '<div class="sp-row"><span class="sp-lbl">● 状态</span><span class="sp-val">' + s.status.map(x => esc(x)).join('、') + '</span></div>' : '') +
+                        '</div>' +
+                        (s.weaponDurability && Object.keys(s.weaponDurability).length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">● 武器耐久</div>' + Object.entries(s.weaponDurability).map(([w,d]) => spBar(w, d)).join('') + '</div>' : '') +
+                        (s.ammo && Object.keys(s.ammo).length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">● 弹药</div>' + Object.entries(s.ammo).map(([a,c]) => spBar(a, c)).join('') + '</div>' : '') +
+                        (s.npcRel && Object.keys(s.npcRel).length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">● NPC关系 (' + Object.keys(s.npcRel).length + ')</div>' + Object.entries(s.npcRel).map(([n,r]) => {
+                            const t = Math.max(0, Math.min(100, r.trust||0));
+                            const a = Math.max(0, Math.min(100, r.affinity||0));
+                            const lastMeet = r.lastMeet ? '第' + r.lastMeet + '天' : '未知';
+                            return '<div class="sp-row" style="display:block;margin-bottom:6px;padding:4px 6px;background:var(--bg-paper-alt);border-radius:4px;">' +
+                                '<div style="display:flex;justify-content:space-between;font-weight:bold;color:var(--accent);font-size:0.72rem;margin-bottom:2px;">' + esc(n) + '<span style="font-size:0.6rem;color:var(--text-muted);">上次:' + lastMeet + '</span></div>' +
+                                '<div style="font-size:0.66rem;margin-bottom:1px;">信任 <span style="display:inline-block;width:60px;height:6px;background:var(--bg-paper);border-radius:3px;overflow:hidden;vertical-align:middle;margin:0 4px;"><span style="display:block;height:100%;width:' + t + '%;background:' + (t > 60 ? 'var(--notify-add)' : t > 30 ? 'var(--color-warn)' : 'var(--color-danger)') + ';"></span></span>' + t + '%</div>' +
+                                '<div style="font-size:0.66rem;">好感 <span style="display:inline-block;width:60px;height:6px;background:var(--bg-paper);border-radius:3px;overflow:hidden;vertical-align:middle;margin:0 4px;"><span style="display:block;height:100%;width:' + a + '%;background:' + (a > 60 ? 'var(--accent)' : a > 30 ? 'var(--color-warn)' : 'var(--color-danger)') + ';"></span></span>' + a + '%</div>' +
+                                '</div>';
+                        }).join('') + '</div>' : '') +
+                        (s.bookmarks && s.bookmarks.length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">★ 收藏夹 (' + s.bookmarks.length + ')</div>' + s.bookmarks.slice(-5).reverse().map(b => '<div class="sp-row" style="font-size:0.68rem;"><span class="sp-lbl" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(b.text) + '</span><span class="sp-val" style="font-size:0.58rem;color:var(--text-muted);">' + esc(b.time || '') + '</span></div>').join('') + '</div>' : '');
+                    _setInnerHTMLIfChanged($('sideProps'), html, 'props', hash);
+                }
                 if (sideMode === 'panel' && $('sideClues')) { /* sideClues removed, clues shown in floating sidebar */ }
-                if (sideMode === 'panel' && $('sideLocation')) $('sideLocation').innerHTML = esc(s.location || ch.sp || '未知');
+                if (sideMode === 'panel' && $('sideLocation')) {
+                    const txt = esc(s.location || ch.sp || '未知');
+                    const hash = (s.location || '') + '|' + (ch.sp || '');
+                    _setInnerHTMLIfChanged($('sideLocation'), txt, 'location', hash);
+                }
                 if (sideMode === 'panel' && $('sideMap')) {
                     const unlocked = s.mapUnlock || [];
                     const rawMap = (ch.map || '').split(/[、，,;；\n]/).map(x => x.trim()).filter(Boolean);
@@ -2068,41 +2132,45 @@
                     const defaultAreas = (DCHR.map || '').split(/[、，,;；\n]/).map(x => x.trim()).filter(Boolean);
                     const allAreas = rawMap.length ? rawMap : (rawLocs.length ? rawLocs : defaultAreas);
                     const curLoc = s.location || ch.sp || '';
-                    const cols = Math.min(3, allAreas.length);
-                    const rows = Math.ceil(allAreas.length / cols);
-                    const cellW = 100 / cols;
-                    const cellH = 100 / rows;
-                    let svg = '<svg viewBox="0 0 100 100" style="width:100%;height:100%;display:block;background:var(--bg-paper-alt);border:1.5px solid var(--border-light);border-radius:6px;margin-bottom:6px;">';
-                    const startX = cellW / 2, startY = cellH / 2;
-                    allAreas.forEach((area, i) => {
-                        const col = i % cols, row = Math.floor(i / cols);
-                        const x = startX + col * cellW;
-                        const y = startY + row * cellH;
-                        const isUnlocked = unlocked.some(u => area.includes(u) || u.includes(area));
-                        const isCurrent = curLoc && (curLoc.includes(area) || area.includes(curLoc));
-                        if (i > 0) {
-                            const prevCol = (i - 1) % cols, prevRow = Math.floor((i - 1) / cols);
-                            const prevX = startX + prevCol * cellW;
-                            const prevY = startY + prevRow * cellH;
-                            const bothUnlocked = isUnlocked && unlocked.some(u => allAreas[i-1].includes(u) || u.includes(allAreas[i-1]));
-                            svg += '<line x1="' + prevX + '" y1="' + prevY + '" x2="' + x + '" y2="' + y + '" stroke="' + (bothUnlocked ? 'var(--accent)' : 'var(--border-light)') + '" stroke-width="0.5" stroke-dasharray="' + (bothUnlocked ? '' : '1,1') + '"/>';
-                        }
-                        if (i === 0) {
-                            svg += '<line x1="' + startX + '" y1="' + startY + '" x2="' + x + '" y2="' + y + '" stroke="' + (isUnlocked ? 'var(--accent)' : 'var(--border-light)') + '" stroke-width="0.5"/>';
-                        }
-                        const fill = isCurrent ? 'var(--accent)' : isUnlocked ? '#8b4513' : '#b0a090';
-                        const radius = isCurrent ? '3' : '2';
-                        svg += '<circle cx="' + x + '" cy="' + y + '" r="' + radius + '" fill="' + fill + '" opacity="' + (isUnlocked || isCurrent ? '1' : '0.4') + '"/>';
-                        svg += '<text x="' + x + '" y="' + (y + 4.5) + '" text-anchor="middle" font-size="2.6" fill="' + (isUnlocked || isCurrent ? 'var(--ink)' : 'var(--text-muted)') + '">' + esc(area.length > 6 ? area.slice(0, 6) : area) + '</text>';
-                    });
-                    svg += '</svg>';
-                    let listHTML = '';
-                    allAreas.forEach(area => {
-                        const isUnlocked = unlocked.some(u => area.includes(u) || u.includes(area));
-                        const isCurrent = curLoc && (curLoc.includes(area) || area.includes(curLoc));
-                        listHTML += '<div class="map-item ' + (isUnlocked ? 'unlocked' : 'locked') + (isCurrent ? ' current' : '') + '">' + (isCurrent ? '★ ' : isUnlocked ? '◆ ' : '◇ ') + esc(area) + '</div>';
-                    });
-                    $('sideMap').innerHTML = svg + '<div style="max-height:120px;overflow-y:auto;margin-top:4px;">' + listHTML + '</div>';
+                    const hash = _hashObj([unlocked, allAreas, curLoc]);
+                    if (_upuiCache['mapHash'] !== hash) {
+                        const cols = Math.min(3, allAreas.length);
+                        const rows = Math.ceil(allAreas.length / cols);
+                        const cellW = 100 / cols;
+                        const cellH = 100 / rows;
+                        let svg = '<svg viewBox="0 0 100 100" style="width:100%;height:100%;display:block;background:var(--bg-paper-alt);border:1.5px solid var(--border-light);border-radius:6px;margin-bottom:6px;">';
+                        const startX = cellW / 2, startY = cellH / 2;
+                        allAreas.forEach((area, i) => {
+                            const col = i % cols, row = Math.floor(i / cols);
+                            const x = startX + col * cellW;
+                            const y = startY + row * cellH;
+                            const isUnlocked = unlocked.some(u => area.includes(u) || u.includes(area));
+                            const isCurrent = curLoc && (curLoc.includes(area) || area.includes(curLoc));
+                            if (i > 0) {
+                                const prevCol = (i - 1) % cols, prevRow = Math.floor((i - 1) / cols);
+                                const prevX = startX + prevCol * cellW;
+                                const prevY = startY + prevRow * cellH;
+                                const bothUnlocked = isUnlocked && unlocked.some(u => allAreas[i-1].includes(u) || u.includes(allAreas[i-1]));
+                                svg += '<line x1="' + prevX + '" y1="' + prevY + '" x2="' + x + '" y2="' + y + '" stroke="' + (bothUnlocked ? 'var(--accent)' : 'var(--border-light)') + '" stroke-width="0.5" stroke-dasharray="' + (bothUnlocked ? '' : '1,1') + '"/>';
+                            }
+                            if (i === 0) {
+                                svg += '<line x1="' + startX + '" y1="' + startY + '" x2="' + x + '" y2="' + y + '" stroke="' + (isUnlocked ? 'var(--accent)' : 'var(--border-light)') + '" stroke-width="0.5"/>';
+                            }
+                            const fill = isCurrent ? 'var(--accent)' : isUnlocked ? '#8b4513' : '#b0a090';
+                            const radius = isCurrent ? '3' : '2';
+                            svg += '<circle cx="' + x + '" cy="' + y + '" r="' + radius + '" fill="' + fill + '" opacity="' + (isUnlocked || isCurrent ? '1' : '0.4') + '"/>';
+                            svg += '<text x="' + x + '" y="' + (y + 4.5) + '" text-anchor="middle" font-size="2.6" fill="' + (isUnlocked || isCurrent ? 'var(--ink)' : 'var(--text-muted)') + '">' + esc(area.length > 6 ? area.slice(0, 6) : area) + '</text>';
+                        });
+                        svg += '</svg>';
+                        let listHTML = '';
+                        allAreas.forEach(area => {
+                            const isUnlocked = unlocked.some(u => area.includes(u) || u.includes(area));
+                            const isCurrent = curLoc && (curLoc.includes(area) || area.includes(curLoc));
+                            listHTML += '<div class="map-item ' + (isUnlocked ? 'unlocked' : 'locked') + (isCurrent ? ' current' : '') + '">' + (isCurrent ? '★ ' : isUnlocked ? '◆ ' : '◇ ') + esc(area) + '</div>';
+                        });
+                        const fullHtml = svg + '<div style="max-height:120px;overflow-y:auto;margin-top:4px;">' + listHTML + '</div>';
+                        _setInnerHTMLIfChanged($('sideMap'), fullHtml, 'map', hash);
+                    }
                 }
                 renderClueSidebar();
                 updClockUI();
@@ -2828,19 +2896,40 @@
                     if (tgt) {
                         tgt.innerHTML = '';
                         let i = 0;
-                        const stp = () => {
-                            if (i < b.tx.length) {
-                                tgt.innerHTML = esc(b.tx.substring(0, i + 1)) + '<span class="cursor-blink"></span>';
-                                i++;
-                                setTimeout(stp, spd);
-                                scb();
-                            } else {
+                        const len = b.tx.length;
+                        let lastTs = 0;
+                        let acc = 0;
+                        // 使用 requestAnimationFrame 批量推进字符，大幅减少 setTimeout 调度和 innerHTML 重写
+                        const step = (ts) => {
+                            if (i >= len) {
                                 tgt.innerHTML = abold(b.tx);
                                 el._bolded = true;
                                 attachItemInfoToBoldElements(el);
+                                return;
+                            }
+                            if (!lastTs) lastTs = ts;
+                            const delta = ts - lastTs;
+                            lastTs = ts;
+                            acc += delta;
+                            // 每次推进多个字符（按实际经过的时间 / 单字间隔），避免 1 字 1 次 innerHTML
+                            const stepChars = spd > 0 ? Math.max(1, Math.floor(acc / spd)) : 1;
+                            if (stepChars >= 1) {
+                                acc -= stepChars * spd;
+                                i = Math.min(len, i + stepChars);
+                                if (i < len) {
+                                    tgt.innerHTML = esc(b.tx.substring(0, i)) + '<span class="cursor-blink"></span>';
+                                    scb();
+                                }
+                            }
+                            if (i < len) requestAnimationFrame(step);
+                            else {
+                                tgt.innerHTML = abold(b.tx);
+                                el._bolded = true;
+                                attachItemInfoToBoldElements(el);
+                                scb();
                             }
                         };
-                        stp();
+                        requestAnimationFrame(step);
                     }
                 } else if (spd === -1) {
                     el._bolded = false;
@@ -5062,9 +5151,27 @@
             });
             $('btnSettings').addEventListener('click', () => {
                 const c = cfg();
-                $('apiEndpointPreset').value = c.preset || 'custom';
+                const preset = c.preset || 'custom';
+                $('apiEndpointPreset').value = preset;
+                // 根据预先生成 apiModelSelect 选项并决定显示 select 还是 input
+                const p = AP[preset] || AP.custom;
+                const sel = $('apiModelSelect');
+                const inp = $('apiModel');
+                sel.innerHTML = '';
+                if (p.md && p.md.length) {
+                    p.md.forEach(m => sel.add(new Option(m, m)));
+                    sel.style.display = '';
+                    inp.style.display = 'none';
+                    // 如果当前保存的 model 在预设列表里就选中它，否则选预设第一个
+                    const found = p.md.indexOf(c.model);
+                    sel.value = found >= 0 ? c.model : p.md[0];
+                    inp.value = c.model;
+                } else {
+                    sel.style.display = 'none';
+                    inp.style.display = '';
+                    inp.value = c.model;
+                }
                 $('apiEndpoint').value = c.ep;
-                $('apiModel').value = c.model;
                 $('apiKey').value = c.key;
                 $('apiMaxTokens').value = c.maxT;
                 $('apiTemperature').value = c.temp;
@@ -5106,10 +5213,14 @@
                 const newKey = $('apiKey').value;
                 // NEVER allow saving an empty key if we already have one (prevents password-manager/autofill wipe)
                 const finalKey = newKey.trim() || oldKey;
+                // 优先使用 select 中选中的（显示 select 时），否则使用 input
+                const mSel = $('apiModelSelect'), mInp = $('apiModel');
+                const useSel = mSel && mSel.style.display !== 'none';
+                const finalModel = (useSel ? mSel.value : (mInp ? mInp.value : '')) || 'gpt-4o';
                 scf({
                     ...cfg(),
                     ep: $('apiEndpoint').value || DCFG.ep, key: finalKey,
-                    model: $('apiModel').value || 'gpt-4o',
+                    model: finalModel,
                     maxT: parseInt($('apiMaxTokens').value) || 2048,
                     temp: parseFloat($('apiTemperature').value) || 0.7,
                     ctx: parseInt($('apiContextLen').value) || 24,
@@ -5132,6 +5243,15 @@
             // ========== 设置模态：API 配置区控件 "输入即保存"（不用等「保存设置」按钮） ==========
             (function bindSettingsAPIInputs() {
                 try {
+                    // 简单防抖工具（避免频繁写 localStorage 导致卡顿）
+                    let _saveTimer = null;
+                    function debounce(fn, ms) {
+                        return function() {
+                            const ctx = this, args = arguments;
+                            if (_saveTimer) clearTimeout(_saveTimer);
+                            _saveTimer = setTimeout(function() { _saveTimer = null; fn.apply(ctx, args); }, ms);
+                        };
+                    }
                     function saveFromSettings() {
                         try {
                             const preset = $('apiEndpointPreset') ? $('apiEndpointPreset').value : cfg().preset;
@@ -5140,11 +5260,16 @@
                             // 保护已有密钥：仅当用户明确输入了非空新密钥时才覆盖
                             const finalKey = newKey.trim() || oldKey;
                             const cur = cfg();
+                            // 优先使用 select 中选中的（显示时），否则使用 input
+                            const mSel = document.getElementById('apiModelSelect');
+                            const mInp = document.getElementById('apiModel');
+                            const useSel = mSel && mSel.style.display !== 'none';
+                            const finalModel = useSel ? (mSel.value || '') : (mInp ? (mInp.value || '') : '');
                             scf({
                                 ...cur,
                                 preset: preset,
                                 ep: $('apiEndpoint') ? ($('apiEndpoint').value || DCFG.ep) : cur.ep,
-                                model: $('apiModel') ? ($('apiModel').value || 'gpt-4o') : cur.model,
+                                model: finalModel || cur.model || 'gpt-4o',
                                 maxT: $('apiMaxTokens') ? (parseInt($('apiMaxTokens').value, 10) || cur.maxT) : cur.maxT,
                                 temp: $('apiTemperature') ? (parseFloat($('apiTemperature').value) || cur.temp) : cur.temp,
                                 ctx: $('apiContextLen') ? (parseInt($('apiContextLen').value, 10) || cur.ctx) : cur.ctx,
@@ -5152,6 +5277,7 @@
                             });
                         } catch {}
                     }
+                    const debouncedSave = debounce(saveFromSettings, 250);
                     // 为 apiEndpointPreset 的 change 事件添加 scf 保存（原代码只更新了 DOM）
                     const oldPresetEl = document.getElementById('apiEndpointPreset');
                     if (oldPresetEl) {
@@ -5160,29 +5286,39 @@
                                 const p = AP[this.value] || AP.custom;
                                 if (document.getElementById('apiEndpoint')) document.getElementById('apiEndpoint').value = p.ep;
                                 const sl = document.getElementById('apiModelSelect');
+                                const mi = document.getElementById('apiModel');
                                 if (sl) {
                                     sl.innerHTML = '';
                                     if (p.md && p.md.length) {
                                         p.md.forEach(m => sl.add(new Option(m, m)));
                                         sl.style.display = '';
-                                        document.getElementById('apiModel').style.display = 'none';
+                                        if (mi) mi.style.display = 'none';
+                                        sl.value = p.md[0];
+                                        if (mi) mi.value = p.md[0];
                                     } else {
                                         sl.style.display = 'none';
-                                        document.getElementById('apiModel').style.display = '';
+                                        if (mi) mi.style.display = '';
                                     }
                                 }
-                                // 选完预设立刻 scf 保存
+                                // 选完预设立刻 scf 保存（预设切换不防抖，立即生效）
                                 saveFromSettings();
                             } catch {}
                         });
                     }
-                    // 为其他 7 个 API 控件绑定 input / change 事件
+                    // 为其他 API 控件绑定 input 事件（使用防抖，减少卡顿）
                     ['apiKey','apiEndpoint','apiModel','apiMaxTokens','apiTemperature','apiContextLen'].forEach(id => {
                         const el = document.getElementById(id);
-                        if (el) el.addEventListener('input', saveFromSettings);
+                        if (el) el.addEventListener('input', debouncedSave);
                     });
                     const modelSelect = document.getElementById('apiModelSelect');
-                    if (modelSelect) modelSelect.addEventListener('change', saveFromSettings);
+                    if (modelSelect) {
+                        // select 变化时同步到 apiModel input，并保存
+                        modelSelect.addEventListener('change', function() {
+                            const mi = document.getElementById('apiModel');
+                            if (mi) mi.value = this.value;
+                            saveFromSettings();
+                        });
+                    }
                     // 在设置标题下方加一个小提示
                     try {
                         const headerRow = document.getElementById('settingsModalTitle');
@@ -6072,40 +6208,60 @@
                 const p = AP[this.value] || AP.custom;
                 $('welEndpoint').value = p.ep;
                 const sl = $('welModelSelect');
+                const mi = $('welModel');
                 sl.innerHTML = '';
-                if (p.md.length) { p.md.forEach(m => sl.add(new Option(m, m))); sl.style.display = ''; $('welModel').style.display = 'none'; }
-                else { sl.style.display = 'none'; $('welModel').style.display = ''; }
+                if (p.md && p.md.length) {
+                    p.md.forEach(m => sl.add(new Option(m, m)));
+                    sl.style.display = '';
+                    if (mi) mi.style.display = 'none';
+                    sl.value = p.md[0];
+                    if (mi) mi.value = p.md[0];
+                } else {
+                    sl.style.display = 'none';
+                    if (mi) mi.style.display = '';
+                }
                 // 选择预设后立即 scf 保存（endpoint/preset/model，保持用户选完就不用重新选）
                 try {
                     scf({
                         ...cfg(),
                         preset: this.value,
                         ep: $('welEndpoint').value || DCFG.ep,
-                        model: (sl.value && sl.style.display !== 'none') ? sl.value : ($('welModel').value || 'gpt-4o')
+                        model: (sl.value && sl.style.display !== 'none') ? sl.value : ((mi ? mi.value : '') || 'gpt-4o')
                     });
                 } catch {}
             });
             // ========== 欢迎模态：所有 API 控件 "输入即保存"（localStorage 持久化），刷新不用重输 ==========
             (function bindWelcomeInputs() {
+                // 简单防抖，避免逐字输入时频繁写 localStorage 导致卡顿
+                let _welTimer = null;
+                function debounce(fn, ms) {
+                    return function() {
+                        const ctx = this, args = arguments;
+                        if (_welTimer) clearTimeout(_welTimer);
+                        _welTimer = setTimeout(function() { _welTimer = null; fn.apply(ctx, args); }, ms);
+                    };
+                }
                 function saveFromWelcome() {
                     try {
                         const sl = $('welModelSelect');
-                        const pickModel = (sl && sl.style.display !== 'none') ? sl.value : $('welModel').value;
+                        const pickModel = (sl && sl.style.display !== 'none') ? sl.value : ($('welModel') ? $('welModel').value : '');
                         const cur = cfg();
                         // NEVER 清空已有 key（如果用户不小心输入又删了，保护原 key）
-                        const newKey = $('welKey').value;
+                        const newKey = $('welKey') ? $('welKey').value : '';
                         const finalKey = (newKey && newKey.trim() !== '') ? newKey.trim() : (cur.key || '');
                         scf({
                             ...cur,
                             preset: $('welEndpointPreset') ? $('welEndpointPreset').value : cur.preset,
-                            ep: $('welEndpoint').value || DCFG.ep,
+                            ep: ($('welEndpoint') ? $('welEndpoint').value : '') || DCFG.ep,
                             model: pickModel || 'gpt-4o',
                             key: finalKey
                         });
                     } catch {}
                 }
+                const debouncedWelSave = debounce(saveFromWelcome, 250);
+                let _hintFn = saveFromWelcome;
                 const welIds = ['welKey','welEndpoint','welModel'];
-                welIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', saveFromWelcome); });
+                welIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', debouncedWelSave); });
                 const sel = document.getElementById('welModelSelect'); if (sel) sel.addEventListener('change', saveFromWelcome);
                 // 提示用户已自动保存
                 try {
@@ -6116,11 +6272,36 @@
                     savedHint.textContent = '✓ 已自动保存到本地（刷新不丢失）';
                     const bn = document.getElementById('btnWelcomeNext');
                     if (bn && bn.parentNode) bn.parentNode.insertBefore(savedHint, bn.nextSibling);
-                    const _origSave = saveFromWelcome;
-                    saveFromWelcome = function(){ _origSave(); if (savedHint){ savedHint.style.display='block'; clearTimeout(saveFromWelcome._t); saveFromWelcome._t = setTimeout(()=>{savedHint.style.display='none';}, 1200);} };
-                    // rebind（因为重写了函数引用）
-                    welIds.forEach(id => { const el = document.getElementById(id); if (el) { el.removeEventListener('input', _origSave); el.addEventListener('input', saveFromWelcome);} });
-                    if (sel) { sel.removeEventListener('change', _origSave); sel.addEventListener('change', saveFromWelcome); }
+                    const _showHintFn = function() {
+                        saveFromWelcome();
+                        if (savedHint) {
+                            savedHint.style.display = 'block';
+                            clearTimeout(_showHintFn._t);
+                            _showHintFn._t = setTimeout(function() { savedHint.style.display = 'none'; }, 1200);
+                        }
+                    };
+                    // 替换 debouncedWelSave，使其执行完调用原 save + 显示提示
+                    const debouncedWithHint = (function() {
+                        let _t2 = null;
+                        return function() {
+                            const ctx = this, args = arguments;
+                            if (_t2) clearTimeout(_t2);
+                            _t2 = setTimeout(function() { _t2 = null; _showHintFn.apply(ctx, args); }, 250);
+                        };
+                    })();
+                    // rebind（debouncedWelSave 改用带提示版）
+                    welIds.forEach(id => {
+                        const el = document.getElementById(id);
+                        if (el) {
+                            el.removeEventListener('input', debouncedWelSave);
+                            el.addEventListener('input', debouncedWithHint);
+                        }
+                    });
+                    if (sel) {
+                        sel.removeEventListener('change', saveFromWelcome);
+                        sel.addEventListener('change', _showHintFn);
+                    }
+                    _hintFn = _showHintFn;
                 } catch {}
             })();
             $('btnTestWel').addEventListener('click', async () => {

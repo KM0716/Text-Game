@@ -197,7 +197,7 @@
         <p class="field-hint" style="text-align:center;margin-bottom:6px;">选择服务商后粘贴密钥即可快速开始</p>
         <label>服务商预设</label>
         <p class="field-hint">选择你使用的AI服务商，会自动填充端点和常用模型</p>
-        <select id="welEndpointPreset"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="ollama">Ollama</option></select>
+        <select id="welEndpointPreset"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="moonshot">月之暗面 Kimi</option><option value="zhipu">智谱 AI GLM</option><option value="qwen">通义千问</option><option value="siliconflow">硅基流动</option><option value="groq">Groq</option><option value="ernie">文心一言</option><option value="minimax">MiniMax 海螺</option><option value="doubao">豆包（火山方舟）</option><option value="ollama">Ollama 本地</option></select>
         <label>端点地址</label>
         <p class="field-hint">API 接口地址，通常以 /v1/chat/completions 结尾</p>
         <input type="url" id="welEndpoint" placeholder="端点地址（自动填充）">
@@ -393,13 +393,14 @@
             <h4>API 配置</h4>
             <label>服务商预设</label>
             <p class="field-hint">选择常用服务商，自动填充端点地址和模型列表</p>
-            <select id="apiEndpointPreset"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="ollama">Ollama</option><option value="custom">自定义</option></select>
+            <select id="apiEndpointPreset"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="moonshot">月之暗面 Kimi</option><option value="zhipu">智谱 AI GLM</option><option value="qwen">通义千问</option><option value="siliconflow">硅基流动</option><option value="groq">Groq</option><option value="ernie">文心一言</option><option value="minimax">MiniMax 海螺</option><option value="doubao">豆包（火山方舟）</option><option value="ollama">Ollama 本地</option><option value="custom">自定义</option></select>
             <label>端点地址</label>
             <p class="field-hint">API 接口地址，通常以 /v1/chat/completions 结尾</p>
             <input id="apiEndpoint" placeholder="端点">
             <label>模型名称</label>
             <p class="field-hint">使用的模型，如 gpt-4o、deepseek-chat、llama3 等</p>
-            <input id="apiModel" placeholder="模型">
+            <select id="apiModelSelect"><option>gpt-4o</option></select>
+            <input id="apiModel" placeholder="模型" style="display:none;">
             <label>API 密钥</label>
             <p class="field-hint">在服务商后台获取的密钥，仅本地存储</p>
             <input type="password" id="apiKey" placeholder="密钥">
