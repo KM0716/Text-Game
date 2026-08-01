@@ -32,8 +32,38 @@ function escAttr(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, c =>
 
 // ---------- Sound System (Web Audio + WAV SE) ----------
 window.audioCtx = window.audioCtx || null;
+// 默认开启：首次进入没有 localStorage 值时，用 !== '0' = true；但还主动把 '1' 写入，避免其它地方用 === '1' 漏判
+try {
+    if (localStorage.getItem('vn_sfx') === null) localStorage.setItem('vn_sfx', '1');
+    if (localStorage.getItem('vn_bgm') === null) localStorage.setItem('vn_bgm', '1');
+} catch(_) {}
 let sfxEnabled = localStorage.getItem('vn_sfx') !== '0';
 let sfxVolume = parseFloat(localStorage.getItem('vn_sfx_vol') || '0.6');
+// 首次页面用户交互后，如果 BGM.enabled=true 但还没在播放，立即启动（绕开浏览器自动播放拦截的"用户手势上下文"技巧）
+(function hookFirstGestureForBgm() {
+    const fire = () => {
+        try {
+            if (window.BGM && window.BGM.enabled && typeof window.bgmPlayCategory === 'function') {
+                window.bgmPlayCategory(window.BGM._currentCategory || 'title', true);
+            }
+        } catch(_) {}
+        window.removeEventListener('pointerdown', fire, true);
+        window.removeEventListener('keydown', fire, true);
+        window.removeEventListener('touchstart', fire, true);
+    };
+    // DOMContentLoaded 之后再挂（避免 audio.js 还没初始化完）
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+            window.addEventListener('pointerdown', fire, true);
+            window.addEventListener('keydown', fire, true);
+            window.addEventListener('touchstart', fire, true);
+        }, { once: true });
+    } else {
+        window.addEventListener('pointerdown', fire, true);
+        window.addEventListener('keydown', fire, true);
+        window.addEventListener('touchstart', fire, true);
+    }
+})();
 
 function ensureAudio() {
     if (!window.audioCtx) {
@@ -455,8 +485,8 @@ function bgmQuickPick(cat) {
 }
 
 function bgmOpenPicker() {
-    if ($('bgmPicker')) { $('bgmPicker').remove(); return; }
-    // 分类按钮：用户不想要 emoji，这里就用纯文字；当前播放分类加 active 色
+    if ($('bgmPickerOverlay')) { try { $('bgmPickerOverlay').remove(); } catch(_) {} }
+    // 分类按钮：纯文字分类；当前播放分类加 active 色
     const cats = [
         { key: 'title',    name: '主菜单' },
         { key: 'explore',  name: '探索' },
@@ -471,27 +501,80 @@ function bgmOpenPicker() {
         { key: 'rain',     name: '雨声' },
         { key: 'survival', name: '生存' }
     ];
-    const style = document.createElement('style');
-    style.textContent = '#bgmPicker{position:fixed;z-index:10001;top:54px;right:12px;background:var(--modal-bg);border:1.5px solid var(--ink);border-radius:10px;padding:10px 12px;min-width:220px;max-width:260px;box-shadow:4px 6px 0 rgba(30,25,18,.18);font-size:.78rem;backdrop-filter: blur(6px);}#bgmPicker h5{margin:0 0 6px;font-size:.82rem;color:var(--accent);display:flex;align-items:center;justify-content:space-between;letter-spacing:.04em;}#bgmPicker .bgm-row{display:grid;grid-template-columns:repeat(3, 1fr);gap:6px;margin-bottom:8px;}#bgmPicker .bgm-cat{border:1.2px solid var(--border-light);border-radius:7px;padding:6px 4px;background:var(--button-bg);cursor:pointer;font-size:.72rem;color:var(--ink);transition:all .14s ease;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;}#bgmPicker .bgm-cat:hover{background:var(--button-hover);transform:translateY(-1px);box-shadow:0 2px 0 rgba(60,40,12,.15);}#bgmPicker .bgm-cat.active{background:var(--accent);color:#fff;border-color:var(--accent);}#bgmPicker .bgm-vol{display:flex;align-items:center;gap:6px;margin-top:2px;padding-top:8px;border-top:1px dashed var(--border-light);font-size:.7rem;color:var(--text-muted);}#bgmPicker input[type=range]{flex:1;accent-color:var(--accent);}#bgmPicker #bgmPickerClose:hover{color:var(--danger);transform:scale(1.1);}';
-    document.head.appendChild(style);
+    const overlayStyle = document.createElement('style');
+    overlayStyle.id = 'bgmPickerStyle_inline';
+    if (!document.getElementById('bgmPickerStyle_inline')) {
+        overlayStyle.textContent = [
+            '#bgmPickerOverlay{position:fixed;inset:0;z-index:10000;background:rgba(20,14,6,0.45);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(3px);-webkit-backdrop-filter:blur(3px);}',
+            '#bgmPicker{position:relative;z-index:10001;width:min(92vw,560px);max-height:min(86vh,640px);overflow:auto;background:var(--modal-bg,#fbf2d8);border:1.8px solid #3a240b;border-radius:12px;padding:14px 16px 14px;box-shadow:0 14px 0 -4px rgba(40,25,8,.18),0 22px 40px rgba(40,25,8,.28);font-size:.82rem;}',
+            '#bgmPicker h5{margin:0 0 10px;font-size:.95rem;color:var(--accent,#9c4718);display:flex;align-items:center;justify-content:space-between;letter-spacing:.06em;font-weight:800;}',
+            '#bgmPicker .bgm-grid{display:grid;grid-template-columns:repeat(4, 1fr);gap:8px;margin-bottom:12px;}',
+            '@media (max-width: 520px){#bgmPicker .bgm-grid{grid-template-columns:repeat(3, 1fr);gap:6px;}}',
+            '#bgmPicker .bgm-cat{border:1.4px solid rgba(80,52,14,.35);border-radius:8px;padding:9px 4px;background:var(--button-bg,#fff5d9);cursor:pointer;font-size:.76rem;color:var(--ink,#2a1d0a);transition:all .14s ease;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.2;font-weight:700;letter-spacing:.03em;}',
+            '#bgmPicker .bgm-cat:hover{background:var(--button-hover,#fbe5a8);transform:translateY(-1px);box-shadow:0 3px 0 rgba(60,40,12,.18);}',
+            '#bgmPicker .bgm-cat.active{background:var(--accent,#9c4718);color:#fff;border-color:var(--accent,#9c4718);box-shadow:0 3px 0 rgba(60,40,12,.3);}',
+            '#bgmPicker .bgm-cur{margin:2px 0 10px;padding:8px 10px;border-radius:6px;background:rgba(160,90,30,.08);border:1px dashed rgba(120,78,30,.35);font-size:.74rem;color:var(--text-muted,#5e4118);line-height:1.5;}',
+            '#bgmPicker .bgm-cur b{color:var(--accent,#9c4718);}',
+            '#bgmPicker .bgm-vol{display:flex;align-items:center;gap:8px;margin-top:2px;padding-top:10px;border-top:1px dashed var(--border-light,rgba(120,78,30,.3));font-size:.76rem;color:var(--text-muted,#5e4118);}',
+            '#bgmPicker input[type=range]{flex:1;accent-color:var(--accent,#9c4718);min-height:24px;}',
+            '#bgmPickerClose{cursor:pointer;color:var(--text-muted,#6a4b22);font-size:1.4rem;line-height:1;padding:2px 8px;border-radius:6px;transition:all .15s ease;}',
+            '#bgmPickerClose:hover{color:var(--danger,#c0392b);transform:scale(1.08);background:rgba(192,57,43,.08);}',
+            '#bgmPicker .bgm-actions{display:flex;gap:8px;margin-top:12px;justify-content:flex-end;}',
+            '#bgmPicker .bgm-stop{padding:7px 12px;border-radius:7px;border:1.4px solid rgba(120,30,14,.5);background:rgba(200,90,40,.1);color:#a83a14;font-weight:700;cursor:pointer;font-size:.76rem;transition:all .15s;}',
+            '#bgmPicker .bgm-stop:hover{background:rgba(200,90,40,.22);transform:translateY(-1px);}'
+        ].join('\n');
+        document.head.appendChild(overlayStyle);
+    }
+    const overlay = document.createElement('div');
+    overlay.id = 'bgmPickerOverlay';
+    overlay.setAttribute('role', 'dialog');
+    overlay.setAttribute('aria-modal', 'true');
+    overlay.setAttribute('aria-label', '背景音乐选择');
     const el = document.createElement('div');
     el.id = 'bgmPicker';
-    const catsHtml = cats.map(c => '<div class="bgm-cat' + (BGM._currentCategory === c.key ? ' active' : '') + '" data-cat="' + c.key + '" title="' + c.name + '">' + c.name + '</div>').join('');
+    const catsHtml = cats.map(c => '<div class="bgm-cat' + (BGM._currentCategory === c.key ? ' active' : '') + '" data-cat="' + c.key + '" title="' + c.name + '：点击切换到该分类的背景音乐">' + c.name + '</div>').join('');
     const marker = BGM.enabled ? '🎵' : '🔇';
+    const curCat = cats.find(c => c.key === BGM._currentCategory);
+    const curLine = '<div class="bgm-cur">当前：<b>' + esc(BGM.enabled ? ((curCat ? curCat.name : BGM._currentCategory) + (BGM.current ? ' · ' + BGM.current : '')) : '已关闭') + '</b>' + (BGM.enabled ? ' · 点击下方分类切换，或拖动下方调节音量' : ' · 点击「音乐」按钮即可开启') + '</div>';
     el.innerHTML =
-        '<h5>' + marker + ' 背景音乐 <span id="bgmPickerClose" style="cursor:pointer;color:var(--text-muted);">×</span></h5>' +
-        '<div class="bgm-row">' + catsHtml + '</div>' +
-        '<div class="bgm-vol"><span>音量</span><input type="range" id="bgmVolRange" min="0" max="1" step="0.05" value="' + BGM.volume + '"><span id="bgmVolLabel">' + Math.round(BGM.volume * 100) + '%</span></div>';
-    document.body.appendChild(el);
+        '<h5><span>' + marker + ' 背景音乐选择</span><span id="bgmPickerClose" title="关闭（Esc）">×</span></h5>' +
+        curLine +
+        '<div class="bgm-grid">' + catsHtml + '</div>' +
+        '<div class="bgm-vol"><span>音量</span><input type="range" id="bgmVolRange" min="0" max="1" step="0.02" value="' + BGM.volume + '"><span id="bgmVolLabel" style="min-width:42px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;">' + Math.round(BGM.volume * 100) + '%</span></div>' +
+        '<div class="bgm-actions"><button type="button" class="bgm-stop" id="bgmStopBtn">停止所有音乐</button></div>';
+    overlay.appendChild(el);
+    document.body.appendChild(overlay);
+    // 事件绑定：分类点击 → 立即切换并高亮；拖动音量 → 实时更新
     el.querySelectorAll('.bgm-cat').forEach(btn => {
         btn.addEventListener('click', () => {
             const cat = btn.dataset.cat;
             bgmQuickPick(cat);
             el.querySelectorAll('.bgm-cat').forEach(b => b.classList.toggle('active', b.dataset.cat === BGM._currentCategory));
+            // 更新"当前"文字
+            const cc = cats.find(c => c.key === BGM._currentCategory);
+            const cur = el.querySelector('.bgm-cur b');
+            if (cur) cur.textContent = BGM.enabled ? ((cc ? cc.name : BGM._currentCategory) + (BGM.current ? ' · ' + BGM.current : '')) : '已关闭';
         });
     });
     const closeBtn = $('bgmPickerClose');
-    if (closeBtn) closeBtn.addEventListener('click', () => el.remove());
+    function closePicker() {
+        try {
+            if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+        } catch(_) { try { overlay.remove(); } catch(_2) {} }
+        document.removeEventListener('keydown', onKey);
+    }
+    if (closeBtn) closeBtn.addEventListener('click', closePicker);
+    const sb = $('bgmStopBtn');
+    if (sb) sb.addEventListener('click', () => {
+        try { bgmStop && bgmStop(); } catch(_) {}
+        try {
+            BGM.enabled = false;
+            localStorage.setItem('vn_bgm', '0');
+            _refreshBgmBtn();
+            const cur = el.querySelector('.bgm-cur b');
+            if (cur) cur.textContent = '已关闭';
+        } catch(_) {}
+    });
     const vr = $('bgmVolRange');
     if (vr) {
         vr.addEventListener('input', e => {
@@ -500,23 +583,12 @@ function bgmOpenPicker() {
             if (l) l.textContent = Math.round(BGM.volume * 100) + '%';
         });
     }
-    // 移动端：picker 距离顶栏留出安全距离，不被 notch / header 遮挡
-    if (window.matchMedia && window.matchMedia('(max-width: 680px)').matches) {
-        el.style.top = '58px';
-        el.style.right = '8px';
-        el.style.minWidth = 'unset';
-        el.style.maxWidth = 'unset';
-        el.style.left = '8px';
-    }
-    setTimeout(() => {
-        function closePicker(ev) {
-            if (!el.contains(ev.target) && ev.target !== $('btnBgm')) {
-                el.remove();
-                document.removeEventListener('click', closePicker);
-            }
-        }
-        document.addEventListener('click', closePicker);
-    }, 10);
+    // 遮罩点击（只点遮罩不点内部）即关闭
+    overlay.addEventListener('mousedown', (e) => { if (e.target === overlay) closePicker(); });
+    overlay.addEventListener('touchstart', (e) => { if (e.target === overlay) closePicker(); }, { passive: true });
+    // ESC 关闭
+    function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); closePicker(); } }
+    document.addEventListener('keydown', onKey);
     _refreshBgmBtn();
 }
 
@@ -669,5 +741,61 @@ window.sfxEnabled = sfxEnabled;
 // toggleSfx 被调用后同步更新 window.sfxEnabled（保持与 toggleSfx 内部变量一致）
 const _origToggleSfx = toggleSfx;
 window.toggleSfx = function(){ const ret = _origToggleSfx(); window.sfxEnabled = sfxEnabled; return ret; };
+
+// ===== 全局点击音效：统一绑定（捕获阶段），解决"部分按钮有点击音、部分没有"的问题 =====
+(function bindGlobalClickSfx() {
+    const CLICK_SELECTORS = [
+        'button', '[role="button"]', 'a[href]', '[onclick]',
+        '.btn-header', '.btn-send', '.btn-quick', '.btn-primary', '.btn-secondary',
+        '.clue-sidebar-toggle', '.clue-head-close', '.clue-sidebar-actions button',
+        '.nav-menu-row', '.nav-more-toggle', '#btnNavMore', '.equip-slot', '.trait-quick-btn', '.preset-btn',
+        '.clue-note-item', '.modal-panel button', '.save-slot-row', '.bp-slot', '.bp-actions button',
+        '.achievements-grid button', '.achievements-item', '.events-item',
+        '.bgm-cat', '#bgmPickerClose', '#bgmStopBtn', '.bgm-stop',
+        '.quick-actions button', '.quick-action button', '.chat-action',
+        '.trait-chip', '.skill-chip', '.tag-chip',
+        '.achievement-card', '.event-card', '.map-node',
+        '.menu-item', '.menu-entry', '.selectable',
+        '[data-action]', '[data-btn]', '.sfx-click'
+    ].join(',');
+    // 同一个 tick 内重复的 click 只响一次（防止事件冒泡/叠加多次触发播放）
+    let _sfxLockUntil = 0;
+    function tryFireClick(ev) {
+        if (!ev || !ev.target) return;
+        // 禁用了 pointer-events 的元素根本不会触发 click，不用处理
+        // 向上找最近的匹配节点（click 发生在子 span/img 上也算）
+        let el = ev.target;
+        let matched = false;
+        for (let d = 0; d < 6 && el && el.nodeType === 1; d++, el = el.parentNode) {
+            try {
+                if (el.matches && el.matches(CLICK_SELECTORS)) { matched = true; break; }
+            } catch(_) {}
+        }
+        if (!matched) return;
+        // 禁用按钮 / 不可见按钮：跳过
+        if (el && (el.disabled || el.getAttribute && el.getAttribute('aria-disabled') === 'true')) return;
+        const now = performance.now();
+        if (now < _sfxLockUntil) return;
+        _sfxLockUntil = now + 35; // 35ms 内不重复（解决同时触发 2 个 click 的场景）
+        try { playSfx('click'); } catch(_) { try { playToneSfx && playToneSfx('click'); } catch(_2) {} }
+    }
+    const hook = () => {
+        // 捕获阶段：即使用户 stopPropagation 也能先到我们；用 pointerdown 时机更稳（和手机端 tap 更一致）
+        document.addEventListener('pointerdown', (e) => {
+            if (e.button != null && e.button !== 0) return; // 仅左键/触摸
+            tryFireClick(e);
+        }, true);
+        // 兼容不支持 pointer 的环境再补 click（避免漏）
+        document.addEventListener('click', (e) => {
+            // pointerdown 已处理的 60ms 内 click 不重复响；没 pointerdown 的环境也能兜底
+            tryFireClick(e);
+        }, true);
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', hook, { once: true });
+    } else {
+        hook();
+    }
+})();
 
 })();

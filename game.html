@@ -6,101 +6,110 @@
     <title>代号：ZDay</title>
     <link rel="stylesheet" href="css/style.css">
     <style>
-      /* ======== 手绘风加载界面（首屏内联，立即生效不等待外链） ======== */
+      /* ======== 末日风加载界面（首屏内联，立即生效不等待外链） ======== */
       #dzLoading {
         position: fixed; inset: 0; z-index: 99999;
         display: flex; flex-direction: column; align-items: center; justify-content: center;
-        background:
-          radial-gradient(1200px 800px at 50% 0%, #fdf5e2 0%, #f4e5c4 55%, #e6cf9d 100%),
-          repeating-linear-gradient(0deg, rgba(120,82,40,0.04) 0, rgba(120,82,40,0.04) 1px, transparent 1px, transparent 28px);
-        color: #3a2a14; font-family: inherit; padding: 24px;
-        transition: opacity 700ms ease, visibility 700ms ease;
+        /* 末日纯色：暗淡尘灰土黄，无渐变 */
+        background: #d9c494;
+        color: #2a1d0a; font-family: inherit; padding: 24px;
+        transition: opacity 600ms ease, visibility 600ms ease;
       }
       #dzLoading.hide { opacity: 0; visibility: hidden; pointer-events: none; }
-      /* 纸张微噪点（SVG dataURI，无外链） */
+      /* 末日颗粒 + 暗角 vignette + 微弱刮痕（SVG dataURI，无外链） */
       #dzLoading::before {
-        content:""; position:absolute; inset:0; opacity:.18; mix-blend-mode:multiply; pointer-events:none;
-        background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='260' height='260'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.27  0 0 0 0 0.18  0 0 0 0 0.08  0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+        content:""; position:absolute; inset:0; pointer-events:none;
+        background:
+          radial-gradient(120% 80% at 50% 50%, transparent 55%, rgba(40,25,8,0.42) 100%),
+          url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.16  0 0 0 0 0.10  0 0 0 0 0.04  0 0 0 0.8 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>"),
+          repeating-linear-gradient(100deg, rgba(70,45,16,0.07) 0 1px, transparent 1px 32px);
+        mix-blend-mode: multiply; opacity: 0.9;
       }
       #dzLoading .ld-inner { position: relative; max-width: 640px; width: 100%; text-align: center; }
-      /* 手绘标题（带墨边抖动） */
+      /* 末日标题：去阴影、极粗、实体深墨色 + 抖动笔触 + 微裂痕，营造沙砾/炭笔末日感 */
       #dzLoading .ld-title {
-        font-size: clamp(2rem, 5.2vw, 3.2rem); font-weight: 800; letter-spacing: .14em;
-        filter: url(#mid);
+        font-size: clamp(2.2rem, 5.6vw, 3.6rem);
+        font-weight: 950;
+        letter-spacing: 0.18em;
+        filter: url(#mid) drop-shadow(0 0 0 rgba(0,0,0,0));
         display: inline-block;
-        background: linear-gradient(180deg, #2b1d0c 0%, #4a3518 60%, #6a4a20 100%);
-        -webkit-background-clip: text; background-clip: text; color: transparent;
-        text-shadow: 2px 3px 0 rgba(120,78,30,0.12);
+        color: #221507;
         padding: 0 .2em 2px;
         opacity: 0; transform: translateY(6px);
-        animation: ldFadeUp 650ms ease 120ms forwards;
+        animation: ldFadeUp 620ms ease 80ms forwards;
+        -webkit-text-stroke: 0.35px #0f0903;
       }
       #dzLoading .ld-sub {
-        margin-top: 10px; font-size: clamp(.78rem, 1.6vw, .92rem); letter-spacing: .22em;
-        color: #6a4b22; opacity: 0; filter: url(#light);
-        animation: ldFadeUp 700ms ease 380ms forwards;
+        margin-top: 10px; font-size: clamp(.78rem, 1.6vw, .92rem); letter-spacing: .28em;
+        color: #4a3112; opacity: 0; filter: url(#light);
+        font-weight: 700;
+        animation: ldFadeUp 620ms ease 300ms forwards;
       }
       /* 手绘分隔线 */
       #dzLoading .ld-line {
         margin: 28px auto 20px; width: min(80%, 360px); height: 22px; opacity: 0;
-        animation: ldFade 600ms ease 580ms forwards;
+        animation: ldFade 520ms ease 480ms forwards;
       }
-      /* 进度条外框（手绘胶带便签感） */
+      /* 进度条外框（末日便签：纯色，无渐变） */
       #dzLoading .ld-barWrap {
         position: relative; margin: 8px auto 18px; width: min(92%, 420px); opacity: 0;
-        animation: ldFade 600ms ease 720ms forwards;
+        animation: ldFade 520ms ease 600ms forwards;
       }
       #dzLoading .ld-tape {
         position: absolute; left: 50%; top: -10px; transform: translateX(-50%) rotate(-3deg);
         width: 110px; height: 22px;
-        background: linear-gradient(180deg, rgba(240,214,124,.78), rgba(222,187,80,.72));
-        border: 1px dashed rgba(130,92,30,.25); opacity: .9;
+        background: rgba(200,168,90,0.85);
+        border: 1px dashed rgba(80,52,14,0.35); opacity: .92;
         filter: url(#light);
       }
       #dzLoading .ld-barBox {
         position: relative; padding: 14px 18px 16px;
-        background: linear-gradient(180deg, #fbf2d8 0%, #f3e3b6 100%);
-        border: 1.5px solid #6a4b20; border-radius: 6px;
+        /* 末日便签：纯色，无渐变 */
+        background: #e9d5a1;
+        border: 1.8px solid #3e2a0d; border-radius: 6px;
         filter: url(#ink-edge-soft);
-        box-shadow: 3px 4px 0 rgba(80,52,20,.12);
+        box-shadow: 3px 4px 0 rgba(40,25,8,.22);
       }
       #dzLoading .ld-barTrack {
         width: 100%; height: 14px;
-        background: repeating-linear-gradient(45deg, rgba(120,82,40,.06) 0 6px, transparent 6px 12px), #efe0b6;
-        border: 1.5px solid #5e4118; border-radius: 4px; overflow: hidden; position: relative;
+        background: #c7ac73;
+        border: 1.6px solid #3a240b; border-radius: 4px; overflow: hidden; position: relative;
       }
       #dzLoading .ld-barFill {
         position: absolute; left: 0; top: 0; bottom: 0; width: 0%;
-        background: linear-gradient(90deg, #a05a1e 0%, #c87a2e 40%, #e09a3a 85%, #ecb458 100%);
+        /* 末日进度条：铁锈橘红纯色，无渐变 */
+        background: #9c4718;
         filter: url(#light);
-        transition: width 260ms ease;
+        transition: width 180ms ease;
       }
       #dzLoading .ld-pct {
-        margin-top: 10px; font-size: .8rem; letter-spacing: .12em; color: #6a4b22;
-        font-variant-numeric: tabular-nums;
+        margin-top: 10px; font-size: .82rem; letter-spacing: .14em; color: #3a240b;
+        font-variant-numeric: tabular-nums; font-weight: 700;
       }
-      /* 标语便签 */
+      /* 标语便签：末日便签纯色背景，无渐变 */
       #dzLoading .ld-note {
         margin: 26px auto 0; max-width: 460px; padding: 14px 22px 16px;
-        background: linear-gradient(180deg, #fef7de 0%, #f6e6a8 100%);
-        border: 1.5px solid #6a4b20; border-radius: 4px; transform: rotate(-1.2deg);
+        background: #e6cf93;
+        border: 1.6px solid #3e2a0d; border-radius: 4px; transform: rotate(-1.2deg);
         filter: url(#paper-shadow); font-size: clamp(.78rem, 1.6vw, .9rem); line-height: 1.85;
-        color: #4a3312; opacity: 0;
-        animation: ldFadeUp 700ms ease 980ms forwards;
+        color: #2e1e06; font-weight: 600; opacity: 0;
+        animation: ldFadeUp 620ms ease 820ms forwards;
+        box-shadow: 2px 3px 0 rgba(40,25,8,.25);
       }
       #dzLoading .ld-note::before {
         content:""; position: absolute; left: 14px; top: 8px; width: 18px; height: 18px;
-        background: radial-gradient(circle at 35% 30%, #3a2a14 0 38%, transparent 40%);
-        border: 1.5px solid #6a4b20; border-radius: 50%; transform: rotate(-20deg); opacity: .85;
+        background: radial-gradient(circle at 35% 30%, #1f1305 0 38%, transparent 40%);
+        border: 1.5px solid #3a240b; border-radius: 50%; transform: rotate(-20deg); opacity: .9;
       }
       #dzLoading .ld-note::after {
         content:""; position: absolute; right: 16px; top: 10px; width: 22px; height: 2px;
-        background: #6a4b20; transform: rotate(14deg); filter: url(#light); box-shadow: 0 7px 0 rgba(106,75,34,.55);
+        background: #3a240b; transform: rotate(14deg); filter: url(#light); box-shadow: 0 7px 0 rgba(58,36,11,.6);
       }
       #dzLoading .ld-note p { margin: 2px 0; }
       #dzLoading .ld-tip {
-        margin-top: 22px; color: #7a5a26; font-size: clamp(.7rem, 1.3vw, .78rem);
-        letter-spacing: .08em; opacity: 0; animation: ldFade 700ms ease 1280ms forwards;
+        margin-top: 22px; color: #3b270b; font-size: clamp(.7rem, 1.3vw, .78rem);
+        letter-spacing: .1em; opacity: 0; animation: ldFade 620ms ease 1080ms forwards;
+        font-weight: 600;
       }
       @keyframes ldFade { from { opacity:0; } to { opacity:1; } }
       @keyframes ldFadeUp {
@@ -228,6 +237,7 @@
                                 <button class="btn-header" id="btnEvents" title="突发事件">事件</button>
                             </div>
                             <div class="nav-menu-row">
+                                <button class="btn-header" id="btnCompressCtx" title="压缩上下文对话历史（节省 Token）">压缩记忆</button>
                                 <button class="btn-header" id="btnIdle">挂机</button>
                             </div>
                         </div>

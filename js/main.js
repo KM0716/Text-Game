@@ -1017,7 +1017,9 @@
                 const rec = { hi: [], st: null, ch: null, clk: null, sbx: null, cfg: null, tm: Date.now() };
                 if (sn.hi != null) {
                     if (!Array.isArray(sn.hi)) errs.push('hi 不是数组');
-                    else rec.hi = sn.hi.filter(x => x && x.role && typeof x.content === 'string').slice(0, 500);
+                    // 修复：读取时保留完整对话历史（最多 3000 条），防止"前面的轮次被截断消失"；
+                    // 原先是 slice(0, 500) 会导致 500+ 轮次后读档只保留"最老的 500 条"，把后续内容全部丢了。
+                    else rec.hi = sn.hi.filter(x => x && x.role && typeof x.content === 'string').slice(-3000);
                 }
                 if (strict && rec.hi.length === 0 && (!sn.st)) errs.push('对话历史和状态均为空');
                 if (sn.st != null) {
@@ -1060,7 +1062,10 @@
                 return { valid, errs, recovered: rec };
             }
             function ldh() { return ld(K.HIS, []); }
-            function svh(h) { sv(K.HIS, h.slice(-500)); }
+            function svh(h) {
+                // 最多保留最近 3000 条历史，避免 localStorage 爆容量；不再用 500 条的过小截断，保证"前面的轮次"也能保存
+                sv(K.HIS, (Array.isArray(h) ? h : []).slice(-3000));
+            }
             function gclk() {
                 if (!clk) {
                     clk = ld(K.CLK, DCLK);
@@ -2827,19 +2832,55 @@
                         const btn = document.createElement('div');
                         btn.className = 'vn-choice' + (i % 2 ? ' vn-choice--alt' : '');
                         btn.textContent = opt;
+                        btn.title = '点击后填入输入栏，可二次编辑再发送';
                         btn.addEventListener('click', () => {
-                            // Fade out all choices
-                            el.style.transition = 'opacity 0.4s ease, max-height 0.4s ease';
-                            el.style.opacity = '0';
-                            el.style.maxHeight = '0';
-                            el.style.overflow = 'hidden';
-                            el.style.margin = '0';
-                            setTimeout(() => { el.style.display = 'none'; }, 400);
-                            // Send the choice as player action
-                            const inp = $('inputText');
-                            if (inp) { inp.value = opt; }
-                            const sendBtn = $('btnSend');
-                            if (sendBtn) { sendBtn.click(); }
+                            // 填入输入栏（不立即发送），给玩家二次编辑机会
+                            try {
+                                const inp = $('inputText');
+                                if (inp) {
+                                    // textarea：保留光标位置
+                                    if (inp.tagName === 'TEXTAREA') {
+                                        inp.focus();
+                                        const curVal = inp.value || '';
+                                        const pad = curVal && !/[\s]$/.test(curVal) ? ' ' : '';
+                                        inp.value = curVal + pad + (opt || '');
+                                        // 移动光标到末尾
+                                        try {
+                                            inp.selectionStart = inp.selectionEnd = inp.value.length;
+                                        } catch(_) {}
+                                    } else {
+                                        // contenteditable：在末尾追加
+                                        inp.focus();
+                                        const sel = window.getSelection();
+                                        const range = document.createRange();
+                                        range.selectNodeContents(inp);
+                                        range.collapse(false);
+                                        if (sel) {
+                                            sel.removeAllRanges();
+                                            sel.addRange(range);
+                                        }
+                                        const curText = (inp.textContent || '').replace(/\s+$/,'');
+                                        const pad = curText ? ' ' : '';
+                                        const node = document.createTextNode(pad + (opt || ''));
+                                        range.insertNode(node);
+                                        range.setStartAfter(node);
+                                        range.setEndAfter(node);
+                                        if (sel) {
+                                            sel.removeAllRanges();
+                                            sel.addRange(range);
+                                        }
+                                    }
+                                }
+                            } catch(e) { /* ignore */ }
+                            // 给玩家视觉反馈：点过的按钮短暂变色，但不要立刻隐藏选项气泡
+                            try {
+                                btn.style.transition = 'background .25s, color .25s, border-color .25s, transform .2s';
+                                btn.style.background = 'var(--accent,#9c4718)';
+                                btn.style.color = '#fff';
+                                btn.style.borderColor = 'var(--accent,#9c4718)';
+                                btn.style.transform = 'translateY(1px)';
+                            } catch(_) {}
+                            try { if (typeof playSfx === 'function') playSfx('success'); } catch(_) {}
                         });
                         el.appendChild(btn);
                     });
@@ -4925,6 +4966,18 @@
                     if (!busy) return;
                     clearInput();
                     try { playSfx('send'); } catch(e) {}
+                    // 玩家真正发送后：隐藏所有未选的选项气泡（点选填输入栏→发送→气泡消失，符合用户预期）
+                    try {
+                        document.querySelectorAll('.vn-choice-container').forEach(el => {
+                            if (el.style.display === 'none' || el.style.opacity === '0') return;
+                            el.style.transition = 'opacity 0.35s ease, max-height 0.45s ease, margin 0.35s ease';
+                            el.style.opacity = '0';
+                            el.style.maxHeight = '0';
+                            el.style.overflow = 'hidden';
+                            el.style.margin = '0';
+                            setTimeout(() => { try { el.style.display = 'none'; } catch(_) {} }, 420);
+                        });
+                    } catch(_) {}
                 } catch(e) {
                     console.error('[Send] 发送按钮出错：', e);
                     try { tst('发送失败：' + (e.message || '未知错误'), 'warn'); } catch {}
@@ -5609,6 +5662,244 @@
                 }, true);
             })();
             $('btnIdle').addEventListener('click', toggleIdle);
+            // ===== 压缩上下文记忆（Rikkahub 式对话框）：目标 token / 保留最近 N 条 / 附加说明 =====
+            (function bindCompressCtxDialog() {
+                const btn = $('btnCompressCtx');
+                if (!btn) return;
+                btn.addEventListener('click', openCompressCtxDialog);
+
+                function openCompressCtxDialog() {
+                    if (summaryLock) { tst('正在生成摘要，请稍候…'); return; }
+                    const histArr = Array.isArray(hist) ? hist : [];
+                    if (histArr.length < 12) { tst('对话轮次太少，暂无需压缩（至少 12 轮后再操作）'); return; }
+                    // 估算当前字符数（≈ token = 字符/2 ，粗略即可）
+                    let estChars = 0;
+                    histArr.forEach(m => { estChars += ((m.content || '').length + 16); });
+                    const estTokens = Math.max(120, Math.round(estChars / 1.8));
+
+                    // 关掉更多菜单（若开着）
+                    try {
+                        const m = $('navMoreMenu'); if (m) m.classList.remove('open');
+                    } catch(_) {}
+
+                    const overlay = document.createElement('div');
+                    overlay.id = 'compressCtxOverlay';
+                    overlay.className = 'modal-overlay';
+                    overlay.style.zIndex = '11000';
+                    overlay.style.display = 'flex';
+                    overlay.style.alignItems = 'center';
+                    overlay.style.justifyContent = 'center';
+                    overlay.style.padding = '20px';
+                    overlay.setAttribute('role', 'dialog');
+                    overlay.setAttribute('aria-modal', 'true');
+                    overlay.setAttribute('aria-label', '压缩对话历史');
+
+                    const panel = document.createElement('div');
+                    panel.className = 'modal-panel';
+                    panel.style.maxWidth = '520px';
+                    panel.style.width = 'min(92vw,520px)';
+                    panel.style.maxHeight = 'min(88vh,720px)';
+                    panel.style.overflow = 'auto';
+                    panel.innerHTML =
+                        '<h3 style="margin-top:0;color:var(--accent,#9c4718);letter-spacing:.06em;font-weight:800;">压缩对话历史</h3>' +
+                        '<p style="font-size:.8rem;color:var(--text-muted,#5e4118);margin:0 0 14px;line-height:1.6;">将前面的长对话压缩为精炼摘要，用于节省 Token 费用，保留最近的消息不参与压缩。</p>' +
+
+                        '<div style="margin-bottom:14px;">' +
+                        '  <label style="display:block;font-size:.78rem;margin-bottom:8px;color:var(--ink,#2a1d0a);font-weight:700;">目标 Token 大小</label>' +
+                        '  <div id="compressTokenTabs" style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">' +
+                        '    <button type="button" class="btn-header" data-tok="500">500</button>' +
+                        '    <button type="button" class="btn-header" data-tok="1000">1000</button>' +
+                        '    <button type="button" class="btn-header" data-tok="2000" style="background:var(--accent,#9c4718);color:#fff;border-color:var(--accent,#9c4718);">✓ 2000</button>' +
+                        '    <button type="button" class="btn-header" data-tok="4000">4000</button>' +
+                        '  </div>' +
+                        '</div>' +
+
+                        '<div style="margin-bottom:14px;">' +
+                        '  <label style="display:block;font-size:.78rem;margin-bottom:6px;color:var(--ink,#2a1d0a);font-weight:700;" for="compressKeepN">保留最近的消息</label>' +
+                        '  <input id="compressKeepN" type="number" min="2" max="200" step="1" value="32" ' +
+                        '    style="width:100%;padding:9px 10px;border-radius:7px;border:1.4px solid rgba(120,78,30,.35);background:var(--field-bg,#fffaf0);font-size:.82rem;box-sizing:border-box;" />' +
+                        '  <p style="margin:5px 0 0;font-size:.7rem;color:var(--text-muted,#5e4118);">默认 32 条；这些消息不会被压缩，以保持最新上下文的细节。</p>' +
+                        '</div>' +
+
+                        '<div style="margin-bottom:14px;">' +
+                        '  <label style="display:block;font-size:.78rem;margin-bottom:6px;color:var(--ink,#2a1d0a);font-weight:700;" for="compressExtra">附加说明（可选）</label>' +
+                        '  <textarea id="compressExtra" rows="2" placeholder="例如：重点保留角色关系、物资消耗、丧尸设定…" ' +
+                        '    style="width:100%;padding:9px 10px;border-radius:7px;border:1.4px solid rgba(120,78,30,.35);background:var(--field-bg,#fffaf0);font-size:.8rem;resize:vertical;min-height:56px;box-sizing:border-box;font-family:inherit;line-height:1.5;"></textarea>' +
+                        '</div>' +
+
+                        '<div style="padding:9px 12px;border-radius:6px;border:1.2px solid rgba(200,80,40,.35);background:rgba(200,80,40,.08);margin-bottom:16px;">' +
+                        '  <p style="margin:0;color:#b03a14;font-size:.76rem;line-height:1.6;">⚠️ 压缩上下文将重置当前对话中的所有消息（仅保留：摘要 + 最近 N 条）。压缩后的内容会写回聊天区并覆盖原存档记录。</p>' +
+                        '</div>' +
+
+                        '<div style="font-size:.72rem;color:var(--text-muted,#5e4118);margin-bottom:14px;">' +
+                        '  当前估算：共 <b style="color:var(--ink,#2a1d0a);">' + histArr.length + '</b> 条消息 · 约 <b style="color:var(--ink,#2a1d0a);">' + estTokens.toLocaleString() + '</b> tokens' +
+                        '</div>' +
+
+                        '<div class="btn-row" style="justify-content:flex-end;">' +
+                        '  <button type="button" class="btn-modal" id="compressCancelBtn" style="margin-right:6px;">取消</button>' +
+                        '  <button type="button" class="btn-modal primary" id="compressConfirmBtn">确认</button>' +
+                        '</div>';
+
+                    overlay.appendChild(panel);
+                    document.body.appendChild(overlay);
+
+                    // 选中目标 token
+                    let selectedToken = 2000;
+                    const tabs = panel.querySelectorAll('#compressTokenTabs .btn-header');
+                    tabs.forEach(t => {
+                        t.addEventListener('click', () => {
+                            tabs.forEach(x => {
+                                x.style.background = '';
+                                x.style.color = '';
+                                x.style.borderColor = '';
+                            });
+                            t.style.background = 'var(--accent,#9c4718)';
+                            t.style.color = '#fff';
+                            t.style.borderColor = 'var(--accent,#9c4718)';
+                            const v = parseInt(t.dataset.tok || '2000', 10);
+                            selectedToken = isFinite(v) && v > 0 ? v : 2000;
+                        });
+                    });
+
+                    const closeDlg = () => {
+                        document.removeEventListener('keydown', onKey);
+                        overlay.removeEventListener('mousedown', onOverlay);
+                        try { if (overlay.parentNode) overlay.parentNode.removeChild(overlay); } catch(_) { try { overlay.remove(); } catch(_2) {} }
+                    };
+                    const onKey = (e) => { if (e.key === 'Escape') { e.preventDefault(); closeDlg(); } };
+                    const onOverlay = (e) => { if (e.target === overlay) closeDlg(); };
+                    document.addEventListener('keydown', onKey);
+                    overlay.addEventListener('mousedown', onOverlay);
+                    const cancelBtn = panel.querySelector('#compressCancelBtn');
+                    if (cancelBtn) cancelBtn.addEventListener('click', closeDlg);
+
+                    const confirmBtn = panel.querySelector('#compressConfirmBtn');
+                    if (confirmBtn) confirmBtn.addEventListener('click', async () => {
+                        const keepNInp = panel.querySelector('#compressKeepN');
+                        const extraInp = panel.querySelector('#compressExtra');
+                        let keepN = parseInt(keepNInp ? keepNInp.value : '32', 10);
+                        if (!isFinite(keepN) || keepN < 2) keepN = 2;
+                        if (keepN > 200) keepN = 200;
+                        const extra = (extraInp ? extraInp.value : '').trim();
+
+                        const histLen = (hist || []).length;
+                        if (histLen - keepN < 6) {
+                            tst('可压缩的消息不足（保留 ' + keepN + ' 条后，前面不足 6 条，无需压缩）');
+                            return;
+                        }
+                        closeDlg();
+                        try { await runSelectiveCompress(selectedToken, keepN, extra); }
+                        catch(e) { tst('压缩失败：' + (e && e.message ? e.message : '未知错误'), 'warn'); }
+                    });
+                }
+
+                async function runSelectiveCompress(targetTokens, keepRecentN, extraNote) {
+                    if (summaryLock) throw new Error('其它摘要任务正在运行，请稍候…');
+                    const f = cfg();
+                    if (!f || !f.ep || !f.key) throw new Error('未配置 AI API，无法压缩');
+                    const arr = Array.isArray(hist) ? hist : [];
+                    // 分段：前面 oldPart 做压缩摘要；recentPart 完整保留
+                    const oldPart = arr.slice(0, Math.max(0, arr.length - keepRecentN));
+                    const recentPart = arr.slice(Math.max(0, arr.length - keepRecentN));
+                    if (oldPart.length < 6) throw new Error('可压缩的消息不足');
+                    summaryLock = true;
+                    tst('正在压缩上下文（目标约 ' + targetTokens + ' tokens，保留最近 ' + keepRecentN + ' 条）…');
+                    try {
+                        // 1) 构造摘要内容（字符上限控制，避免摘要请求本身爆上下文）
+                        let sumContent = oldPart.map(m =>
+                            (m.role === 'user' ? '【玩家行动】' :
+                             m.role === 'assistant' ? '【AI叙事】' :
+                             m.role === 'system' && /^【前情摘要】/.test(m.content || '') ? '【前情摘要】' :
+                             '【系统】') +
+                            ' ' + (m.content || '')
+                        ).join('\n\n');
+                        const MAX_SUM_CHARS = Math.max(8000, targetTokens * 5);
+                        if (sumContent.length > MAX_SUM_CHARS) {
+                            sumContent = '…（前面 ' + (sumContent.length - MAX_SUM_CHARS).toLocaleString() + ' 字省略）…\n' +
+                                         sumContent.slice(-MAX_SUM_CHARS);
+                        }
+                        const maxNewTokens = Math.max(200, Math.min(4096, targetTokens + 200));
+                        const extraLine = extraNote ? ('\n5. 额外保留重点：' + extraNote) : '';
+                        const sumPrompt =
+`请为以下末日文字冒险游戏的对话历史生成精炼剧情摘要。要求：
+1. 严格控制在约 ${targetTokens} tokens（中文约 ${Math.round(targetTokens*1.8)} 字）以内，越精炼越好但不要丢关键信息
+2. 保留：关键剧情事件、重要决策与后果、角色变化（心态/精神/欢愉/伤势）、已发现的 NPC 关系、物资和装备增减、线索/悬念/未完成目标
+3. 明确标记：【当前状态】【未解决悬念】【重要 NPC 关系】三段（找不到的段可省略）
+4. 若输入里已有旧的【前情摘要】，把旧摘要也揉进新的摘要里，不要重复
+${extraLine}
+
+对话历史（按时间正序）：
+${sumContent}
+
+请直接输出摘要正文，不要任何解释、标题、前后缀或 markdown 代码块。`;
+                        const sumBody = {
+                            model: f.model,
+                            messages: [{ role: 'user', content: sumPrompt }],
+                            max_tokens: maxNewTokens,
+                            temperature: 0.28,
+                            top_p: 0.88
+                        };
+                        const MAX_RETRY = 3;
+                        let summary = '';
+                        let lastErr = null;
+                        for (let attempt = 0; attempt < MAX_RETRY; attempt++) {
+                            if (attempt > 0) await new Promise(res => setTimeout(res, 650 * attempt));
+                            try {
+                                const abCtl = new AbortController();
+                                const to = setTimeout(() => { try { abCtl.abort(); } catch(_) {} }, 30000);
+                                let rp;
+                                try {
+                                    rp = await window._sendProxyRequest(f.ep, sumBody, f.key, abCtl.signal, false);
+                                } finally { clearTimeout(to); }
+                                if (!rp.ok) {
+                                    const shouldRetry = (rp.status === 429 || rp.status >= 500) && attempt < MAX_RETRY - 1;
+                                    const errText = 'HTTP ' + rp.status;
+                                    if (shouldRetry) { lastErr = new Error(errText); continue; }
+                                    throw new Error(errText);
+                                }
+                                const d = await rp.json();
+                                const cand = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
+                                if (cand) { summary = cand.trim(); break; }
+                            } catch (e) {
+                                lastErr = e;
+                                if (attempt < MAX_RETRY - 1) continue;
+                            }
+                        }
+                        if (!summary) {
+                            if (lastErr) throw lastErr;
+                            throw new Error('摘要返回为空');
+                        }
+                        // 2) 写回 hist：【前情摘要】一条 + 最近 N 条完整
+                        const newHist = [
+                            { role: 'system', content: '【前情摘要】' + summary },
+                            ...recentPart.filter(m => !(m.role === 'system' && /^【前情摘要】/.test(m.content || '')))
+                        ];
+                        hist = newHist;
+                        contextSummary = summary;
+                        try { sv(K.SUM, summary); } catch(_) {}
+                        try { svh(hist); } catch(_) {}
+                        // 3) 同步写 AUTO 存档（避免刷新丢）
+                        try {
+                            const svs = gsv() || {};
+                            const cur = Object.assign({}, svs.auto || {});
+                            cur.hi = hist.slice(-3000);
+                            cur.tm = Date.now();
+                            svs.auto = cur;
+                            ssv(svs);
+                        } catch(_) {}
+                        // 4) 重渲染到聊天区（前面的轮次会显示成摘要 + 后续完整轮次）
+                        try { if (typeof rbt === 'function') rbt(); } catch(_) {}
+                        playSfx('success');
+                        snotify('info', '压缩完成',
+                            '旧消息 ' + oldPart.length + ' 条 → 摘要约 ' + summary.length + ' 字，保留最近 ' +
+                            ((hist || []).length - 1) + ' 条');
+                        tst('✓ 上下文已压缩（节省约 ' + Math.max(0, oldPart.length - 1) + ' 条消息空间）');
+                    } finally {
+                        summaryLock = false;
+                    }
+                }
+            })();
+
             $('btnAchievements') && $('btnAchievements').addEventListener('click', () => {
                 const f = window.renderAchievementsPanel; if (f) f();
                 $('achievementsModal').style.display = 'flex';
@@ -6880,34 +7171,34 @@
                             const ps = noteEl.querySelectorAll('p');
                             if (ps && ps.length && sl.length >= ps.length) {
                                 // 淡入淡出切换标语，保持手绘便签的视觉
-                                noteEl.style.transition = 'opacity 420ms ease';
+                                noteEl.style.transition = 'opacity 320ms ease';
                                 noteEl.style.opacity = '0';
                                 setTimeout(() => {
                                     try {
                                         ps.forEach((p, i) => { if (sl[i]) p.textContent = sl[i]; });
                                     } catch(_) {}
                                     noteEl.style.opacity = '1';
-                                }, 320);
+                                }, 220);
                             }
                         };
                         // 启动时先推一个起始进度
-                        setPct(6);
-                        // 用 requestAnimationFrame 做「手绘渐显」的进度推进（非指数级，有停顿感更自然）
+                        setPct(8);
+                        // 提速版：整体节奏更紧凑，减少"慢速龟爬"体感
                         let _acc = 0; let _lastTs = performance.now();
                         let _lastStep = _lastTs;
                         function raf(ts) {
                             const dt = ts - _lastTs; _lastTs = ts; _acc += dt;
-                            // 整体节奏：前 2.5s 比较快拉到 60%，之后慢速向 88% 逼近，等 window load 事件再拉满 100
+                            // 速度曲线：1.1s 冲 ~70%，2.2s 逼近 ~93%，等待 load 再拉满
                             let speedPerSec;
-                            if (pct < 18) speedPerSec = 55;
-                            else if (pct < 62) speedPerSec = 38;
-                            else if (pct < 82) speedPerSec = 11;
-                            else speedPerSec = 2.2;
+                            if (pct < 22) speedPerSec = 110;
+                            else if (pct < 70) speedPerSec = 72;
+                            else if (pct < 92) speedPerSec = 18;
+                            else speedPerSec = 1.6;
                             const add = speedPerSec * (dt / 1000);
                             if (add > 0) setPct(pct + add);
-                            // 每 1.5s 换一版标语
-                            if (ts - _lastStep > 1500) { _lastStep = ts; switchSlogan(); }
-                            if (pct < 92) requestAnimationFrame(raf);
+                            // 每 1.0s 换一版标语
+                            if (ts - _lastStep > 1000) { _lastStep = ts; switchSlogan(); }
+                            if (pct < 97) requestAnimationFrame(raf);
                         }
                         requestAnimationFrame(raf);
                         // 对外暴露两个钩子：fin() 由 init 末尾 window.load + min time 之后触发；skip() 供极端情况下（用户点/报错）立即关闭
@@ -6917,14 +7208,14 @@
                                 setTimeout(() => {
                                     try {
                                         root.classList.add('hide');
-                                        setTimeout(() => { try { root.remove(); } catch(_) {} }, 780);
+                                        setTimeout(() => { try { root.remove(); } catch(_) {} }, 560);
                                     } catch(_) {}
-                                }, 180);
+                                }, 120);
                             },
-                            skip: function() { setPct(100); setTimeout(() => { try { root.classList.add('hide'); } catch(_) {} }, 80); }
+                            skip: function() { setPct(100); setTimeout(() => { try { root.classList.add('hide'); } catch(_) {} }, 60); }
                         };
-                        // 兜底：10 秒还没关掉就强制隐藏，避免用户卡死
-                        setTimeout(() => { try { if (window._dzLoading) window._dzLoading.fin(); } catch(_) {} }, 10000);
+                        // 兜底：5.5 秒还没关掉就强制隐藏，避免用户卡死（提速）
+                        setTimeout(() => { try { if (window._dzLoading) window._dzLoading.fin(); } catch(_) {} }, 5500);
                     } catch(e) {
                         // 任何加载屏自身异常都不能挡住游戏
                         try { const r = document.getElementById('dzLoading'); if (r) r.classList.add('hide'); } catch(_) {}
@@ -7166,6 +7457,11 @@
                         tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
                     }
                     loadedFromSave = true;
+                }
+
+                // 如果成功从存档读取了历史，必须重新渲染到聊天区（前面的轮次也一并显示）
+                if (loadedFromSave && Array.isArray(hist) && hist.length > 0) {
+                    try { if (typeof rbt === 'function') rbt(); } catch(_) {}
                 }
 
                 // ===== ULTIMATE API KEY PROTECTION =====
