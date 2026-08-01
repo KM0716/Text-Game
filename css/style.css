@@ -2909,6 +2909,90 @@
             .traits-quick-row { gap: 4px !important; }
             /* 预设按钮触摸优化 */
             .preset-btn { padding: 6px 10px; min-height: 36px; touch-action: manipulation; }
+            /* ===== 移动端线索气泡适配 ===== */
+            .clue-sidebar {
+                width: 82vw !important;
+                max-width: 320px !important;
+                top: 68px !important;
+                right: -92vw !important;
+                max-height: calc(100vh - 130px) !important;
+                z-index: 9998 !important;
+            }
+            .clue-sidebar.open {
+                right: 3vw !important;
+                left: auto !important;
+            }
+            .clue-sidebar.docked-left {
+                right: auto !important;
+                left: 3vw !important;
+            }
+            .clue-sidebar.docked-right {
+                left: auto !important;
+                right: 3vw !important;
+            }
+            .clue-sidebar-toggle {
+                width: 44px !important;
+                height: 44px !important;
+                font-size: 1.1rem !important;
+                top: 54px !important;
+                right: 6px !important;
+                z-index: 9997 !important;
+                touch-action: none;
+                -webkit-tap-highlight-color: transparent;
+            }
+            .clue-sidebar-header {
+                font-size: 0.85rem !important;
+                padding: 10px 12px 8px !important;
+            }
+            .clue-note {
+                padding: 8px 10px 10px !important;
+            }
+            .clue-sidebar-actions {
+                padding: 10px 10px !important;
+                gap: 6px !important;
+            }
+            .clue-sidebar-actions button {
+                font-size: 0.76rem !important;
+                padding: 8px 6px !important;
+                min-height: 40px !important;
+                touch-action: manipulation;
+            }
+            .clue-note-item {
+                padding: 10px 10px 10px 28px !important;
+                font-size: 0.76rem !important;
+            }
+            .clue-note-empty {
+                font-size: 0.78rem !important;
+                padding: 18px 8px !important;
+            }
+            /* ===== 移动端导航栏按钮排版优化 ===== */
+            .app-header {
+                padding-left: 8px;
+                padding-right: 8px;
+                padding-bottom: 4px;
+            }
+            .nav-group {
+                gap: 4px !important;
+            }
+            .nav-group.nav-more-wrap {
+                position: relative;
+            }
+            .nav-more-menu {
+                min-width: 220px !important;
+                top: calc(100% + 6px) !important;
+                right: 2px !important;
+                z-index: 9999 !important;
+            }
+            .nav-menu-section {
+                padding: 6px 8px !important;
+            }
+            .nav-menu-row {
+                gap: 4px !important;
+            }
+            .nav-menu-title {
+                font-size: 0.72rem !important;
+                padding: 4px 6px !important;
+            }
         }
         @media (max-width: 360px) {
             .header-actions { flex-wrap: wrap; }
@@ -2925,6 +3009,15 @@
             .btn-send { min-width: 48px; font-size: 0.75rem; }
             .quick-actions { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
             .btn-quick { white-space: nowrap; flex-shrink: 0; min-height: 38px; }
+            /* 超小屏线索气泡进一步压缩 */
+            .clue-sidebar { width: 88vw !important; max-width: 300px !important; right: -95vw !important; }
+            .clue-sidebar.open, .clue-sidebar.docked-right { right: 2vw !important; }
+            .clue-sidebar.docked-left { left: 2vw !important; }
+            .clue-sidebar-toggle { width: 40px !important; height: 40px !important; top: 56px !important; right: 4px !important; font-size: 1rem !important; }
+            .clue-sidebar-header { font-size: 0.8rem !important; padding: 8px 10px 6px !important; }
+            .clue-note-item { padding: 8px 8px 8px 26px !important; font-size: 0.72rem !important; }
+            .clue-sidebar-actions button { font-size: 0.7rem !important; padding: 6px 4px !important; min-height: 36px !important; }
+            .nav-more-menu { min-width: 200px !important; }
         }
         /* Tablet optimization */
         @media (min-width: 481px) and (max-width: 840px) {

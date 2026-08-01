@@ -21,27 +21,37 @@
             const POS_TRAITS = (window.POS_TRAITS != null) ? window.POS_TRAITS : {};
             const NEG_TRAITS = (window.NEG_TRAITS != null) ? window.NEG_TRAITS : {};
             const PROFESSIONS = (window.PROFESSIONS != null) ? window.PROFESSIONS : {};
-            // audio.js 暴露的 —— 使用安全包装，延迟读取 window，避免与 audio.js 加载时序的耦合问题
-            const playSfx = (...a) => { if (typeof window.playSfx === 'function') return window.playSfx(...a); };
-            const playTone = (...a) => { if (typeof window.playTone === 'function') return window.playTone(...a); };
-            const tst = (...a) => { if (typeof window.tst === 'function') return window.tst(...a); };
-            const esc = (s) => { if (typeof window.esc === 'function') return window.esc(s); const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
-            const escAttr = (s) => { if (typeof window.escAttr === 'function') return window.escAttr(s); return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); };
-            const scb = (...a) => { if (typeof window.scb === 'function') return window.scb(...a); };
-            const sketchConfirm = (...a) => { if (typeof window.sketchConfirm === 'function') return window.sketchConfirm(...a); return Promise.resolve(false); };
-            const sketchPrompt = (...a) => { if (typeof window.sketchPrompt === 'function') return window.sketchPrompt(...a); return Promise.resolve(''); };
-            const bgmToggle = (...a) => { if (typeof window.bgmToggle === 'function') return window.bgmToggle(...a); };
-            const bgmQuickPick = (...a) => { if (typeof window.bgmQuickPick === 'function') return window.bgmQuickPick(...a); };
-            const bgmOpenPicker = (...a) => { if (typeof window.bgmOpenPicker === 'function') return window.bgmOpenPicker(...a); };
-            const bgmAutoSwitch = (...a) => { if (typeof window.bgmAutoSwitch === 'function') return window.bgmAutoSwitch(...a); };
-            const initAutoBGM = (...a) => { if (typeof window.initAutoBGM === 'function') return window.initAutoBGM(...a); };
-            const toggleSfx = (...a) => { if (typeof window.toggleSfx === 'function') return window.toggleSfx(...a); };
-            const launchTutorial = (...a) => { if (typeof window.launchTutorial === 'function') return window.launchTutorial(...a); };
-            const bgmInit = (...a) => { if (typeof window.bgmInit === 'function') return window.bgmInit(...a); };
-            const bgmPlay = (...a) => { if (typeof window.bgmPlay === 'function') return window.bgmPlay(...a); };
-            const bgmPlayCategory = (...a) => { if (typeof window.bgmPlayCategory === 'function') return window.bgmPlayCategory(...a); };
-            const bgmStop = (...a) => { if (typeof window.bgmStop === 'function') return window.bgmStop(...a); };
-            const bgmSetVol = (...a) => { if (typeof window.bgmSetVol === 'function') return window.bgmSetVol(...a); };
+            // audio.js 暴露的 —— 先保存原始函数引用（防止IIFE赋值时形成自调用死循环），然后再做安全包装
+            // 关键：保存当前 window 上已有的真实实现，后续即使 window 被覆盖也不会丢失原始实现
+            const _origPlaySfx = window.playSfx, _origPlayTone = window.playTone, _origTst = window.tst;
+            const _origEsc = window.esc, _origEscAttr = window.escAttr, _origScb = window.scb;
+            const _origSketchConfirm = window.sketchConfirm, _origSketchPrompt = window.sketchPrompt;
+            const _origSnotify = window.snotify;
+            const _origBgmToggle = window.bgmToggle, _origBgmQuickPick = window.bgmQuickPick, _origBgmOpenPicker = window.bgmOpenPicker;
+            const _origBgmAutoSwitch = window.bgmAutoSwitch, _origInitAutoBGM = window.initAutoBGM, _origToggleSfx = window.toggleSfx;
+            const _origLaunchTutorial = window.launchTutorial, _origBgmInit = window.bgmInit;
+            const _origBgmPlay = window.bgmPlay, _origBgmPlayCategory = window.bgmPlayCategory, _origBgmStop = window.bgmStop, _origBgmSetVol = window.bgmSetVol;
+            const playSfx = (...a) => { if (typeof _origPlaySfx === 'function') return _origPlaySfx(...a); };
+            const playTone = (...a) => { if (typeof _origPlayTone === 'function') return _origPlayTone(...a); };
+            const tst = (...a) => { if (typeof _origTst === 'function') return _origTst(...a); };
+            const esc = (s) => { if (typeof _origEsc === 'function') return _origEsc(s); const d = document.createElement('div'); d.textContent = s == null ? '' : s; return d.innerHTML; };
+            const escAttr = (s) => { if (typeof _origEscAttr === 'function') return _origEscAttr(s); return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); };
+            const scb = (...a) => { if (typeof _origScb === 'function') return _origScb(...a); };
+            const sketchConfirm = (...a) => { if (typeof _origSketchConfirm === 'function') return _origSketchConfirm(...a); return Promise.resolve(false); };
+            const sketchPrompt = (...a) => { if (typeof _origSketchPrompt === 'function') return _origSketchPrompt(...a); return Promise.resolve(''); };
+            // 注意：snotify 在下方 1509 行以 function snotify() 正式定义，此处不重复 const 声明以避免语法冲突
+            const bgmToggle = (...a) => { if (typeof _origBgmToggle === 'function') return _origBgmToggle(...a); };
+            const bgmQuickPick = (...a) => { if (typeof _origBgmQuickPick === 'function') return _origBgmQuickPick(...a); };
+            const bgmOpenPicker = (...a) => { if (typeof _origBgmOpenPicker === 'function') return _origBgmOpenPicker(...a); };
+            const bgmAutoSwitch = (...a) => { if (typeof _origBgmAutoSwitch === 'function') return _origBgmAutoSwitch(...a); };
+            const initAutoBGM = (...a) => { if (typeof _origInitAutoBGM === 'function') return _origInitAutoBGM(...a); };
+            const toggleSfx = (...a) => { if (typeof _origToggleSfx === 'function') return _origToggleSfx(...a); };
+            const launchTutorial = (...a) => { if (typeof _origLaunchTutorial === 'function') return _origLaunchTutorial(...a); };
+            const bgmInit = (...a) => { if (typeof _origBgmInit === 'function') return _origBgmInit(...a); };
+            const bgmPlay = (...a) => { if (typeof _origBgmPlay === 'function') return _origBgmPlay(...a); };
+            const bgmPlayCategory = (...a) => { if (typeof _origBgmPlayCategory === 'function') return _origBgmPlayCategory(...a); };
+            const bgmStop = (...a) => { if (typeof _origBgmStop === 'function') return _origBgmStop(...a); };
+            const bgmSetVol = (...a) => { if (typeof _origBgmSetVol === 'function') return _origBgmSetVol(...a); };
             // sfxEnabled / BGM 在 audio.js 中维护，window.sfxEnabled 暴露的是其同步引用
             const sfxEnabled = () => 'sfxEnabled' in window ? window.sfxEnabled : (localStorage && localStorage.getItem('vn_sfx') !== '0');
             const BGM = () => window.BGM || { enabled: false, volume: 0.45, tracks: {}, _currentCategory: 'title' };
@@ -1497,30 +1507,37 @@
                 'memory': 5000
             };
             function snotify(type, label, value) {
-                if (_replayingHistory) return;
-                const container = $('notifyContainer');
-                if (!container) return;
-                const now = Date.now();
-                const cd = _notifyCooldownByType[type] || 3000;
-                const valueSig = [type || '', label || '', value || ''].join('\u0001');
-                const noValueSig = [type || '', label || ''].join('\u0001');
-                if (_notifyCurrentBatchId > 0) {
-                    if (_notifyThisBatchSet.has(valueSig)) return;
-                    _notifyThisBatchSet.add(valueSig);
-                } else {
-                    if (_notifyCooldownMap.has(noValueSig) && (now - _notifyCooldownMap.get(noValueSig) < cd)) return;
-                    if (notifyQueue.some(n => [n.type || '', n.label || '', n.value || ''].join('\u0001') === valueSig)) return;
-                }
-                _notifyCooldownMap.set(noValueSig, now);
-                // 清理过期的冷却记录（避免Map无限增长）
-                if (_notifyCooldownMap.size > 100) {
-                    for (const [k, t] of _notifyCooldownMap) {
-                        if (now - t > 120000) _notifyCooldownMap.delete(k);
+                try {
+                    // 优先调用原始 snotify（防止外部注入的版本被覆盖）
+                    if (typeof _origSnotify === 'function' && _origSnotify !== snotify) {
+                        return _origSnotify(type, label, value);
                     }
+                    if (_replayingHistory) return;
+                    const container = $('notifyContainer');
+                    if (!container) return;
+                    const now = Date.now();
+                    const cd = _notifyCooldownByType[type] || 3000;
+                    const valueSig = [type || '', label || '', value || ''].join('\u0001');
+                    const noValueSig = [type || '', label || ''].join('\u0001');
+                    if (_notifyCurrentBatchId > 0) {
+                        if (_notifyThisBatchSet.has(valueSig)) return;
+                        _notifyThisBatchSet.add(valueSig);
+                    } else {
+                        if (_notifyCooldownMap.has(noValueSig) && (now - _notifyCooldownMap.get(noValueSig) < cd)) return;
+                        if (notifyQueue.some(n => [n.type || '', n.label || '', n.value || ''].join('\u0001') === valueSig)) return;
+                    }
+                    _notifyCooldownMap.set(noValueSig, now);
+                    if (_notifyCooldownMap.size > 100) {
+                        for (const [k, t] of _notifyCooldownMap) {
+                            if (now - t > 120000) _notifyCooldownMap.delete(k);
+                        }
+                    }
+                    notifyQueue.push({ type, label, value });
+                    try { sessionStorage.setItem('vn_notifyQueue', JSON.stringify(notifyQueue)); } catch(e) {}
+                    if (!notifyBusy) processNotifyQueue();
+                } catch(e) {
+                    console.warn('[snotify] error:', e);
                 }
-                notifyQueue.push({ type, label, value });
-                try { sessionStorage.setItem('vn_notifyQueue', JSON.stringify(notifyQueue)); } catch(e) {}
-                if (!notifyBusy) processNotifyQueue();
             }
             function processNotifyQueue() {
                 const container = $('notifyContainer');
@@ -1810,19 +1827,28 @@
                     addBtn.onclick = () => {
                         sketchPrompt('请输入新线索内容：', '', '添加线索').then(text => {
                             if (text && text.trim()) {
-                                const s2 = gst();
-                                if (!s2.clues) s2.clues = [];
-                                s2.clues.push({
-                                    text: text.trim(),
-                                    priority: 2,
-                                    id: 'clue_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
-                                    time: (gclk().day || 1) + '日 ' + fmtTime(gclk().elapsedSec)
-                                });
-                                sst(s2);
-                                renderClueSidebar();
-                                playSfx('pickup');
-                                tst('新线索已添加');
+                                try {
+                                    const s2 = gst() || {};
+                                    if (!s2.clues) s2.clues = [];
+                                    const clk = typeof gclk === 'function' ? (gclk() || {}) : {};
+                                    const timeStr = ((clk.day || 1) + '日 ') + (typeof fmtTime === 'function' ? fmtTime(clk.elapsedSec || 0) : '');
+                                    s2.clues.push({
+                                        text: text.trim(),
+                                        priority: 2,
+                                        id: 'clue_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
+                                        time: timeStr
+                                    });
+                                    if (typeof sst === 'function') sst(s2);
+                                    renderClueSidebar();
+                                    playSfx('clue-add');
+                                    tst('新线索已添加');
+                                } catch (err) {
+                                    console.error('[AddClue] 出错：', err);
+                                    tst('添加线索失败：' + (err.message || '未知错误'));
+                                }
                             }
+                        }).catch(err => {
+                            console.error('[AddClue] sketchPrompt 出错：', err);
                         });
                     };
                 }
@@ -3288,9 +3314,12 @@
             window.fmtTime = fmtTime; window.dayPhase = dayPhase;
             window.seasonFromDay = seasonFromDay; window.randWeather = randWeather; window.randTemp = randTemp;
             window.aiInitStats = aiInitStats; window.fillCharModal = fillCharModal;
-            window.sketchConfirm = sketchConfirm; window.sketchPrompt = sketchPrompt;
+            // 仅当这些函数在 window 上尚未存在时才赋值（避免覆盖 audio.js 的真实实现，防止自调用死循环）
+            if (typeof window.sketchConfirm !== 'function') window.sketchConfirm = sketchConfirm;
+            if (typeof window.sketchPrompt !== 'function') window.sketchPrompt = sketchPrompt;
             // Expose additional helpers needed by second script block
-            window.playTone = playTone; window.snotify = snotify;
+            if (typeof window.playTone !== 'function') window.playTone = playTone;
+            if (typeof window.snotify !== 'function') window.snotify = snotify;
             window.NORMAL_SKILLS = NORMAL_SKILLS; window.ABILITIES = ABILITIES;
             // Live variable accessors (hist and sbx are mutable let variables)
             window._getHist = () => hist; window._setHist = (v) => { hist = v; };
@@ -4607,22 +4636,29 @@
 
             // ===== Event Listeners =====
             $('btnSend').addEventListener('click', () => {
-                const v = $('inputText').value.trim();
-                if (v && !busy) {
+                try {
+                    const inputEl = $('inputText');
+                    if (!inputEl) return;
+                    const v = inputEl.value.trim();
+                    if (!v || busy) return;
                     // Cheat code detection
                     if (v === 'worldlock') {
-                        const cfgs = cfg();
-                        scf({ ...cfgs, worldLock: !cfgs.worldLock });
-                        tst(cfgs.worldLock ? '作弊码已关闭：角色锁定已启用' : '作弊码已激活：角色解锁中（可自由修改创建角色）');
-                        $('inputText').value = '';
+                        try {
+                            const cfgs = cfg() || {};
+                            scf({ ...cfgs, worldLock: !cfgs.worldLock });
+                            tst(cfgs.worldLock ? '作弊码已关闭：角色锁定已启用' : '作弊码已激活：角色解锁中（可自由修改创建角色）');
+                        } catch(e) { tst('作弊码切换失败'); }
+                        inputEl.value = '';
                         return;
                     }
                     if (v === 'toggledebug' || v === 'godmode' || v === 'god' || v === 'debug') {
-                        const cur = cfg().debug || false;
-                        scf({ ...cfg(), debug: !cur });
-                        tst(!cur ? '⚡ 上帝模式已激活：你无所不能、永不死亡、可获取任何物资、进入任何地点、操控任何NPC' : '上帝模式已关闭');
-                        upui();
-                        $('inputText').value = '';
+                        try {
+                            const cur = (cfg() || {}).debug || false;
+                            scf({ ...cfg(), debug: !cur });
+                            tst(!cur ? '⚡ 上帝模式已激活：你无所不能、永不死亡、可获取任何物资、进入任何地点、操控任何NPC' : '上帝模式已关闭');
+                            if (typeof upui === 'function') upui();
+                        } catch(e) { tst('调试模式切换失败'); }
+                        inputEl.value = '';
                         return;
                     }
                     if (v === 'showdebug' || v === 'showsandbox' || v === 'secretpanel') {
@@ -4634,18 +4670,18 @@
                             gdGrp.style.display = hidden ? 'block' : 'none';
                             tst(hidden ? '开发者面板已显示' : '开发者面板已隐藏');
                         }
-                        $('inputText').value = '';
+                        inputEl.value = '';
                         return;
                     }
                     // ===== DEBUG MODE: Command prefix "/" =====
-                    if (cfg().debug && (v.startsWith('/') || v.startsWith('debug:') || v.startsWith('调试:'))) {
-                        runDebugCmd(v);
-                        $('inputText').value = '';
-                        $('inputText').style.height = '';
+                    if ((cfg() || {}).debug && (v.startsWith('/') || v.startsWith('debug:') || v.startsWith('调试:'))) {
+                        try { if (typeof runDebugCmd === 'function') runDebugCmd(v); } catch(e) { console.error('[Send] runDebugCmd err:', e); }
+                        inputEl.value = '';
+                        inputEl.style.height = '';
                         return;
                     }
                     // ===== CHEAT DETECTION: Block unrealistic/cheating behavior =====
-                    if (!cfg().debug) {
+                    if (!(cfg() || {}).debug) {
                         const cheatPatterns = [
                             { re: /瞬移|传送|瞬间移动|直接出现在|瞬间到达/, msg: '不可以作弊！末世世界没有瞬移能力，请选择现实可行的移动方式。' },
                             { re: /无限(物资|弹药|资源|金币|金钱)|源源不断|无穷无尽/, msg: '不可以作弊！资源有限，请合理管理和获取物资。' },
@@ -4658,14 +4694,25 @@
                         for (const cp of cheatPatterns) {
                             if (cp.re.test(v)) {
                                 tst(cp.msg);
-                                $('inputText').value = '';
+                                inputEl.value = '';
                                 return;
                             }
                         }
                     }
                     if (idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return; }
-                    hin(v); $('inputText').value = ''; $('inputText').style.height = '';
-                    playSfx('send');
+                    if (typeof hin !== 'function') {
+                        console.error('[Send] hin 函数不存在');
+                        tst('核心功能初始化失败，请刷新页面重试');
+                        return;
+                    }
+                    hin(v);
+                    inputEl.value = '';
+                    inputEl.style.height = '';
+                    try { playSfx('send'); } catch(e) {}
+                } catch(e) {
+                    console.error('[Send] 发送按钮出错：', e);
+                    try { tst('发送失败：' + (e.message || '未知错误'), 'warn'); } catch {}
+                    try { $('btnSend').disabled = false; } catch {}
                 }
             });
             $('inputText').addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); $('btnSend').click(); } });
@@ -4844,40 +4891,47 @@
             }
 
             $('btnNewGame').addEventListener('click', async () => {
-                if (!cfg().key) {
-                    // Show API config first if not set
-                    const c = cfg();
-                    // 无条件回填所有欢迎模态字段（即使用户没填过 key，也会显示 endpoint/preset/model）
-                    if ($('welEndpointPreset')) $('welEndpointPreset').value = c.preset || AP[c.preset] ? c.preset : 'openai';
-                    // 触发一次 welEndpointPreset change 来刷新 welModelSelect 的选项
-                    if ($('welEndpointPreset')) { try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {} }
-                    $('welEndpoint').value = c.ep || '';
-                    const sl = $('welModelSelect');
-                    if (c.model && sl) {
-                        const hasOpt = [...sl.options].some(o => o.value === c.model);
-                        if (hasOpt) sl.value = c.model;
-                        else { $('welModel').value = c.model; sl.style.display='none'; $('welModel').style.display=''; }
-                    } else if (c.model) {
-                        $('welModel').value = c.model;
+                try {
+                    const c = cfg() || {};
+                    if (!c.key) {
+                        if ($('welEndpointPreset')) {
+                            try {
+                                $('welEndpointPreset').value = c.preset || (typeof AP === 'object' && AP[c.preset]) ? c.preset : 'openai';
+                                try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
+                            } catch(e) { console.warn('[NewGame] 预设填充出错：', e); }
+                        }
+                        try { if ($('welEndpoint')) $('welEndpoint').value = c.ep || ''; } catch {}
+                        try {
+                            const sl = $('welModelSelect');
+                            if (c.model && sl) {
+                                const hasOpt = [...sl.options].some(o => o.value === c.model);
+                                if (hasOpt) sl.value = c.model;
+                                else if ($('welModel')) { $('welModel').value = c.model; sl.style.display='none'; $('welModel').style.display=''; }
+                            } else if (c.model && $('welModel')) { $('welModel').value = c.model; }
+                        } catch(e) {}
+                        try { if ($('welKey')) $('welKey').value = c.key || ''; } catch {}
+                        try { $('welcomeModal').style.display = 'flex'; } catch {}
+                        return;
                     }
-                    $('welKey').value = c.key || '';
-                    $('welcomeModal').style.display = 'flex';
-                    return;
+                    const curSt = (typeof gst === 'function') ? gst() : null;
+                    const hasGame = hist.length > 0 || (curSt && curSt.inv && curSt.inv.length > 0);
+                    if (hasGame && !c.worldLock) {
+                        try {
+                            if (!await sketchConfirm('游戏已开始。角色与世界已锁定，不可更改。\n如需重新开始，请使用"新游戏"功能（将清除所有进度）。\n\n确定要创建新角色吗？此操作将清除当前所有进度！')) return;
+                        } catch(e) { if (!window.confirm('确定要清除当前进度并创建新角色吗？此操作不可撤销！')) return; }
+                        // Clear everything for a fresh start
+                        try { if (typeof ccb === 'function') ccb(); } catch {}
+                        hist = [];
+                        try { if (typeof DSTA !== 'undefined' && typeof sst === 'function') sst(JSON.parse(JSON.stringify(DSTA))); } catch {}
+                        try { if (typeof svh === 'function') svh([]); } catch {}
+                        try { if (typeof stopIdle === 'function') stopIdle(); } catch {}
+                    }
+                    try { if (typeof fillCharModal === 'function') fillCharModal(); } catch(e) { console.warn('[NewGame] fillCharModal 出错：', e); }
+                    try { if ($('charModal')) $('charModal').style.display = 'flex'; } catch {}
+                } catch(e) {
+                    console.error('[NewGame] 开局按钮出错：', e);
+                    try { tst('开局功能出错：' + (e.message || '未知错误'), 'warn'); } catch {}
                 }
-                const c = cfg();
-                const hasGame = hist.length > 0 || (gst() && gst().inv && gst().inv.length > 0);
-                if (hasGame && !c.worldLock) {
-                    if (!await sketchConfirm('游戏已开始。角色与世界已锁定，不可更改。\n如需重新开始，请使用"新游戏"功能（将清除所有进度）。\n\n确定要创建新角色吗？此操作将清除当前所有进度！')) return;
-                    // Clear everything for a fresh start
-                    ccb();
-                    hist = [];
-                    sst(JSON.parse(JSON.stringify(DSTA)));
-                    svh([]);
-                    stopIdle();
-                }
-                // If worldLock cheat code is active, allow editing without clearing
-                fillCharModal();
-                $('charModal').style.display = 'flex';
             });
             $('btnSettings').addEventListener('click', () => {
                 const c = cfg();
@@ -5268,23 +5322,49 @@
                 const menu = $('navMoreMenu');
                 if (!btn || !menu) return;
                 let closeTimer = null;
+                let openState = false;
                 const openMenu = () => {
                     if (closeTimer) { clearTimeout(closeTimer); closeTimer = null; }
                     menu.classList.add('open');
+                    openState = true;
                 };
                 const closeMenu = (delay = 200) => {
-                    closeTimer = setTimeout(() => menu.classList.remove('open'), delay);
+                    closeTimer = setTimeout(() => {
+                        menu.classList.remove('open');
+                        openState = false;
+                    }, delay);
                 };
+                // 点击按钮切换（支持桌面和移动端）
                 btn.addEventListener('click', (e) => {
                     e.stopPropagation();
-                    menu.classList.toggle('open');
+                    e.preventDefault();
+                    if (openState) {
+                        closeMenu(0);
+                    } else {
+                        openMenu();
+                    }
                 });
+                // 移动端：touch 增强
+                btn.addEventListener('touchend', (e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    if (openState) closeMenu(0);
+                    else openMenu();
+                }, { passive: false });
+                // 菜单内部点击不冒泡
                 menu.addEventListener('click', (e) => e.stopPropagation());
+                menu.addEventListener('touchend', (e) => e.stopPropagation());
+                // 桌面端：mouseenter/mouseleave 悬浮展开
                 btn.addEventListener('mouseenter', openMenu);
                 menu.addEventListener('mouseenter', openMenu);
                 btn.addEventListener('mouseleave', () => closeMenu(260));
                 menu.addEventListener('mouseleave', () => closeMenu(200));
-                document.addEventListener('click', () => menu.classList.remove('open'));
+                // 点击文档外部关闭（统一处理，防止重复触发）
+                const outsideHandler = () => {
+                    if (openState) closeMenu(0);
+                };
+                document.addEventListener('click', outsideHandler);
+                document.addEventListener('touchend', outsideHandler, { passive: true });
             })();
             // BGM 选择面板：右键或长按
             $('btnBgm').addEventListener('contextmenu', (e) => { e.preventDefault(); bgmOpenPicker(); });
@@ -5416,13 +5496,19 @@
                 let startX = 0, startY = 0;
                 let initialLeft = 0, initialTop = 0;
                 let pressTimer = null;
+                let longPressFired = false;
                 let isTouch = false;
+                let lastTouchX = 0, lastTouchY = 0;
 
                 const startDrag = (clientX, clientY) => {
+                    if (isDragging) return;
                     isDragging = true;
+                    longPressFired = true;
                     const rect = clueSb.getBoundingClientRect();
                     initialLeft = rect.left;
                     initialTop = rect.top;
+                    startX = clientX;
+                    startY = clientY;
                     clueSb.classList.remove('docked-left', 'docked-right', 'open');
                     clueSb.classList.add('dragging');
                     clueSb.style.left = initialLeft + 'px';
@@ -5436,69 +5522,81 @@
                     // Skip drag if the target is the close button or its children
                     const target = e.target;
                     if (target && (target.id === 'btnCloseClueSidebar' || (target.closest && target.closest('#btnCloseClueSidebar')))) return;
+                    // 若点击的是内容区（非header），不允许拖拽（避免影响内部按钮、编辑操作）
+                    if (target && target.closest && target.closest('#clueNoteContent')) return;
                     isPressed = true;
                     isDragging = false;
+                    longPressFired = false;
                     isTouch = !!e.touches;
                     const point = e.touches ? e.touches[0] : e;
                     startX = point.clientX;
                     startY = point.clientY;
-                    
-                    if (isTouch) {
-                        // 触屏设备：长按触发拖拽（350ms）
-                        pressTimer = setTimeout(() => {
-                            if (isPressed) startDrag(point.clientX, point.clientY);
-                        }, 350);
-                    }
-                    // PC鼠标：直接通过移动距离触发，不使用计时器
+                    lastTouchX = startX;
+                    lastTouchY = startY;
+
+                    // 所有设备：统一使用长按（400ms）+ 移动阈值双重触发机制
+                    pressTimer = setTimeout(() => {
+                        if (isPressed && !isDragging) startDrag(lastTouchX, lastTouchY);
+                    }, 400);
                 };
 
                 const onPointerMove = (e) => {
                     if (!isPressed && !isDragging) return;
-                    
+
                     const point = e.touches ? e.touches[0] : e;
+                    if (e.touches && point) { lastTouchX = point.clientX; lastTouchY = point.clientY; }
                     const dx = point.clientX - startX;
                     const dy = point.clientY - startY;
-                    
+
                     if (!isDragging && isPressed) {
-                        // 移动超过阈值才进入拖拽
-                        if (Math.abs(dx) > 5 || Math.abs(dy) > 5) {
+                        // 移动超过阈值：直接进入拖拽（同时取消长按计时器）
+                        if (Math.abs(dx) > 8 || Math.abs(dy) > 8) {
                             if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-                            if (!isTouch) {
-                                startDrag(point.clientX, point.clientY);
-                            }
+                            startDrag(point.clientX, point.clientY);
                         }
                     }
-                    
+
                     if (!isDragging) return;
-                    
+
                     // 拖拽中：更新位置
                     const newLeft = initialLeft + dx;
                     const newTop = initialTop + dy;
-                    const maxLeft = window.innerWidth - clueSb.offsetWidth - 10;
-                    const maxTop = window.innerHeight - clueSb.offsetHeight - 10;
-                    clueSb.style.left = Math.max(10, Math.min(newLeft, maxLeft)) + 'px';
-                    clueSb.style.top = Math.max(10, Math.min(newTop, maxTop)) + 'px';
+                    const maxLeft = Math.max(0, window.innerWidth - clueSb.offsetWidth - 6);
+                    const maxTop = Math.max(0, window.innerHeight - clueSb.offsetHeight - 6);
+                    clueSb.style.left = Math.max(6, Math.min(newLeft, maxLeft)) + 'px';
+                    clueSb.style.top = Math.max(6, Math.min(newTop, maxTop)) + 'px';
                 };
 
                 const onPointerUp = (e) => {
+                    // 如果长按拖拽已生效，或正在拖拽，阻止正常 click 触发（防止 toggle 开关误触）
+                    const shouldSuppressClick = isDragging || longPressFired;
                     isPressed = false;
                     if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
                     startX = 0; startY = 0;
-                    
-                    if (!isDragging) return;
-                    
+
+                    if (!isDragging) {
+                        if (shouldSuppressClick && clueToggle) {
+                            // 标记本次点击无效，下一次 click 监听会跳过
+                            clueToggle._suppressNextClick = true;
+                            setTimeout(() => { if (clueToggle) clueToggle._suppressNextClick = false; }, 50);
+                        }
+                        return;
+                    }
+
                     isDragging = false;
+                    longPressFired = false;
                     clueSb.classList.remove('dragging');
                     document.body.style.userSelect = '';
                     // 计算吸附方向
                     const rect = clueSb.getBoundingClientRect();
                     const centerX = rect.left + rect.width / 2;
                     const dockLeft = centerX < window.innerWidth / 2;
-                    
-                    clueSb.style.top = rect.top + 'px';
+                    const clampedTop = Math.max(10, Math.min(rect.top, window.innerHeight - clueSb.offsetHeight - 10));
+
+                    clueSb.style.top = clampedTop + 'px';
                     clueSb.style.left = dockLeft ? '10px' : 'auto';
                     clueSb.style.right = dockLeft ? 'auto' : '10px';
-                    
+
                     if (dockLeft) {
                         clueSb.classList.add('docked-left');
                         clueSb.classList.remove('docked-right');
@@ -5513,17 +5611,25 @@
                 const dragArea = header || clueSb;
                 dragArea.addEventListener('mousedown', onPointerDown);
                 dragArea.addEventListener('touchstart', onPointerDown, { passive: true });
-                
+
                 document.addEventListener('mousemove', onPointerMove);
                 document.addEventListener('touchmove', onPointerMove, { passive: true });
-                
+
                 document.addEventListener('mouseup', onPointerUp);
                 document.addEventListener('touchend', onPointerUp);
+                document.addEventListener('touchcancel', onPointerUp);
             }
 
             // toggle button 保留原逻辑，但需要考虑拖拽状态
             if (clueToggle) {
                 clueToggle.addEventListener('click', (e) => {
+                    // 拖拽或长按结束时，误触发 toggle click 的抑制
+                    if (clueToggle._suppressNextClick) {
+                        clueToggle._suppressNextClick = false;
+                        e.stopPropagation();
+                        e.preventDefault();
+                        return;
+                    }
                     if (clueSb.classList.contains('dragging')) return;
                     // Clear any drag-position inline styles before toggling
                     // so CSS class-based positioning works correctly
@@ -5531,6 +5637,7 @@
                     if (clueSb.style.top) clueSb.style.top = '';
                     if (clueSb.style.right) clueSb.style.right = '';
                     clueSb.classList.toggle('open');
+                    renderClueSidebar();
                     playSfx('open');
                 });
             }
@@ -5550,43 +5657,109 @@
                 });
             }
             $('btnSave').addEventListener('click', () => {
-                const svs = gsv(), sl = $('saveSlots');
-                sl.innerHTML = '';
-                for (let i = 1; i <= 10; i++) {
-                    const k = 's' + i, sn = svs[k];
-                    const d = document.createElement('div');
-                    d.style.cssText = 'padding:6px;margin:4px 0;border:1.5px dashed var(--divider);border-radius:6px;display:flex;justify-content:space-between;align-items:center;font-size:0.66rem;';
-                    d.innerHTML = '<span style="flex:1;">槽' + i + ' ' + (sn ? '| ' + new Date(sn.tm).toLocaleString() + ' | 第' + (sn.clk ? sn.clk.day : 0) + '天' : '| 空') + '</span><button class="btn-header" data-act="save">保存</button>' + (sn ? '<button class="btn-header" data-act="del" style="color:var(--color-danger);">删档</button>' : '');
-                    d.querySelector('[data-act="save"]').addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        const curCfg = cfg();
-                        const cleanCfg = {};
-                        Object.keys(curCfg).forEach(k => {
-                            const v = curCfg[k];
-                            if (v === '' || v === null || v === undefined) return;
-                            cleanCfg[k] = JSON.parse(JSON.stringify(v));
+                try {
+                    const svs = gsv() || {}, sl = $('saveSlots');
+                    if (!sl) return;
+                    sl.innerHTML = '';
+                    for (let i = 1; i <= 10; i++) {
+                        const k = 's' + i, sn = svs[k];
+                        const d = document.createElement('div');
+                        d.style.cssText = 'padding:8px;margin:6px 0;border:1.5px dashed var(--divider);border-radius:8px;display:flex;flex-wrap:wrap;gap:6px;justify-content:space-between;align-items:center;font-size:0.68rem;';
+                        const slotInfo = '<span style="flex:1;min-width:140px;">槽' + i + ' ' + (sn ? '| ' + new Date(sn.tm).toLocaleString() + ' | 第' + ((sn.clk && sn.clk.day) || 0) + '天' : '| 空') + '</span>';
+                        const btnGroupStyle = 'display:flex;gap:4px;flex-wrap:wrap;';
+                        d.innerHTML = slotInfo + '<div style="' + btnGroupStyle + '"><button class="btn-header" data-act="save">保存</button>' + (sn ? '<button class="btn-header" data-act="load" style="color:var(--accent);">读取</button><button class="btn-header" data-act="del" style="color:var(--color-danger);">删档</button>' : '') + '</div>';
+                        // 保存按钮
+                        d.querySelector('[data-act="save"]').addEventListener('click', (e) => {
+                            try {
+                                e.stopPropagation();
+                                const curCfg = cfg() || {};
+                                const cleanCfg = {};
+                                Object.keys(curCfg).forEach(k => {
+                                    const v = curCfg[k];
+                                    if (v === '' || v === null || v === undefined) return;
+                                    try { cleanCfg[k] = JSON.parse(JSON.stringify(v)); } catch(e2) {}
+                                });
+                                svs[k] = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), cfg: cleanCfg, tm: Date.now() };
+                                ssv(svs);
+                                const cfgs = cfg() || {};
+                                scf({ ...cfgs, lastSlot: k });
+                                $('saveModal').style.display = 'none';
+                                tst('已存档至槽' + i + '（下次可自动读取）');
+                                playSfx('pickup');
+                            } catch(err) {
+                                console.error('[Save] 存档失败：', err);
+                                tst('存档失败：' + (err.message || '未知错误'), 'warn');
+                            }
                         });
-                        svs[k] = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), cfg: cleanCfg, tm: Date.now() };
-                        ssv(svs);
-                        // Save last slot reference
-                        const cfgs = cfg();
-                        scf({ ...cfgs, lastSlot: k });
-                        $('saveModal').style.display = 'none';
-                        tst('已存档至槽' + i + '（下次可自动读取）');
-                    });
-                    const delBtn = d.querySelector('[data-act="del"]');
-                    if (delBtn) delBtn.addEventListener('click', async (e) => {
-                        e.stopPropagation();
-                        if (await sketchConfirm('确定删除槽' + i + '的存档？')) {
-                            delete svs[k];
-                            ssv(svs);
-                            $('btnSave').click(); // refresh
-                            tst('已删除存档');
-                        }
-                    });
-                    sl.appendChild(d);
+                        // 读取按钮
+                        const loadBtn = d.querySelector('[data-act="load"]');
+                        if (loadBtn) loadBtn.addEventListener('click', async (e) => {
+                            try {
+                                e.stopPropagation();
+                                if (!sn) { tst('该存档槽为空'); return; }
+                                try {
+                                    if (!await sketchConfirm('确定读取槽' + i + '的存档？\n当前进度将被覆盖且无法恢复。')) return;
+                                } catch(ce) {
+                                    if (!window.confirm('确定读取槽' + i + '的存档？当前进度将被覆盖！')) return;
+                                }
+                                if (typeof stopIdle === 'function') stopIdle();
+                                const r = validateSaveData(sn, false);
+                                hist = (r.recovered.hi || []).slice();
+                                if (typeof sst === 'function') sst(r.recovered.st);
+                                if (typeof sch === 'function') sch(r.recovered.ch);
+                                if (typeof sclk === 'function') sclk(r.recovered.clk);
+                                if (typeof ssbx === 'function' && typeof mergeSbx === 'function' && r.recovered.sbx) {
+                                    sbx = mergeSbx(r.recovered.sbx);
+                                    ssbx(sbx);
+                                }
+                                if (typeof scf === 'function' && r.recovered.cfg) {
+                                    const curCfg = cfg() || {};
+                                    const merged = { ...curCfg, ...r.recovered.cfg };
+                                    if (!merged.key && curCfg.key) merged.key = curCfg.key;
+                                    if (r.recovered.cfg.key === '' || r.recovered.cfg.key === null || r.recovered.cfg.key === undefined) {
+                                        merged.key = curCfg.key;
+                                    }
+                                    scf(typeof migrateCfg === 'function' ? migrateCfg(merged) : merged);
+                                }
+                                if (r.errs && r.errs.length > 0) {
+                                    if (typeof snotify === 'function') snotify('warn', '存档导入', '已自动修复 ' + r.errs.length + ' 处字段缺失');
+                                    tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
+                                }
+                                if (typeof rbt === 'function') rbt();
+                                if (typeof upui === 'function') upui();
+                                $('saveModal').style.display = 'none';
+                                tst('已读取槽' + i + '存档');
+                                playSfx('pickup');
+                            } catch(err) {
+                                console.error('[Load] 读档失败：', err);
+                                tst('读档失败：' + (err.message || '未知错误'), 'warn');
+                            }
+                        });
+                        // 删档按钮
+                        const delBtn = d.querySelector('[data-act="del"]');
+                        if (delBtn) delBtn.addEventListener('click', async (e) => {
+                            try {
+                                e.stopPropagation();
+                                let ok = false;
+                                try { ok = await sketchConfirm('确定删除槽' + i + '的存档？此操作不可撤销。'); }
+                                catch(ce) { ok = window.confirm('确定删除槽' + i + '的存档？'); }
+                                if (!ok) return;
+                                delete svs[k];
+                                ssv(svs);
+                                $('btnSave').click(); // 刷新
+                                tst('已删除槽' + i + '存档');
+                            } catch(err) {
+                                console.error('[DelSave] 删档失败：', err);
+                                tst('删档失败：' + (err.message || '未知错误'), 'warn');
+                            }
+                        });
+                        sl.appendChild(d);
+                    }
+                    $('saveModal').style.display = 'flex';
+                } catch(err) {
+                    console.error('[SaveDlg] 打开存档面板失败：', err);
+                    tst('打开存档面板失败：' + (err.message || '未知错误'), 'warn');
                 }
-                $('saveModal').style.display = 'flex';
             });
             $('btnAutoSave').addEventListener('click', () => {
                 const svs = gsv();
@@ -5672,44 +5845,10 @@
                 inp.click();
             });
             $('btnLoad').addEventListener('click', () => {
-                const svs = gsv(), sl = $('loadSlots');
-                sl.innerHTML = '';
-                for (let i = 1; i <= 10; i++) {
-                    const k = 's' + i, sn = svs[k];
-                    const d = document.createElement('div');
-                    d.style.cssText = 'padding:6px;margin:4px 0;border:1.5px dashed var(--divider);border-radius:6px;display:flex;justify-content:space-between;align-items:center;font-size:0.66rem;';
-                    d.innerHTML = '<span>槽' + i + ' ' + (sn ? '| ' + new Date(sn.tm).toLocaleString() + ' | 第' + (sn.clk ? sn.clk.day : 0) + '天' : '| 空') + '</span><button class="btn-header" ' + (sn ? '' : 'disabled') + '>读取</button>';
-                    d.querySelector('button').addEventListener('click', (e) => {
-                        e.stopPropagation();
-                        if (!sn) return;
-                        stopIdle();
-                        const r = validateSaveData(sn, false);
-                        hist = r.recovered.hi.slice();
-                        sst(r.recovered.st);
-                        sch(r.recovered.ch);
-                        sclk(r.recovered.clk);
-                        if (r.recovered.sbx) { sbx = mergeSbx(r.recovered.sbx); ssbx(sbx); }
-                        if (r.recovered.cfg) {
-                            const curCfg = cfg();
-                            const merged = { ...curCfg, ...r.recovered.cfg };
-                            if (!merged.key && curCfg.key) merged.key = curCfg.key;
-                            if (r.recovered.cfg.key === '' || r.recovered.cfg.key === null || r.recovered.cfg.key === undefined) {
-                                merged.key = curCfg.key;
-                            }
-                            scf(migrateCfg(merged));
-                        }
-                        if (r.errs.length > 0) {
-                            snotify('warn', '存档导入', '已自动修复 ' + r.errs.length + ' 处字段缺失');
-                            tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
-                        }
-                        rbt();
-                        upui();
-                        $('loadModal').style.display = 'none';
-                        tst('读档成功');
-                    });
-                    sl.appendChild(d);
+                // 读档功能已合并到存档界面，直接打开同一个 saveModal
+                try { if ($('btnSave')) $('btnSave').click(); } catch(e) {
+                    console.warn('[btnLoad] 触发存档面板失败：', e);
                 }
-                $('loadModal').style.display = 'flex';
             });
             $('btnWelcomeNext').addEventListener('click', () => {
                 const k = $('welKey').value.trim();

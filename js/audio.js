@@ -181,13 +181,34 @@ const BGM = {
         survival:['bgm_survival1.mp3']
     },
     _currentCategory: 'title',
-    _lastLocation: ''
+    _lastLocation: '',
+    _preloadCache: {},   // 预加载缓存: {filename: Audio element}
+    _preloadLimit: 12    // 预加载缓存上限
 };
+
+// 预加载指定曲目（非阻塞，后台静默加载）
+function _bgmPreload(file) {
+    if (!file || BGM._preloadCache[file]) return;
+    try {
+        const keys = Object.keys(BGM._preloadCache);
+        if (keys.length >= BGM._preloadLimit) {
+            const oldest = keys[0];
+            try { if (BGM._preloadCache[oldest]) { BGM._preloadCache[oldest].pause(); BGM._preloadCache[oldest].src = ''; } } catch {}
+            delete BGM._preloadCache[oldest];
+        }
+        const a = new Audio();
+        a.preload = 'auto';
+        a.src = 'BGM/' + encodeURIComponent(file);
+        a.volume = 0;
+        try { a.load(); } catch(e) {}
+        BGM._preloadCache[file] = a;
+    } catch(e) {}
+}
 
 function bgmInit() {
     if (BGM.audio) return;
     BGM.audio = new Audio();
-    BGM.audio.preload = 'metadata';
+    BGM.audio.preload = 'auto';
     BGM.audio.loop = false;
     BGM.audio.volume = BGM.volume;
     BGM.audio.crossOrigin = 'anonymous';
@@ -202,10 +223,20 @@ function bgmInit() {
                 const idx = list.indexOf(BGM.current);
                 const next = list[(idx + 1) % list.length];
                 BGM.current = next;
-                BGM.audio.src = 'BGM/' + next;
+                _bgmPreload(next);
+                BGM.audio.src = 'BGM/' + encodeURIComponent(next);
             }
         }
     });
+    BGM.audio.addEventListener('canplaythrough', () => {
+        if (BGM.audio) BGM.audio.volume = BGM.volume;
+    });
+    // 启动时预加载所有分类的第一首（非阻塞，后台进行）
+    setTimeout(() => {
+        Object.values(BGM.tracks).forEach(list => {
+            if (list && list[0]) _bgmPreload(list[0]);
+        });
+    }, 800);
 }
 
 function bgmPlay(file) {
@@ -213,11 +244,38 @@ function bgmPlay(file) {
     bgmInit();
     if (BGM.current === file && BGM.audio && !BGM.audio.paused) return;
     BGM.current = file;
-    BGM.audio.src = 'BGM/' + encodeURIComponent(file);
+    const cached = BGM._preloadCache[file];
+    if (cached) {
+        try { BGM.audio.srcObject = null; } catch {}
+        BGM.audio.src = cached.src;
+    } else {
+        BGM.audio.src = 'BGM/' + encodeURIComponent(file);
+    }
+    // 启动前先将音量设为 0，再平滑淡入（防止爆音/突兀）
+    BGM.audio.volume = 0;
     try {
         const p = BGM.audio.play();
-        if (p && typeof p.catch === 'function') p.catch(() => {});
-    } catch(e) {}
+        if (p && typeof p.catch === 'function') {
+            p.then(() => {
+                const fadeStart = Date.now();
+                const fadeDur = 260;
+                const fadeTimer = setInterval(() => {
+                    const t = Math.min(1, (Date.now() - fadeStart) / fadeDur);
+                    if (BGM.audio) {
+                        BGM.audio.volume = Math.max(0, Math.min(BGM.volume, t * BGM.volume));
+                    }
+                    if (t >= 1 || !BGM.audio) clearInterval(fadeTimer);
+                }, 28);
+            }).catch(() => {
+                if (BGM.audio) BGM.audio.volume = BGM.volume;
+                _bgmPreload(file);
+            });
+        } else {
+            setTimeout(() => { if (BGM.audio) BGM.audio.volume = BGM.volume; }, 120);
+        }
+    } catch(e) {
+        try { if (BGM.audio) BGM.audio.volume = BGM.volume; } catch {}
+    }
 }
 
 function bgmPlayCategory(cat, random) {
@@ -235,11 +293,36 @@ function bgmPlayCategory(cat, random) {
             : list[0];
     }
     BGM._currentFile = file;
+    // 预加载该分类下其他曲目（后台进行，不阻塞当前播放）
+    setTimeout(() => {
+        list.forEach(f => { if (f !== file) _bgmPreload(f); });
+    }, 400);
     bgmPlay(file);
 }
 
 function bgmStop() {
-    if (BGM.audio) { try { BGM.audio.pause(); BGM.audio.currentTime = 0; } catch(e) {} }
+    if (!BGM.audio) return;
+    try {
+        const startVol = BGM.audio.volume || 0;
+        const fadeStart = Date.now();
+        const fadeDur = 220;
+        const fadeTimer = setInterval(() => {
+            const t = Math.min(1, (Date.now() - fadeStart) / fadeDur);
+            if (BGM.audio) {
+                BGM.audio.volume = Math.max(0, startVol * (1 - t));
+            } else {
+                clearInterval(fadeTimer);
+                return;
+            }
+            if (t >= 1) {
+                clearInterval(fadeTimer);
+                try { BGM.audio.pause(); BGM.audio.currentTime = 0; } catch(e) {}
+                if (BGM.audio) BGM.audio.volume = BGM.volume;
+            }
+        }, 26);
+    } catch(e) {
+        try { BGM.audio.pause(); BGM.audio.currentTime = 0; } catch(e2) {}
+    }
 }
 
 function _safeSnotify(level, tag, msg) {
@@ -265,7 +348,18 @@ function bgmToggle() {
 function bgmSetVol(v) {
     BGM.volume = Math.max(0, Math.min(1, v));
     localStorage.setItem('vn_bgm_vol', BGM.volume);
-    if (BGM.audio) BGM.audio.volume = BGM.volume;
+    if (BGM.audio) {
+        const start = BGM.audio.volume;
+        const end = BGM.volume;
+        const fadeStart = Date.now();
+        const fadeDur = 150;
+        const ft = setInterval(() => {
+            const t = Math.min(1, (Date.now() - fadeStart) / fadeDur);
+            if (BGM.audio) BGM.audio.volume = start + (end - start) * t;
+            else clearInterval(ft);
+            if (t >= 1) clearInterval(ft);
+        }, 20);
+    }
 }
 
 function initAutoBGM() {
@@ -497,11 +591,14 @@ function sketchPrompt(msg, def, title) {
 }
 
 // ---------- 暴露到 window ----------
+// 注意：BGM 以函数形式暴露，调用方式：const bgm = BGM(); 返回内部 BGM 对象
+const getBGM = () => BGM;
 Object.assign(window, {
     $, scb, esc, escAttr,
     ensureAudio, playTone, playSfx, playToneSfx, SE_FILES,
     bgmInit, bgmPlay, bgmPlayCategory, bgmStop, bgmToggle, bgmSetVol,
-    initAutoBGM, bgmAutoSwitch, bgmQuickPick, bgmOpenPicker, BGM,
+    initAutoBGM, bgmAutoSwitch, bgmQuickPick, bgmOpenPicker,
+    BGM: getBGM,
     toggleSfx, launchTutorial,
     tst, sketchConfirm, sketchPrompt
 });

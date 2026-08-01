@@ -1741,8 +1741,8 @@
         let ambientStarted = false;
         function updateAmbient() {
             if (!window.audioCtx) return;
-            const clk = gclk();
-            const hour = (clk.elapsedSec || 0) / 3600;
+            const clk = gclk() || {};
+            const hour = ((clk.elapsedSec || 0) / 3600);
             const weather = clk.weather || '晴';
             let targetAmbient = null;
             if (weather === '雨') targetAmbient = 'ambient_rain';
@@ -1750,10 +1750,10 @@
             else if (weather === '雪') targetAmbient = 'ambient_wind';
             else if (hour >= 20 || hour < 6) targetAmbient = 'ambient_night';
             else targetAmbient = 'ambient_wind';
-            const conf = sfxExt[targetAmbient];
+            const conf = (typeof sfxExt !== 'undefined') ? sfxExt[targetAmbient] : null;
             if (conf && conf.type === 'loop' && conf.freq) {
-                if (!ambientStarted || ambientNode && ambientNode.frequency && Math.abs(ambientNode.frequency.value - conf.freq) > 5) {
-                    playNoiseAmbient(conf);
+                if (!ambientStarted || (typeof ambientNode !== 'undefined' && ambientNode && ambientNode.frequency && Math.abs(ambientNode.frequency.value - conf.freq) > 5)) {
+                    if (typeof playNoiseAmbient === 'function') playNoiseAmbient(conf);
                     ambientStarted = true;
                 }
             }
@@ -1764,7 +1764,8 @@
         // Periodic status effects ticker (already exists at 5s interval)
         // Periodic random event checks during gameplay
         setInterval(() => {
-            if (gst().hp > 0) triggerRandomEvent();
+            const s = gst();
+            if (s && s.hp != null && s.hp > 0) triggerRandomEvent();
         }, 120000); // Check every 2 minutes
 
 })(); // innerIIFE 结束
