@@ -67,7 +67,6 @@
                 </div>
                 <div class="nav-group nav-secondary">
                     <button class="btn-header" id="btnSave">💾 存档</button>
-                    <button class="btn-header" id="btnLoad">📂 读档</button>
                     <button class="btn-header accent" id="btnNewGame">🎮 开局</button>
                 </div>
                 <div class="nav-group nav-more-wrap">
@@ -481,16 +480,6 @@
             </div>
         </div>
         <div class="setting-group">
-            <h4>存档与备份</h4>
-            <p class="field-hint">导出当前游戏全部数据为备份文件，或从备份文件恢复进度。</p>
-            <div class="btn-row" style="justify-content:flex-start;gap:6px;">
-                <button type="button" class="btn-modal" id="btnSetExportBackup" style="font-size:0.7rem;">导出全部备份</button>
-                <button type="button" class="btn-modal" id="btnSetImportBackup" style="font-size:0.7rem;">选择备份文件导入</button>
-            </div>
-            <input type="file" id="inputSetImportBackup" accept=".json" style="display:none;">
-            <p id="setImportBackupStatus" class="field-hint" style="margin-top:8px;"></p>
-        </div>
-        <div class="setting-group">
             <h4>重新开始</h4>
             <p class="field-hint">生成一个死亡结局后直接从头开始游戏，保留当前角色设定和世界设定不变。</p>
             <div class="btn-row">
@@ -542,7 +531,7 @@
 
     <!-- Save/Load Modals (save modal 合并存档与读档功能) -->
     <div class="modal-overlay" id="saveModal" style="display:none;"><div class="modal-panel"><button class="modal-close" id="modalCloseSave">x</button><h3>存档 / 读档</h3><div id="saveSlots"></div><div class="btn-row"><button class="btn-modal primary" id="btnAutoSave">快速存档</button><button class="btn-modal" id="btnExportBackup">导出备份</button><button class="btn-modal" id="btnImportBackup">导入备份</button></div></div></div>
-    <div class="modal-overlay" id="loadModal" style="display:none;"><div class="modal-panel"><button class="modal-close" id="modalCloseLoad">x</button><h3>读档</h3><div id="loadSlots"></div></div></div>
+    
 
     <!-- Prompt Help Modal -->
     <div class="modal-overlay" id="promptHelpModal" style="display:none;"><div class="modal-panel" style="max-width:420px;"><button class="modal-close" id="modalClosePromptHelp">x</button><h3>Prompt 变量说明</h3>

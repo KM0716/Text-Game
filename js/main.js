@@ -21,6 +21,9 @@
             const POS_TRAITS = (window.POS_TRAITS != null) ? window.POS_TRAITS : {};
             const NEG_TRAITS = (window.NEG_TRAITS != null) ? window.NEG_TRAITS : {};
             const PROFESSIONS = (window.PROFESSIONS != null) ? window.PROFESSIONS : {};
+            // Achievement state (exposed by gamesystems.js) — use getter to always get the current Set
+            const _getUnlockedAchievements = () => window._unlockedAchievements || new Set();
+            const _ACH_KEY = () => window._ACH_KEY || 'vn_achievements';
             // audio.js 暴露的 —— 先保存原始函数引用（防止IIFE赋值时形成自调用死循环），然后再做安全包装
             // 关键：保存当前 window 上已有的真实实现，后续即使 window 被覆盖也不会丢失原始实现
             const _origPlaySfx = window.playSfx, _origPlayTone = window.playTone, _origTst = window.tst;
@@ -480,7 +483,7 @@
             // 浏览器会自动将 'BGM/xxx.mp3' 解析为相对于 game.html 的路径
             // 无需额外处理编码或子路径
 
-            let hist = [], busy = false, ctrl = null, undo = null, theme = 'light', chr, sta, clk, sbx, sideMode = 'profile';
+            let hist = [], busy = false, _equipBusy = false, ctrl = null, undo = null, theme = 'light', chr, sta, clk, sbx, sideMode = 'profile';
             const hasHover = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
             const isMobile = () => !hasHover || /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || window.innerWidth <= 480;
             window.isMobile = isMobile;
@@ -2905,9 +2908,9 @@
             }
 
             async function hin(inp, isIdle, displayText, systemPromptExtra) {
-                if (busy) return;
-                if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return; }
-                const tx = inp.trim(); if (!tx) return;
+                if (busy) { tst('正在演算中，请稍候…'); return false; }
+                if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return false; }
+                const tx = inp.trim(); if (!tx) return false;
                 // Use displayText for player bubble if provided, otherwise use tx
                 const showText = displayText ? displayText.trim() : tx;
                 // Hide any visible choice bubbles when player sends custom input
@@ -2922,7 +2925,7 @@
                         }
                     });
                 }
-                undo = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), ach: unlockedAchievements ? [...unlockedAchievements] : [], bubbleCount: $('chatArea') ? $('chatArea').children.length : 0, turnId: Date.now() };
+                undo = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), ach: _getUnlockedAchievements().size ? [..._getUnlockedAchievements()] : [], bubbleCount: $('chatArea') ? $('chatArea').children.length : 0, turnId: Date.now() };
                 snotifyStartBatch();
                 // 重置 pai 事件触发的 turn 标记（防止跨回合误触发）
                 if (typeof window._paiSetTurn === 'function') window._paiSetTurn(undo.turnId);
@@ -3213,14 +3216,14 @@
                     if (isIdle) stopIdle();
                     snotifyEndBatch();
                 } finally {
-                    busy = false;
-                    snotifyEndBatch();
-                    if (!isIdle && !idleLocked) $('btnSend').disabled = false;
-                    if (!isIdle) $('inputText').classList.remove('busy');
-                    if (!isIdle && !idleLocked && !isMobile()) $('inputText').focus();
-                    upui();
-                    checkChatFold();
-                    scb();
+                    try { busy = false; } catch(e) {}
+                    try { snotifyEndBatch(); } catch(e) {}
+                    try { if (!isIdle && !idleLocked) $('btnSend').disabled = false; } catch(e) {}
+                    try { if (!isIdle) $('inputText').classList.remove('busy'); } catch(e) {}
+                    try { if (!isIdle && !idleLocked && !isMobile()) $('inputText').focus(); } catch(e) {}
+                    try { upui(); } catch(e) { console.error('[hin] upui failed in finally:', e); }
+                    try { checkChatFold(); } catch(e) {}
+                    try { scb(); } catch(e) {}
                     // Auto-save after each game action (keep auto-slot in sync)
                     // ALWAYS save, even during idle mode, to prevent data loss on refresh
                     // IMPORTANT: NEVER save empty API key into auto-save slot
@@ -4044,20 +4047,25 @@
                         btn.title = item.info.desc || '点击装备';
                         btn.addEventListener('click', async () => {
                             if (busy) { tst('正在演算中'); return; }
+                            if (_equipBusy) return;
+                            _equipBusy = true;
+                            try {
                             let slot = getEquipSlot(item.name, item.info);
                             if (!slot) {
                                 showEquipSlotSelector(item.name, item.info, (chosenSlot) => {
-                                    const s2 = gst();
-                                    if (!s2.equip) s2.equip = {};
-                                    if (s2.equip[chosenSlot]) invAdd(s2.equip[chosenSlot], 1);
-                                    s2.equip[chosenSlot] = parseItemQty(item.name).base;
-                                    invRemove(item.name, 1);
-                                    addLogEntry('system', '装备了 ' + item.name + ' → ' + slotLabel(chosenSlot));
-                                    checkAchievements();
-                                    playSfx('equip');
-                                    snotify('add', '装备', item.name + ' → ' + slotLabel(chosenSlot));
-                                    renderEquipment();
-                                    upui();
+                                    try {
+                                        const s2 = gst();
+                                        if (!s2.equip) s2.equip = {};
+                                        if (s2.equip[chosenSlot]) invAdd(s2.equip[chosenSlot], 1);
+                                        s2.equip[chosenSlot] = parseItemQty(item.name).base;
+                                        invRemove(item.name, 1);
+                                        addLogEntry('system', '装备了 ' + item.name + ' → ' + slotLabel(chosenSlot));
+                                        checkAchievements();
+                                        playSfx('equip');
+                                        snotify('add', '装备', item.name + ' → ' + slotLabel(chosenSlot));
+                                        renderEquipment();
+                                        upui();
+                                    } finally { _equipBusy = false; }
                                 });
                                 return;
                             }
@@ -4076,6 +4084,7 @@
                             snotify('add', '装备', item.name + ' → ' + slotLabel(slot));
                             renderEquipment();
                             upui();
+                            } finally { _equipBusy = false; }
                         });
                         itemsContainer.appendChild(btn);
                     });
@@ -4129,6 +4138,9 @@
                         const act = btn.dataset.act;
                         if (act === 'unequip') {
                             if (busy) { tst('正在演算中'); return; }
+                            if (_equipBusy) return;
+                            _equipBusy = true;
+                            try {
                             // 实际执行卸下操作
                             const s = gst();
                             if (s.equip && s.equip[slotKey] && s.equip[slotKey] === itemName) {
@@ -4159,6 +4171,7 @@
                                     }
                                 }
                             }
+                            } finally { _equipBusy = false; }
                         } else if (act === 'details') {
                             showItemDetail(itemName, itemInfo);
                         }
@@ -4640,7 +4653,8 @@
                     const inputEl = $('inputText');
                     if (!inputEl) return;
                     const v = inputEl.value.trim();
-                    if (!v || busy) return;
+                    if (!v) return;
+                    if (busy) { tst('正在演算中，请稍候…'); return; }
                     // Cheat code detection
                     if (v === 'worldlock') {
                         try {
@@ -4706,6 +4720,7 @@
                         return;
                     }
                     hin(v);
+                    if (!busy) return;
                     inputEl.value = '';
                     inputEl.style.height = '';
                     try { playSfx('send'); } catch(e) {}
@@ -5071,96 +5086,7 @@
                     } catch {}
                 } catch {}
             })();
-            // ===== Export / Import full backup =====
-            $('btnSetExportBackup') && $('btnSetExportBackup').addEventListener('click', () => {
-                const chr = gch();
-                const backup = {
-                    generatedAt: new Date().toISOString(),
-                    version: 2,
-                    playerName: chr.cn || chr.characterName || '未知',
-                    cfg: cfg(),
-                    chr: chr,
-                    sta: gst(),
-                    clk: gclk(),
-                    sbx: gsbx(),
-                    hist: hist,
-                    theme: theme,
-                    saves: (() => { try { return JSON.parse(localStorage.getItem('vn_saves') || '{}'); } catch { return {}; } })()
-                };
-                try {
-                    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: 'application/json' });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    const d = new Date();
-                    const pad = n => String(n).padStart(2, '0');
-                    a.href = url;
-                    a.download = `文游_备份_${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}.json`;
-                    document.body.appendChild(a); a.click(); a.remove();
-                    setTimeout(() => URL.revokeObjectURL(url), 5000);
-                    tst('已导出备份：' + a.download);
-                    playSfx('pickup');
-                } catch (e) {
-                    tst('导出失败：' + e.message, 'warn');
-                }
-            });
-            // 设置面板导入备份按钮：触发隐藏的file input
-            $('btnSetImportBackup') && $('btnSetImportBackup').addEventListener('click', () => {
-                const inp = $('inputSetImportBackup');
-                if (inp) { inp.value = ''; inp.click(); }
-            });
-            $('inputSetImportBackup') && $('inputSetImportBackup').addEventListener('change', async (e) => {
-                const statusEl = $('setImportBackupStatus');
-                const file = e.target.files && e.target.files[0];
-                if (!file) return;
-                try {
-                    if (statusEl) statusEl.style.color = 'var(--accent)';
-                    if (statusEl) statusEl.textContent = '正在读取 ' + file.name + ' …';
-                    const text = await file.text();
-                    const backup = JSON.parse(text);
-                    if (!backup || typeof backup !== 'object') throw new Error('文件格式不正确');
-                    const sn = { hi: backup.hist || backup.hi, st: backup.sta || backup.st, ch: backup.chr || backup.ch, clk: backup.clk, sbx: backup.sbx, cfg: backup.cfg };
-                    const r = validateSaveData(sn, true);
-                    if (!r.valid) throw new Error('存档校验失败：' + r.errs.join('; '));
-                    // Cross-player detection: check if the backup's character name differs from current
-                    const curChr = gch();
-                    const bkChr = r.recovered.ch || {};
-                    const bkName = bkChr.cn || bkChr.characterName || '未知角色';
-                    const curName = curChr.cn || curChr.characterName || '当前角色';
-                    const isCrossPlayer = (bkName !== curName);
-                    let confirmMsg = '确定要导入该备份吗？\n生成时间：' + (backup.generatedAt || '未知') + '\n当前的所有游戏进度和存档槽将被覆盖。此操作不可撤销。';
-                    if (isCrossPlayer) {
-                        if (!await sketchConfirm('⚠️ 检测到这不是当前玩家的存档！\n\n当前角色：' + curName + '\n备份角色：' + bkName + '\n\n这是来自另一个玩家/角色的存档，将完全覆盖当前进度。\n\n确定要继续导入吗？此操作不可撤销！')) {
-                            if (statusEl) statusEl.textContent = '已取消导入';
-                            return;
-                        }
-                        confirmMsg = '即将导入「' + bkName + '」的存档，覆盖当前「' + curName + '」的全部进度。\n\n确定要继续吗？';
-                    }
-                    if (!await sketchConfirm(confirmMsg)) { if (statusEl) statusEl.textContent = '已取消导入'; return; }
-                    if (r.recovered.cfg) scf(r.recovered.cfg);
-                    sch(r.recovered.ch);
-                    sst(r.recovered.st);
-                    sclk(r.recovered.clk);
-                    if (r.recovered.sbx) ssbx(r.recovered.sbx);
-                    hist = r.recovered.hi.slice();
-                    if (backup.theme) { theme = backup.theme; try { localStorage.setItem('vn_theme', theme); } catch {} document.documentElement.setAttribute('data-theme', theme); }
-                    if (backup.saves) try { localStorage.setItem('vn_saves', JSON.stringify(backup.saves)); } catch {}
-                    if (r.errs.length > 0) {
-                        snotify('warn', '存档导入', '已自动修复 ' + r.errs.length + ' 处字段缺失');
-                        tst('存档部分字段缺失，已自动修复。建议导出新备份。', 'warn');
-                    }
-                    upui();
-                    if (statusEl) { statusEl.style.color = 'var(--notify-add)'; statusEl.textContent = '✅ 导入成功！游戏已加载备份内容。'; }
-                    tst('备份导入成功');
-                    playSfx('victory');
-                    setTimeout(() => location.reload(), 800);
-                } catch (err) {
-                    console.error(err);
-                    if (statusEl) { statusEl.style.color = 'var(--notify-remove)'; statusEl.textContent = '❌ 导入失败：' + err.message; }
-                    tst('导入失败：' + err.message, 'warn');
-                } finally {
-                    e.target.value = '';
-                }
-            });
+            // ===== Export / Import full backup (handled by save modal buttons btnExportBackup/btnImportBackup) =====
             $('godModeToggle').addEventListener('change', () => {
                 const cur = cfg();
                 scf({ ...cur, debug: $('godModeToggle').checked });
@@ -5400,9 +5326,10 @@
                     if (undo.clk) sclk(JSON.parse(JSON.stringify(undo.clk)));
                     if (undo.sbx) { sbx = mergeSbx(JSON.parse(JSON.stringify(undo.sbx))); ssbx(sbx); }
                     if (undo.ach) {
-                        unlockedAchievements = new Set(undo.ach);
-                        try { localStorage.setItem(ACH_KEY, JSON.stringify([...unlockedAchievements])); } catch(e) {}
-                        if (typeof renderAchievements === 'function') renderAchievements();
+                        if (typeof window._setUnlockedAchievements === 'function') {
+                            window._setUnlockedAchievements(undo.ach);
+                        }
+                        if (typeof window.renderAchievementsPanel === 'function') window.renderAchievementsPanel();
                     }
                     // Remove all chat bubbles added since the undo point (player + all AI bubbles)
                     const ca = $('chatArea');
@@ -5436,8 +5363,9 @@
                     if (undo.clk) sclk(JSON.parse(JSON.stringify(undo.clk)));
                     if (undo.sbx) { sbx = mergeSbx(JSON.parse(JSON.stringify(undo.sbx))); ssbx(sbx); }
                     if (undo.ach) {
-                        unlockedAchievements = new Set(undo.ach);
-                        try { localStorage.setItem(ACH_KEY, JSON.stringify([...unlockedAchievements])); } catch(e) {}
+                        if (typeof window._setUnlockedAchievements === 'function') {
+                            window._setUnlockedAchievements(undo.ach);
+                        }
                     }
                 }
                 // Remove last user message AND all AI responses after it from hist
@@ -5844,12 +5772,6 @@
                 };
                 inp.click();
             });
-            $('btnLoad').addEventListener('click', () => {
-                // 读档功能已合并到存档界面，直接打开同一个 saveModal
-                try { if ($('btnSave')) $('btnSave').click(); } catch(e) {
-                    console.warn('[btnLoad] 触发存档面板失败：', e);
-                }
-            });
             $('btnWelcomeNext').addEventListener('click', () => {
                 const k = $('welKey').value.trim();
                 if (!k) return tst('需要API密钥');
@@ -6254,6 +6176,7 @@
                     }
                 }
                 else if (!busy && !idleLocked) hin(b.dataset.action);
+                else if (busy) tst('正在演算中，请稍候…');
                 else if (idleLocked) tst('挂机中，行动已锁定。可打开背包或面板查看信息。');
             }));
             document.getElementById('presetBtns').addEventListener('click', e => {
@@ -6396,7 +6319,8 @@
             window._applyStatusEffect = (e,d,s) => applyStatusEffect(e,d,s);
             window._tickStatusEffects = () => tickStatusEffects();
             window._addKeyMemory = (t,ty) => addKeyMemory(t,ty);
-            window._addLogEntry = (t,txt,cid) => addLogEntry(t,txt,cid);
+            // 注意：不要覆盖 window._addLogEntry — gamesystems.js 已在 L1591 设置真实实现
+            // 如果覆盖会导致 main.js 的 addLogEntry 转发器 → window._addLogEntry → main.js.addLogEntry 的无限循环
             window._checkAchievements = () => checkAchievements();
             window._renderAchievementsPanel = () => renderAchievementsPanel();
             window._renderEventsPanel = () => renderEventsPanel();

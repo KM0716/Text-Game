@@ -1603,6 +1603,14 @@
         window._checkAchievements = checkAchievements;
         window.renderAchievementsPanel = renderAchievementsPanel;
         window.renderEventsPanel = renderEventsPanel;
+        // Expose achievement state for cross-script access (main.js undo/redo needs it)
+        window._unlockedAchievements = unlockedAchievements;
+        window._ACH_KEY = ACH_KEY;
+        window._setUnlockedAchievements = (arr) => {
+            unlockedAchievements.clear();
+            if (arr && Array.isArray(arr)) arr.forEach(id => unlockedAchievements.add(id));
+            saveAchievements();
+        };
 
         // Add buttons to settings panel
         setTimeout(() => {
