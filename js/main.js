@@ -6827,6 +6827,85 @@
 
             // ===== Init =====
             (function() {
+                // 先启动手绘加载屏的进度驱动（尽早，HTML 里已经内联了 DOM/CSS，首帧不会白屏）
+                (function startLoadingScreen() {
+                    try {
+                        const root = document.getElementById('dzLoading');
+                        if (!root) return;
+                        const fill = document.getElementById('ldBarFill');
+                        const pctEl = document.getElementById('ldPct');
+                        const noteEl = document.getElementById('ldNote');
+                        // 随机的末日手绘风标语
+                        const slogans = [
+                            ['· 正在翻找幸存者的旧背包…','· 给枪械重新装填弹药…','· 擦拭望远镜的镜片…'],
+                            ['· 在地图上标注撤离点…','· 把胶带贴在伤口上…','· 倾听远处的脚步声…'],
+                            ['· 清点今天的水和罐头…','· 给匕首涂一层防锈油…','· 翻阅被雨水泡皱的日记…'],
+                            ['· 给收音机换上新电池…','· 修补防弹衣的破口…','· 在便签上写下新的线索…'],
+                            ['· 检查防毒面具的滤毒罐…','· 整理急救包内的药品…','· 确认安全屋的门窗已经锁死…']
+                        ];
+                        let pct = 0; let _noteIdx = 0;
+                        const setPct = (n) => {
+                            pct = Math.max(0, Math.min(100, Math.round(n)));
+                            if (fill) fill.style.width = pct + '%';
+                            if (pctEl) pctEl.textContent = pct;
+                        };
+                        const switchSlogan = () => {
+                            if (!noteEl) return;
+                            const sl = slogans[(++_noteIdx) % slogans.length];
+                            const ps = noteEl.querySelectorAll('p');
+                            if (ps && ps.length && sl.length >= ps.length) {
+                                // 淡入淡出切换标语，保持手绘便签的视觉
+                                noteEl.style.transition = 'opacity 420ms ease';
+                                noteEl.style.opacity = '0';
+                                setTimeout(() => {
+                                    try {
+                                        ps.forEach((p, i) => { if (sl[i]) p.textContent = sl[i]; });
+                                    } catch(_) {}
+                                    noteEl.style.opacity = '1';
+                                }, 320);
+                            }
+                        };
+                        // 启动时先推一个起始进度
+                        setPct(6);
+                        // 用 requestAnimationFrame 做「手绘渐显」的进度推进（非指数级，有停顿感更自然）
+                        let _acc = 0; let _lastTs = performance.now();
+                        let _lastStep = _lastTs;
+                        function raf(ts) {
+                            const dt = ts - _lastTs; _lastTs = ts; _acc += dt;
+                            // 整体节奏：前 2.5s 比较快拉到 60%，之后慢速向 88% 逼近，等 window load 事件再拉满 100
+                            let speedPerSec;
+                            if (pct < 18) speedPerSec = 55;
+                            else if (pct < 62) speedPerSec = 38;
+                            else if (pct < 82) speedPerSec = 11;
+                            else speedPerSec = 2.2;
+                            const add = speedPerSec * (dt / 1000);
+                            if (add > 0) setPct(pct + add);
+                            // 每 1.5s 换一版标语
+                            if (ts - _lastStep > 1500) { _lastStep = ts; switchSlogan(); }
+                            if (pct < 92) requestAnimationFrame(raf);
+                        }
+                        requestAnimationFrame(raf);
+                        // 对外暴露两个钩子：fin() 由 init 末尾 window.load + min time 之后触发；skip() 供极端情况下（用户点/报错）立即关闭
+                        window._dzLoading = {
+                            fin: function() {
+                                setPct(100);
+                                setTimeout(() => {
+                                    try {
+                                        root.classList.add('hide');
+                                        setTimeout(() => { try { root.remove(); } catch(_) {} }, 780);
+                                    } catch(_) {}
+                                }, 180);
+                            },
+                            skip: function() { setPct(100); setTimeout(() => { try { root.classList.add('hide'); } catch(_) {} }, 80); }
+                        };
+                        // 兜底：10 秒还没关掉就强制隐藏，避免用户卡死
+                        setTimeout(() => { try { if (window._dzLoading) window._dzLoading.fin(); } catch(_) {} }, 10000);
+                    } catch(e) {
+                        // 任何加载屏自身异常都不能挡住游戏
+                        try { const r = document.getElementById('dzLoading'); if (r) r.classList.add('hide'); } catch(_) {}
+                    }
+                })();
+
                 if (!document.getElementById('emojiFallbackStyle_inline')) {
                     const st3 = document.createElement('style');
                     st3.id = 'emojiFallbackStyle_inline';
@@ -7189,6 +7268,26 @@
                         }
                     }
                 } catch(e) {}
+
+                // ===== 手绘加载屏收尾：等待 window load（所有脚本/CSS/BGM 资源就绪）+ 最小 1100ms 展示时间 =====
+                // 保证手绘标题 / 标语 / 进度动画完整播放，避免一闪而过
+                (function closeLoadingWhenReady() {
+                    try {
+                        const startAt = performance.now();
+                        const MIN_SHOW_MS = 1100;
+                        function done() {
+                            const elapsed = performance.now() - startAt;
+                            const wait = Math.max(0, MIN_SHOW_MS - elapsed);
+                            setTimeout(() => {
+                                try { if (window._dzLoading) window._dzLoading.fin(); } catch(_) {}
+                            }, wait);
+                        }
+                        if (document.readyState === 'complete') { done(); return; }
+                        window.addEventListener('load', done, { once: true, passive: true });
+                        // 兜底：load 若没触发（极端环境），3s 后仍收尾
+                        setTimeout(() => { try { if (window._dzLoading) window._dzLoading.fin(); } catch(_) {} }, 3000);
+                    } catch(_) { try { if (window._dzLoading) window._dzLoading.fin(); } catch(__) {} }
+                })();
             })();
         })();
 
