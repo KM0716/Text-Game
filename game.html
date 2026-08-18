@@ -808,6 +808,8 @@
     <script src="js/data.js"></script>
     <!-- 1b. 独立扩展模块（在data.js之后加载，合并/覆盖扩展数据） -->
     <script src="js/npc_data.js"></script>
+    <!-- 1c. AI 调用框架/模板系统：标准三段式输出模板 + 标签白名单 + 校验/兜底（零依赖，在任何用到的模块前加载） -->
+    <script src="js/ai_framework.js"></script>
     <script src="js/achievements.js"></script>
     <script src="js/events.js"></script>
     <!-- 2. audio.js：音效/BGM/Toast/对话框工具（依赖data.js常量+BGM/SE资源路径） -->

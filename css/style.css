@@ -3622,3 +3622,88 @@
     .codex-npc-name { font-size: 0.85rem; }
     .codex-npc-backstory { font-size: 0.65rem; }
 }
+
+/* ================================================================
+   地图交互增强样式（v2：可点击、悬停高亮、当前位置跳动、tooltip）
+   ================================================================ */
+.map-item {
+    transition: all 0.22s cubic-bezier(.25,.8,.3,1);
+    position: relative;
+    border-radius: 0 6px 6px 0;
+}
+/* 已解锁 = 可点击 */
+.map-item.unlocked {
+    cursor: pointer;
+    color: var(--ink);
+    font-weight: 600;
+    border-left-width: 3px;
+    border-left-color: rgba(60, 130, 80, 0.6);
+}
+.map-item.unlocked:hover {
+    background: rgba(60, 130, 80, 0.14);
+    transform: translateX(4px);
+    border-left-color: var(--accent, #3c8250);
+    box-shadow: 2px 3px 10px rgba(0,0,0,0.06);
+}
+/* 未解锁：变灰 + 问号提示 */
+.map-item.locked {
+    color: var(--ink-soft);
+    opacity: 0.48;
+    cursor: not-allowed;
+    filter: grayscale(0.5);
+}
+.map-item.locked::after {
+    content: "🔒";
+    display: inline-block;
+    margin-left: 6px;
+    font-size: 0.62rem;
+    opacity: 0.8;
+}
+/* 当前位置：跳动 + 发光光圈 */
+.map-item.current {
+    border-left-color: var(--accent) !important;
+    background: linear-gradient(90deg, rgba(139,92,44,0.18), rgba(139,92,44,0.02));
+    color: var(--accent);
+    font-weight: bold;
+    animation: map-item-pulse 1.6s ease-in-out infinite;
+    position: relative;
+}
+.map-item.current::before {
+    content: "📍";
+    display: inline-block;
+    margin-right: 5px;
+    font-size: 0.78rem;
+    filter: drop-shadow(0 0 4px rgba(139,92,44,0.45));
+}
+@keyframes map-item-pulse {
+    0%, 100% { transform: translateX(0); box-shadow: 0 0 0 rgba(139,92,44,0); }
+    50%      { transform: translateX(3px); box-shadow: 0 0 10px rgba(139,92,44,0.25); }
+}
+/* Tooltip：通过 data-title 展示解锁状态/危险等级/距离 */
+.map-item[data-title]:hover::after {
+    content: attr(data-title);
+    position: absolute;
+    left: 100%;
+    top: 50%;
+    transform: translate(6px, -50%);
+    background: rgba(28,22,16,0.92);
+    color: #faf3e7;
+    font-size: 0.62rem;
+    line-height: 1.4;
+    padding: 5px 8px;
+    border-radius: 5px;
+    white-space: nowrap;
+    z-index: 80;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.18s ease;
+    box-shadow: 0 4px 14px rgba(0,0,0,0.25);
+    border: 1px solid rgba(139,92,44,0.4);
+}
+.map-item[data-title]:hover::after { opacity: 1; }
+/* 低性能降级：减少动画 */
+@media (prefers-reduced-motion: reduce) {
+    .map-item, .map-item.current { transition: none; animation: none; }
+    .map-item.unlocked:hover, .map-item.current:hover { transform: none; }
+}
+

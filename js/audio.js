@@ -314,6 +314,12 @@ function bgmPlayCategory(cat, random) {
     bgmInit();
     const list = BGM.tracks[cat] || BGM.tracks.title;
     if (!list.length) return;
+    // ===== 修复 AI 生成打断 BGM：如果「分类相同」且「当前音乐仍在播放」，则完全不做任何操作 =====
+    if (BGM._currentCategory === cat && BGM.audio && !BGM.audio.paused &&
+        BGM._currentFile && list.includes(BGM._currentFile)) {
+        _refreshBgmBtn();
+        return;
+    }
     BGM._currentCategory = cat;
     let file;
     if (random && list.length > 1) {
@@ -798,4 +804,248 @@ window.toggleSfx = function(){ const ret = _origToggleSfx(); window.sfxEnabled =
     }
 })();
 
+// ============================================================
+//  BGM 增强：缓存前解除 loading 锁定 + 长按切换曲目 + 缓存进度条
+// ============================================================
+(function bgmEnhancements() {
+    // ===== ① 首曲"就绪前"阻塞 loading 层解除（防止加载页面先解除、音乐稍后突然冒出吓玩家一跳）=====
+    let _firstTrackReady = false;
+    let _waitingForBgmReady = true;
+    const _tryUnlockLoading = () => {
+        if (!_waitingForBgmReady || _firstTrackReady) return;
+        const loading = document.getElementById('initialLoading');
+        if (!loading) { // 没有 loading 层就视为解除
+            _waitingForBgmReady = false;
+            return;
+        }
+        // loading 层存在时，检查自定义 ready 标记：如果应用定义了 window._appReady = false，
+        // 则这里只负责置位 _firstTrackReady，交由应用方决定何时解除；
+        // 否则直接在首曲 canplaythrough 后 300ms 解除 loading
+        if (typeof window._appReadyGate === 'function') {
+            window._appReadyGate('_bgmReady', _firstTrackReady);
+        } else if (_firstTrackReady) {
+            try {
+                loading.style.transition = 'opacity .4s';
+                loading.style.opacity = '0';
+                setTimeout(() => { try { loading.remove(); } catch(_) {} }, 420);
+            } catch(_) {}
+            _waitingForBgmReady = false;
+        }
+    };
+    // 兜底：8 秒后无论 BGM 是否加载完成都放行，避免卡死 loading 层
+    setTimeout(() => {
+        if (_waitingForBgmReady) {
+            console.warn('[BGM] 首曲加载超时，兜底解除 loading');
+            _firstTrackReady = true;
+            _tryUnlockLoading();
+        }
+    }, 8000);
+    // 补丁 bgmInit 中的回调：标记首曲就绪
+    const _origInit = typeof bgmInit === 'function' ? bgmInit : null;
+    if (_origInit) {
+        const patchedInit = function() {
+            const ret = _origInit.apply(this, arguments);
+            if (BGM.audio && !BGM.audio._enhancePatched) {
+                BGM.audio._enhancePatched = true;
+                BGM.audio.addEventListener('canplaythrough', () => {
+                    if (!_firstTrackReady) {
+                        _firstTrackReady = true;
+                        _tryUnlockLoading();
+                    }
+                });
+                BGM.audio.addEventListener('error', () => {
+                    if (!_firstTrackReady) {
+                        console.warn('[BGM] 首曲加载失败，兜底解除 loading');
+                        _firstTrackReady = true;
+                        _tryUnlockLoading();
+                    }
+                });
+            }
+            return ret;
+        };
+        window.bgmInit = patchedInit;
+    }
+    // 如果 BGM 本身就被用户关闭了，立即解锁
+    if (!BGM.enabled) {
+        _firstTrackReady = true;
+        setTimeout(_tryUnlockLoading, 0);
+    }
+
+    // ===== ② 缓存进度条（不阻塞 UI 的右下角胶囊）=====
+    let _progressEl = null;
+    let _progressTimer = null;
+    function _ensureProgressEl() {
+        if (_progressEl && _progressEl.parentNode) return _progressEl;
+        try {
+            const wrap = document.createElement('div');
+            wrap.id = 'bgmCacheProgress';
+            wrap.style.cssText = [
+                'position:fixed;right:14px;bottom:72px;z-index:9998',
+                'min-width:180px;max-width:280px;padding:8px 12px;border-radius:999px',
+                'background:rgba(0,0,0,.55);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)',
+                'color:#fff;font-size:12px;line-height:1.4;box-shadow:0 6px 20px rgba(0,0,0,.25)',
+                'transition:opacity .25s;pointer-events:none;opacity:0;'
+            ].join(';');
+            wrap.innerHTML =
+                '<div style="display:flex;align-items:center;gap:8px;justify-content:space-between;">' +
+                '<span id="bgmCacheLabel" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">音乐缓存中…</span>' +
+                '<span id="bgmCachePct" style="font-variant-numeric:tabular-nums;font-weight:700;opacity:.9;">0%</span></div>' +
+                '<div style="margin-top:6px;height:3px;background:rgba(255,255,255,.2);border-radius:999px;overflow:hidden;">' +
+                '<div id="bgmCacheBar" style="height:100%;width:0%;background:linear-gradient(90deg,#ffb36b,#ff6f91);transition:width .18s;"></div></div>';
+            document.body.appendChild(wrap);
+            _progressEl = wrap;
+            return wrap;
+        } catch(e) { return null; }
+    }
+    function _showProgress(label, pct) {
+        const el = _ensureProgressEl(); if (!el) return;
+        const bar = document.getElementById('bgmCacheBar');
+        const pctLabel = document.getElementById('bgmCachePct');
+        const text = document.getElementById('bgmCacheLabel');
+        try {
+            el.style.opacity = '1';
+            if (text) text.textContent = label || '音乐缓存中…';
+            const p = Math.max(0, Math.min(100, Math.round(pct || 0)));
+            if (bar) bar.style.width = p + '%';
+            if (pctLabel) pctLabel.textContent = p + '%';
+        } catch(_) {}
+        if (_progressTimer) { clearTimeout(_progressTimer); _progressTimer = null; }
+        if (pct >= 100) {
+            _progressTimer = setTimeout(() => {
+                if (_progressEl) _progressEl.style.opacity = '0';
+                _progressTimer = null;
+            }, 650);
+        }
+    }
+
+    // ===== ③ 带进度的预加载（替代简单的 a.load）=====
+    // 返回 Promise<Audio>，同时通过 XHR 拉数据再转 blob URL 来拿到真实进度
+    function _bgmPreloadWithProgress(file, opts) {
+        const label = (opts && opts.label) || ('缓存：' + file);
+        const src = 'BGM/' + encodeURIComponent(file);
+        return new Promise((resolve) => {
+            // XHR 路径：能拿到真实下载进度
+            try {
+                const useXHR = typeof XMLHttpRequest !== 'undefined' && typeof Blob !== 'undefined' && typeof URL !== 'undefined' && URL.createObjectURL;
+                if (useXHR) {
+                    const xhr = new XMLHttpRequest();
+                    xhr.open('GET', src, true);
+                    xhr.responseType = 'arraybuffer';
+                    xhr.onprogress = (e) => {
+                        if (e.lengthComputable) {
+                            const pct = (e.loaded / e.total) * 100;
+                            _showProgress(label, pct);
+                        }
+                    };
+                    xhr.onload = () => {
+                        try {
+                            const blob = new Blob([xhr.response]);
+                            const url = URL.createObjectURL(blob);
+                            const a = new Audio();
+                            a.preload = 'auto';
+                            a.src = url;
+                            a._blobUrl = url;
+                            try { a.load(); } catch(_) {}
+                            try { _showProgress(label, 100); } catch(_) {}
+                            resolve(a);
+                        } catch(_) {
+                            // XHR 失败 → 降级 Audio 直接加载
+                            try {
+                                const a2 = new Audio();
+                                a2.preload = 'auto';
+                                a2.src = src;
+                                _showProgress(label, 95);
+                                setTimeout(() => _showProgress(label, 100), 400);
+                                resolve(a2);
+                            } catch(_2) { resolve(null); }
+                        }
+                    };
+                    xhr.onerror = () => { xhr.onerror = null; try {
+                        const a2 = new Audio();
+                        a2.preload = 'auto';
+                        a2.src = src;
+                        resolve(a2);
+                    } catch(_) { resolve(null); } };
+                    try { xhr.send(); } catch(_) { resolve(null); }
+                    return;
+                }
+            } catch(_) {}
+            // 降级：直接 Audio 元素加载（没进度数据，就简单显示 0→100 的过渡）
+            try {
+                const a = new Audio();
+                a.preload = 'auto';
+                a.src = src;
+                _showProgress(label, 20);
+                a.addEventListener('canplaythrough', () => { _showProgress(label, 100); resolve(a); }, { once: true });
+                a.addEventListener('error', () => { _showProgress(label, 100); resolve(null); }, { once: true });
+                try { a.load(); } catch(_) {}
+                setTimeout(() => { _showProgress(label, 100); resolve(a); }, 5000);
+            } catch(_) { resolve(null); }
+        });
+    }
+    window._bgmPreloadWithProgress = _bgmPreloadWithProgress;
+
+    // ===== ④ 长按 bgm 按钮 → 切到下一首（同分类内），并显示缓存进度 =====
+    let _bgmLongPressTimer = null;
+    let _bgmLongPressTriggered = false;
+    const _cancelLongPress = () => {
+        if (_bgmLongPressTimer) { clearTimeout(_bgmLongPressTimer); _bgmLongPressTimer = null; }
+    };
+    const _startLongPress = () => {
+        _bgmLongPressTriggered = false;
+        _cancelLongPress();
+        _bgmLongPressTimer = setTimeout(() => {
+            _bgmLongPressTriggered = true;
+            try {
+                if (!BGM.enabled) { if (typeof _safeSnotify === 'function') _safeSnotify('info', 'BGM', '背景音乐已关闭，请先开启'); return; }
+                bgmInit();
+                const cat = BGM._currentCategory || 'camp';
+                const list = BGM.tracks[cat] || BGM.tracks.title || [];
+                if (!list.length) return;
+                const curIdx = list.indexOf(BGM._currentFile || BGM.current);
+                const nextFile = list[(curIdx + 1) % list.length];
+                if (!nextFile) return;
+                BGM._currentFile = nextFile;
+                // 带进度缓存，然后播放
+                _bgmPreloadWithProgress(nextFile, { label: '切换：' + cat + ' · ' + nextFile }).then((cachedAudio) => {
+                    try {
+                        if (cachedAudio) {
+                            BGM._preloadCache[nextFile] = cachedAudio;
+                        }
+                        bgmPlay(nextFile);
+                        if (typeof _safeSnotify === 'function') _safeSnotify('info', 'BGM', '切换：' + cat + ' · ' + (nextFile || ''));
+                        _refreshBgmBtn();
+                    } catch(_) {}
+                });
+            } catch(e) {
+                console.warn('[BGM] 长按切换失败：', e);
+            }
+        }, 500); // 500ms = 长按
+    };
+    // 在 DOMContentLoaded 时把长按事件挂到 btnBgm
+    const attachLongPress = () => {
+        const btn = document.getElementById('btnBgm');
+        if (!btn) return;
+        btn.addEventListener('pointerdown', (e) => {
+            if (e.button != null && e.button !== 0) return;
+            _startLongPress();
+        });
+        btn.addEventListener('pointermove', _cancelLongPress);
+        btn.addEventListener('pointerleave', _cancelLongPress);
+        btn.addEventListener('pointerup', () => { _cancelLongPress(); });
+        btn.addEventListener('pointercancel', _cancelLongPress);
+        // 原来的 click 是 bgmToggle：如果长按已触发，则吞掉紧随其后的 click
+        btn.addEventListener('click', (e) => {
+            if (_bgmLongPressTriggered) {
+                try { e.stopPropagation(); e.preventDefault(); } catch(_) {}
+                _bgmLongPressTriggered = false;
+            }
+        }, true);
+    };
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attachLongPress, { once: true });
+    } else {
+        attachLongPress();
+    }
+})();
 })();

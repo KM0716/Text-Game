@@ -74,7 +74,14 @@
                 cat1: {
                     title: '一、时间与世界设施',
                     fields: {
-                        dayLenSec: { label: '昼夜流速', type: 'number', val: 86400, hint: '游戏一天对应现实秒数，86400=真实时间，1200=20分钟' },
+                        // ===== 时间系统重构：删除内置加速计时器，昼夜流速改成跟随现实流速开关 =====
+                        // val: true = 跟随现实（玩家本地时钟）；false = 随玩家行动手动推进
+                        dayLenSec: {
+                            label: '昼夜流速',
+                            type: 'toggle',
+                            val: true,
+                            hint: '开启=跟随本地现实时间推进；关闭=随玩家每次行动推进1小时（纯行动驱动）'
+                        },
                         waterStopMode: { label: '停水模式', type: 'select', val: '随机', opts: ['随机','固定天数','永不停水'], hint: '城市供水何时中断' },
                         powerStopMode: { label: '停电模式', type: 'select', val: '随机', opts: ['随机','固定天数','永不停电'] },
                         foodRotSpeed: { label: '食物变质速度', type: 'select', val: '正常', opts: ['缓慢','正常','快速'], hint: '食物在背包中变质速度' },
@@ -540,7 +547,11 @@
             }
             function insertItemChip(itemName) {
                 const el = $('inputText');
+                // 关键修复：只允许插入到输入栏，避免被误插入到导出按钮、角色名输入框等其他可编辑元素
                 if (!el) return;
+                const isInputArea = (el.id === 'inputText') ||
+                    (el.classList && (el.classList.contains('contenteditable-input') || el.classList.contains('chat-input')));
+                if (!isInputArea) return;
                 if (el.tagName === 'TEXTAREA') {
                     const start = el.selectionStart || el.value.length;
                     const end = el.selectionEnd || el.value.length;
@@ -549,18 +560,24 @@
                 }
                 const chip = makeItemChipNode(itemName);
                 const selection = window.getSelection();
+                let usedSelection = false;
                 if (selection && selection.rangeCount > 0) {
                     const range = selection.getRangeAt(0);
-                    range.deleteContents();
-                    range.insertNode(chip);
-                    const spaceAfter = document.createTextNode(' ');
-                    chip.parentNode.insertBefore(spaceAfter, chip.nextSibling);
-                    selection.removeAllRanges();
-                    const newRange = document.createRange();
-                    newRange.setStartAfter(spaceAfter);
-                    newRange.collapse(true);
-                    selection.addRange(newRange);
-                } else {
+                    // 关键修复：确认 selection 的范围确实在输入栏内，避免把 chip 插到导出按钮等外部 DOM
+                    if (el.contains(range.commonAncestorContainer) || el.contains(range.startContainer)) {
+                        range.deleteContents();
+                        range.insertNode(chip);
+                        const spaceAfter = document.createTextNode(' ');
+                        chip.parentNode.insertBefore(spaceAfter, chip.nextSibling);
+                        selection.removeAllRanges();
+                        const newRange = document.createRange();
+                        newRange.setStartAfter(spaceAfter);
+                        newRange.collapse(true);
+                        selection.addRange(newRange);
+                        usedSelection = true;
+                    }
+                }
+                if (!usedSelection) {
                     el.appendChild(chip);
                     el.appendChild(document.createTextNode(' '));
                 }
@@ -570,7 +587,11 @@
             // 修复"导出角色设定文本贴回输入栏后物品引用显示为纯文本"——粘贴/输入含 {{物品名}} 时自动转为可交互 chip 胶囊
             function convertRefTokensToChips() {
                 const el = $('inputText');
-                if (!el || el.tagName === 'TEXTAREA' || !el.classList.contains('contenteditable-input')) return;
+                // 关键修复：只在输入栏本身转换，避免被外部导出按钮文本触发（exportCharacter 的 {{}} 是导出文本用的，不应被转 chip）
+                if (!el) return;
+                const isInputArea = (el.id === 'inputText') ||
+                    (el.classList && (el.classList.contains('contenteditable-input') || el.classList.contains('chat-input')));
+                if (!isInputArea || el.tagName === 'TEXTAREA') return;
                 const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
                 const pending = [];
                 let node;
@@ -891,17 +912,35 @@
                     const pq2 = parseItemQty(s.inv[i]);
                     if (pq2.base === pq.base) { foundEntry = { i, base: pq2.base, cur: pq2.qty }; break; }
                 }
+                let result;
                 if (foundEntry) {
                     const newQty = foundEntry.cur + addQty;
                     s.inv[foundEntry.i] = formatItemQty(foundEntry.base, newQty);
                     sst(s);
-                    return { base: foundEntry.base, addedQty: addQty, totalQty: newQty };
+                    result = { base: foundEntry.base, addedQty: addQty, totalQty: newQty, isNew: false };
                 } else {
                     const raw = formatItemQty(pq.base, addQty);
                     s.inv.push(raw);
                     sst(s);
-                    return { base: pq.base, addedQty: addQty, totalQty: addQty };
+                    result = { base: pq.base, addedQty: addQty, totalQty: addQty, isNew: true };
                 }
+                // ===== 关键修复：入包后立即触发侧边提示气泡、系统日志、音效和成就检查 =====
+                try {
+                    const dispName = result.base + (result.totalQty > 1 ? ('x' + result.totalQty) : '');
+                    snotify('add', '获得物品', result.base);
+                    addLogEntry('system', '获得：' + iref(result.base) + (result.totalQty > 1 ? (' x' + result.totalQty) : ''));
+                    playSfx('pickup');
+                    // 更新成就统计（物品收集类型数）
+                    if (typeof window._trackCollectedItemType === 'function') {
+                        window._trackCollectedItemType(result.base);
+                    } else if (result.isNew) {
+                        // 简易兜底统计
+                        s.collectedTypesCount = (s.collectedTypesCount || 0) + 1;
+                        sst(s);
+                    }
+                    if (typeof checkAchievements === 'function') checkAchievements();
+                } catch(e) { console.warn('[invAdd notify error]', e); }
+                return result;
             }
             // 从背包移除物品（优先数量后缀），返回是否成功 {success, removedQty}
             function invRemove(itemName, qty) {
@@ -1277,103 +1316,63 @@
                 } catch(e) {}
             }
             function startClock() {
-                if (clockTimer) clearInterval(clockTimer);
+                // ===== 时间系统重构：删除"自动流失"的 setInterval 计时器 =====
+                // 模式说明：
+                // - gclk().dayLenSec === true  → 昼夜流速跟随现实（玩家本地时钟，每 30s 同步一次显示，不触发生命衰减）
+                // - gclk().dayLenSec === false → 纯行动驱动模式：每次玩家行动 hin() 结束后自动 advTime(1)
+                // - 其他（旧存档 number 值）：自动迁移为 true（跟随现实）
+                if (clockTimer) { clearInterval(clockTimer); clockTimer = null; }
                 // Check for death location easter egg (one-time)
                 if (!window._deathEggChecked) {
                     window._deathEggChecked = true;
                     setTimeout(() => checkDeathEasterEgg(), 5000);
                 }
-                clockTimer = setInterval(() => {
+                // 迁移旧值 number → boolean
+                try {
                     const c = gclk();
-                    const isRealTime = (c.dayLenSec === 86400);
-                    const prevDay = c.day || 1;
-                    const prevHour = Math.floor(c.elapsedSec / 3600);
-
-                    if (isRealTime) {
-                        // Real time sync mode: use player's device clock
+                    if (typeof c.dayLenSec === 'number') {
+                        // 86400 = 之前的"真实时间"模式 → true；其它加速模式 → false（行动驱动）
+                        c.dayLenSec = (c.dayLenSec === 86400);
+                        sclk(c);
+                    }
+                } catch(e) {}
+                // 仅在"跟随现实"模式下，启动一个 30 秒的轻量同步器（只更新 UI / 天气温日变化，不扣状态）
+                const _realTimeSyncLoop = () => {
+                    const c = gclk();
+                    if (c.dayLenSec === true) {
+                        const prevDay = c.day || 1;
                         const now = new Date();
                         const hrs = now.getHours(), mins = now.getMinutes(), secs = now.getSeconds();
                         const newElapsed = hrs * 3600 + mins * 60 + secs;
-                        // Only change day when midnight passes in real time
                         if (c._lastRealDay !== now.getDate() && c._lastRealDay !== undefined) {
-                            c.day = (c.day || 1) + (now.getDate() !== c._lastRealDay ? 1 : 0);
+                            c.day = (c.day || 1) + 1;
                             c._lastRealDay = now.getDate();
                             const season = seasonFromDay(c.day);
                             if (Math.random() < 0.6) c.weather = randWeather(season, c.weather);
                             c.temp = randTemp(season, c.temp);
                             c.season = season;
-                        } else if (c._lastRealDay === undefined) {
-                            c._lastRealDay = now.getDate();
-                        }
-                        c.elapsedSec = newElapsed;
-                    } else {
-                        // Standard accelerated time — dayLenSec 控制游戏一天对应多少现实秒
-                        // 例如 dayLenSec=1200 表示现实20分钟=游戏24小时，每秒推进72秒游戏时间
-                        const dayLen = c.dayLenSec || 86400;
-                        const advance = 86400 / dayLen;
-                        c.elapsedSec += advance;
-                        // 跨天处理
-                        if (c.elapsedSec >= 86400) {
-                            c.elapsedSec -= 86400;
-                            c.day = (c.day || 1) + 1;
-                            const season = seasonFromDay(c.day);
-                            if (c.day !== prevDay && Math.random() < 0.6) {
-                                c.weather = randWeather(season, c.weather);
-                            }
-                            c.temp = randTemp(season, c.temp);
-                            c.season = season;
-                            // 新一天触发：饥饿/口渴额外衰减（模拟夜间消耗）
                             const s = gst();
                             if (s) {
                                 s.hunger = Math.max(0, (s.hunger ?? 50) - 3);
                                 s.thirst = Math.max(0, (s.thirst ?? 50) - 4);
                                 sst(s);
                             }
+                        } else if (c._lastRealDay === undefined) {
+                            c._lastRealDay = now.getDate();
                         }
-                        // 夜间危险提示（夜晚时段且每隔一段时间）
-                        const curH = Math.floor(c.elapsedSec / 3600);
-                        if (curH >= 20 && curH < 22 && prevHour < 20 && prevHour >= 18) {
-                            // 刚进入夜晚时提示
-                            if (Math.random() < 0.3) {
-                                snotify('info', '夜晚降临', '夜间丧尸更活跃，注意安全');
-                            }
-                        }
+                        c.elapsedSec = newElapsed;
+                        sclk(c);
+                        updClockUI();
+                        if (window.updateAmbientSound) window.updateAmbientSound();
+                    } else {
+                        // 行动驱动模式：仍定期刷新 UI 显示（不会推进时间），让天气/温度显示保持最新
+                        updClockUI();
                     }
-
-                    const curHour = Math.floor(c.elapsedSec / 3600);
-                    if (curHour !== prevHour) {
-                        const gameHours = Math.abs(curHour - prevHour) > 12 ? 1 : (curHour - prevHour + 24) % 24 || 1;
-                        decayStatus(gameHours);
-                        const season = c.season || seasonFromDay(c.day || 1);
-                        c.temp = randTemp(season, c.temp);
-                        upui();
-                        // Small ambient interaction on hour change
-                        if (Math.random() < 0.05) {
-                            const smallEvents = [
-                                { t: '远处传来一声丧尸的低吼…', w: 'night' },
-                                { t: '风从破碎的窗户灌进来，带着灰尘味。', w: null },
-                                { t: '你听到几只鸟雀掠过屋顶。', w: 'day' },
-                                { t: '远处的汽车警报器突然响了几秒，又戛然而止。', w: null },
-                                { t: '收音机的白噪声中，似乎有人声闪过…', w: null },
-                                { t: '脚下的地板发出轻微吱呀声。', w: null }
-                            ];
-                            const now = new Date();
-                            const h = isRealTime ? now.getHours() : curHour;
-                            const isNight = (h >= 20 || h < 6);
-                            const valid = smallEvents.filter(e => 
-                                (e.w === 'night' && isNight) || (e.w === 'day' && !isNight) || e.w == null
-                            );
-                            if (valid.length) {
-                                const pick = valid[Math.floor(Math.random() * valid.length)];
-                                addLogEntry('event', pick.t);
-                            }
-                        }
-                    }
-                    sclk(c);
-                    updClockUI();
-                    // Update ambient sound based on time/weather
-                    if (window.updateAmbientSound) window.updateAmbientSound();
-                }, 1000);
+                    clockTimer = setTimeout(_realTimeSyncLoop, 30000);
+                };
+                updClockUI();
+                if (window.updateAmbientSound) window.updateAmbientSound();
+                clockTimer = setTimeout(_realTimeSyncLoop, 15000);
             }
             function updClockUI() {
                 const c = gclk();
@@ -1386,6 +1385,7 @@
             function advTime(hours) {
                 const c = gclk();
                 const prevDay = c.day || 1;
+                const prevHour = Math.floor(c.elapsedSec / 3600);
                 c.elapsedSec += hours * 3600;
                 while (c.elapsedSec >= 86400) { c.elapsedSec -= 86400; c.day = (c.day || 1) + 1; }
                 if (c.day !== prevDay) {
@@ -1396,12 +1396,59 @@
                     // 追踪夜间存活次数（用于成就判定）
                     const s = gst();
                     s.nightSurvived = (s.nightSurvived || 0) + 1;
+                    s.hunger = Math.max(0, (s.hunger ?? 50) - 3);
+                    s.thirst = Math.max(0, (s.thirst ?? 50) - 4);
                     sst(s);
                 }
                 decayStatus(hours);
+                // 小时级变化：环境小事件、温度更新、夜晚提示（从 startClock 移到此处）
+                const curHour = Math.floor(c.elapsedSec / 3600);
+                if (curHour !== prevHour) {
+                    const season = c.season || seasonFromDay(c.day || 1);
+                    c.temp = randTemp(season, c.temp);
+                    // 夜晚降临提示（仅当跨越 20 点门槛时）
+                    if (curHour >= 20 && prevHour < 20) {
+                        if (Math.random() < 0.4) {
+                            snotify('info', '夜晚降临', '夜间丧尸更活跃，注意安全');
+                        }
+                    }
+                    // 小环境互动（概率 8%）
+                    if (Math.random() < 0.08) {
+                        const smallEvents = [
+                            { t: '远处传来一声丧尸的低吼…', w: 'night' },
+                            { t: '风从破碎的窗户灌进来，带着灰尘味。', w: null },
+                            { t: '你听到几只鸟雀掠过屋顶。', w: 'day' },
+                            { t: '远处的汽车警报器突然响了几秒，又戛然而止。', w: null },
+                            { t: '收音机的白噪声中，似乎有人声闪过…', w: null },
+                            { t: '脚下的地板发出轻微吱呀声。', w: null }
+                        ];
+                        const h = curHour;
+                        const isNight = (h >= 20 || h < 6);
+                        const valid = smallEvents.filter(e =>
+                            (e.w === 'night' && isNight) || (e.w === 'day' && !isNight) || e.w == null
+                        );
+                        if (valid.length) {
+                            const pick = valid[Math.floor(Math.random() * valid.length)];
+                            addLogEntry('event', pick.t);
+                        }
+                    }
+                }
                 sclk(c);
                 updClockUI();
                 upui();
+                // 推进时间后也触发一次 BGM 上下文判断（白天/夜晚环境变更）
+                try { if (typeof window.bgmUpdateByContext === 'function') window.bgmUpdateByContext(); } catch(e) {}
+                // ===== 突发事件：advTime 时间推进 = 玩家行动 → 按配置概率尝试触发随机事件 =====
+                try {
+                    if (typeof window.tryTriggerRandomEvent === 'function') {
+                        const freq = (cfg().eventFreq || '适中');
+                        const ctx = { s: gst(), ch: gch(), clock: gclk() };
+                        (async () => {
+                            try { await window.tryTriggerRandomEvent(freq, ctx); }
+                            catch (e) { if (cfg().debug) console.warn('[advTime] 随机事件执行失败：', e); }
+                        })();
+                    }
+                } catch(e) { if (cfg().debug) console.warn('[advTime] 触发事件出错：', e); }
             }
 
             function decayStatus(gameHours) {
@@ -1635,28 +1682,31 @@
             let _notifyThisBatchSet = new Set();
             // 按通知签名的冷却记录：Map<sig, lastShownTimestamp>
             const _notifyCooldownMap = new Map();
+            // 兜底队列看门狗：防止 notifyBusy 死锁导致队列永远不消费
+            let _notifyWatchdogTimer = null;
             function snotifyStartBatch() { _notifyCurrentBatchId = Date.now(); _notifyThisBatchSet = new Set(); }
             function snotifyEndBatch() { _notifyCurrentBatchId = 0; }
             window._snotifyStartBatch = snotifyStartBatch;
             window._snotifyEndBatch = snotifyEndBatch;
-            // 分类冷却时间（毫秒）：警告类冷却更久，避免重复刷屏
+            // ===== 修复：大幅缩短冷却时间（原冷却是分钟级的，严重影响提示气泡的可见性）=====
+            // 冷却仅用于防止同一毫秒内重复刷屏，不阻止正常多次触发
             const _notifyCooldownByType = {
-                'warn': 60000,     // 警告：60秒
-                'danger': 45000,   // 危险：45秒
-                'info': 30000,     // 信息：30秒
-                'status': 3000,    // 状态变更：3秒
-                'add': 2000,       // 获得物品：2秒
-                'remove': 2000,    // 失去物品：2秒
-                'clue': 2000,      // 线索：2秒
-                'map': 5000,       // 地图：5秒
-                'vehicle': 5000,   // 载具：5秒
-                'ability': 3000,   // 异能：3秒
-                'craft': 3000,     // 合成：3秒
-                'event': 10000,    // 事件：10秒
-                'skill_add': 5000, // 技能：5秒
-                'trait_add': 5000, // 特质：5秒
-                'trait_rem': 5000,
-                'memory': 5000
+                'warn': 2000,       // 警告：2秒（原 60 秒）
+                'danger': 3000,     // 危险：3秒（原 45 秒）
+                'info': 1500,       // 信息：1.5秒（原 30 秒）
+                'status': 800,      // 状态变更：0.8秒
+                'add': 500,         // 获得物品：0.5秒
+                'remove': 500,      // 失去物品：0.5秒
+                'clue': 1000,       // 线索：1秒
+                'map': 2000,        // 地图：2秒
+                'vehicle': 2000,    // 载具：2秒
+                'ability': 1500,    // 异能：1.5秒
+                'craft': 1500,      // 合成：1.5秒
+                'event': 3000,      // 事件：3秒
+                'skill_add': 2000,  // 技能：2秒
+                'trait_add': 2000,  // 特质：2秒
+                'trait_rem': 2000,
+                'memory': 2000
             };
             function snotify(type, label, value) {
                 try {
@@ -1668,25 +1718,38 @@
                     const container = $('notifyContainer');
                     if (!container) return;
                     const now = Date.now();
-                    const cd = _notifyCooldownByType[type] || 3000;
+                    const cd = _notifyCooldownByType[type] || 1000;
                     const valueSig = [type || '', label || '', value || ''].join('\u0001');
-                    const noValueSig = [type || '', label || ''].join('\u0001');
+                    // ===== 修复：批次模式下不再过度去重（valueSig 含完整内容，同 label 不同 value 也允许显示）=====
                     if (_notifyCurrentBatchId > 0) {
                         if (_notifyThisBatchSet.has(valueSig)) return;
                         _notifyThisBatchSet.add(valueSig);
                     } else {
-                        if (_notifyCooldownMap.has(noValueSig) && (now - _notifyCooldownMap.get(noValueSig) < cd)) return;
+                        // 非批次模式：用 valueSig（完整签名）做冷却，避免完全同内容刷屏
+                        if (_notifyCooldownMap.has(valueSig) && (now - _notifyCooldownMap.get(valueSig) < cd)) return;
                         if (notifyQueue.some(n => [n.type || '', n.label || '', n.value || ''].join('\u0001') === valueSig)) return;
                     }
-                    _notifyCooldownMap.set(noValueSig, now);
-                    if (_notifyCooldownMap.size > 100) {
-                        for (const [k, t] of _notifyCooldownMap) {
-                            if (now - t > 120000) _notifyCooldownMap.delete(k);
+                    _notifyCooldownMap.set(valueSig, now);
+                    // 定期清理冷却表防止内存膨胀
+                    if (_notifyCooldownMap.size > 200) {
+                        for (const [k, t] of Array.from(_notifyCooldownMap.entries())) {
+                            if (now - t > 30000) _notifyCooldownMap.delete(k);
                         }
                     }
                     notifyQueue.push({ type, label, value });
-                    try { sessionStorage.setItem('vn_notifyQueue', JSON.stringify(notifyQueue)); } catch(e) {}
+                    try { sessionStorage.setItem('vn_notifyQueue', JSON.stringify(notifyQueue.slice(-50))); } catch(e) {}
+                    // ===== 看门狗兜底：如果 200ms 后还没消费完，强制重启 processNotifyQueue 防止死锁 =====
                     if (!notifyBusy) processNotifyQueue();
+                    if (!_notifyWatchdogTimer) {
+                        _notifyWatchdogTimer = setTimeout(() => {
+                            _notifyWatchdogTimer = null;
+                            if (notifyQueue.length > 0 && notifyBusy) {
+                                console.warn('[snotify] watchdog 兜底：队列堵塞，强制重启消费');
+                                notifyBusy = false;
+                                processNotifyQueue();
+                            }
+                        }, 200);
+                    }
                 } catch(e) {
                     console.warn('[snotify] error:', e);
                 }
@@ -1850,6 +1913,60 @@
                 } else {
                     profileView.style.display = 'none';
                     panelView.style.display = '';
+                }
+            }
+            // ============================================================
+            // 线索完成自动删除：根据新出现的剧情文本关键词匹配已完成线索
+            // 触发时机：AI narrative 渲染、玩家 mds 状态变更
+            // ============================================================
+            function checkAndRemoveCompletedClues(newText) {
+                try {
+                    if (!newText || typeof newText !== 'string') return 0;
+                    const s = gst();
+                    if (!s || !s.clues || !s.clues.length) return 0;
+                    // 归一化线索对象
+                    s.clues = s.clues.map(c => typeof c === 'string'
+                        ? { text: c, priority: 2, id: 'clue_complete_' + Date.now() + '_' + Math.random().toString(36).slice(2,6), time: '' }
+                        : { ...c, text: c.text || c.content || String(c) });
+                    const text = String(newText);
+                    const removed = [];
+                    s.clues = s.clues.filter(clue => {
+                        if (!clue || !clue.text) return false;
+                        const clueText = String(clue.text).trim();
+                        if (!clueText || clueText.length < 2) return false;
+                        // ========= 完成判定：线索文本 + 下列任一组合即认为已完成 =========
+                        // 正则：(线索text)[^换行]*(已解决|已完成|已证实|已处理|已找到|已确认|不需要了|没用了|结束了|搞定了|结束|不用再管|处理完毕|不再需要|销毁|丢弃|删除|没用|破解了|解开了|解决|没什么用|不重要了|放弃这个)
+                        // 或反向：(销毁了|删除了|丢弃了|不再跟踪|解开了)[^换行]*(线索text)
+                        const reForward = new RegExp(
+                            '(' + clueText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')'
+                            + '[^\\n]{0,60}(已解决|已完成|已证实|已处理|已找到|已确认|不需要了|没用了|结束了|搞定了|处理完毕|不再需要|不再跟踪|破解了|解开了|解决了|没什么用|不重要了|销毁|丢弃|删除)',
+                            'i'
+                        );
+                        const reBackward = new RegExp(
+                            '(销毁了|删除了|丢弃了|不再跟踪|解开了|解决了|处理完毕|确认搞定)[^\\n]{0,60}'
+                            + '(' + clueText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')',
+                            'i'
+                        );
+                        // 另外：如果剧情文本中直接出现 "不再需要 线索text" / "线索text 搞定" 这类短组合
+                        const reShortDone = new RegExp('(搞定|解决|完成|处理掉|销毁|删除|不再管)[\\s，,、。]*(这个|这条)?[\\s，,、。]*' + clueText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+                        const isDone = reForward.test(text) || reBackward.test(text) || reShortDone.test(text);
+                        if (isDone) removed.push(clueText);
+                        return !isDone;
+                    });
+                    if (removed.length > 0) {
+                        sst(s);
+                        // 只做视觉提示，不阻塞
+                        try {
+                            renderClueSidebar();
+                            const desc = removed.map(x => (x.length > 14 ? x.slice(0, 13) + '…' : x)).join('、');
+                            snotify('clue', '线索完成', esc(desc) + ' 已自动清理');
+                            addLogEntry('system', '清理已完成线索：' + removed.join('、'));
+                        } catch(e) { if (cfg().debug) console.warn(e); }
+                    }
+                    return removed.length;
+                } catch (e) {
+                    if (cfg && typeof cfg === 'function' && cfg().debug) console.warn('[checkAndRemoveCompletedClues]', e);
+                    return 0;
                 }
             }
             function renderClueSidebar() {
@@ -2282,13 +2399,64 @@
                         });
                         svg += '</svg>';
                         let listHTML = '';
-                        allAreas.forEach(area => {
+                        allAreas.forEach((area, idx) => {
                             const isUnlocked = unlocked.some(u => area.includes(u) || u.includes(area));
                             const isCurrent = curLoc && (curLoc.includes(area) || area.includes(curLoc));
-                            listHTML += '<div class="map-item ' + (isUnlocked ? 'unlocked' : 'locked') + (isCurrent ? ' current' : '') + '">' + (isCurrent ? '★ ' : isUnlocked ? '◆ ' : '◇ ') + esc(area) + '</div>';
+                            // v2 互动：data-location 携带地点名 + data-title 做 tooltip（危险等级/解锁状态）
+                            // 伪危险等级：按字符串 hash 生成一个稳定等级（纯视觉参考，不影响实际游戏判定）
+                            let seed = 0; const seedStr = area + (ch.cn || '');
+                            for (let k = 0; k < seedStr.length; k++) seed = ((seed << 5) - seed + seedStr.charCodeAt(k)) | 0;
+                            const dangerSeed = Math.abs(seed) % 5;
+                            const dangerLabels = ['安全', '低危', '中危', '高危', '极危'];
+                            const title = isCurrent ? '当前位置 · ' + esc(area)
+                                : isUnlocked ? '已解锁 · ' + dangerLabels[dangerSeed] + ' · 点击前往'
+                                : '未解锁 · ' + dangerLabels[dangerSeed];
+                            listHTML += '<div class="map-item ' + (isUnlocked ? 'unlocked' : 'locked') + (isCurrent ? ' current' : '') + '"'
+                                + ' data-location="' + escAttr(area) + '"'
+                                + ' data-title="' + escAttr(title) + '"'
+                                + ' data-idx="' + idx + '">'
+                                + (isCurrent ? '★ ' : isUnlocked ? '◆ ' : '◇ ') + esc(area)
+                                + '</div>';
                         });
                         const fullHtml = svg + '<div style="max-height:120px;overflow-y:auto;margin-top:4px;">' + listHTML + '</div>';
                         _setInnerHTMLIfChanged($('sideMap'), fullHtml, 'map', hash);
+                        // ==== v2 地图点击移动：事件委托（只绑定一次） ====
+                        const sideMapEl = $('sideMap');
+                        if (sideMapEl && !sideMapEl._moveBound) {
+                            sideMapEl._moveBound = true;
+                            sideMapEl.addEventListener('click', async (ev) => {
+                                const node = ev.target.closest('.map-item');
+                                if (!node) return;
+                                const area = node.getAttribute('data-location');
+                                if (!area) return;
+                                const st = gst();
+                                const unlocked = st.mapUnlock || [];
+                                const isUnlocked = unlocked.some(u => area.includes(u) || u.includes(area));
+                                if (!isUnlocked) {
+                                    snotify('warn', '地图', esc(area) + ' 尚未解锁，无法前往');
+                                    return;
+                                }
+                                const curLoc = st.location || '';
+                                if (curLoc && (curLoc.includes(area) || area.includes(curLoc))) {
+                                    snotify('info', '地图', '你已经在 ' + esc(area) + ' 了');
+                                    return;
+                                }
+                                let confirm = true;
+                                if (typeof window.sketchConfirm === 'function') {
+                                    try { confirm = await window.sketchConfirm('移动到 ' + area + '？（将消耗 1 小时）'); }
+                                    catch(e) { confirm = true; }
+                                }
+                                if (!confirm) return;
+                                st.location = area;
+                                sst(st);
+                                if (!gclk().dayLenSec) {
+                                    try { advTime(1); } catch(e) {}
+                                }
+                                upui();
+                                snotify('map', '移动', '已到达 ' + esc(area));
+                                try { playSfx('pickup', 0.35); } catch(e) {}
+                            });
+                        }
                     }
                 }
                 renderClueSidebar();
@@ -2323,8 +2491,25 @@
                     } 
                 }
                 // Check for death conditions
-                if (!cfg().debug && s.hp <= 0 && !s.deathShown) {
+                // ===== 修复：不仅 HP，饱腹/口渴/精神/体温任意一个到达致命阈值也必须触发死亡结局 =====
+                let deathCause = null;
+                if (s.hp <= 0) deathCause = 'HP归零';
+                else if (s.hunger <= 0) deathCause = '饥饿过度';
+                else if (s.thirst <= 0) deathCause = '脱水休克';
+                else if (s.spirit <= 0) deathCause = '精神崩溃';
+                else if (s.bodyTemp <= 32) deathCause = '失温症';
+                else if (s.bodyTemp >= 42) deathCause = '中暑高热';
+                if (!cfg().debug && deathCause && !s.deathShown) {
                     s.deathShown = true;
+                    s.deathTriggered = true;
+                    s.hp = Math.min(s.hp || 0, 0);
+                    if (deathCause !== 'HP归零') {
+                        // 给非 HP 死因设置对应的伤势描述
+                        if (deathCause === '饥饿过度') s.injury = (s.injury && s.injury !== '无') ? (s.injury + '、极度饥饿') : '极度饥饿';
+                        if (deathCause === '脱水休克') s.injury = (s.injury && s.injury !== '无') ? (s.injury + '、严重脱水') : '严重脱水';
+                        if (deathCause === '精神崩溃') s.mentality = '崩溃';
+                    }
+                    s._deathCause = deathCause;
                     // 死亡结局实现在 gamesystems.js，通过 window.triggerDeathEnding 暴露（裸引用会在其未加载时抛 ReferenceError）
                     if (typeof triggerDeathEnding === 'function') triggerDeathEnding(s);
                     else if (window.triggerDeathEnding) window.triggerDeathEnding(s);
@@ -2347,17 +2532,17 @@
                 if (ch.hp !== undefined && ch.hp <= 30 && ch.hp > 0) playSfx('warn');
                 // Handle multiple item additions (ptg aiList) — 限制每次最多收集8种物品
                 // 修复：改用 invAdd（base 名去重 + 数量合并），不再因字符串严格相等而静默丢弃同名物品
+                // 注意：invAdd 内部已经统一处理 snotify / addLogEntry / playSfx / 成就统计，此处不再重复
                 if (ch.aiList && Array.isArray(ch.aiList)) {
-                    ch.aiList.slice(0, 8).forEach(v => {
+                    const uniqList = [];
+                    const seen = new Set();
+                    ch.aiList.forEach(v => {
                         if (!v) return;
-                        const base = parseItemQty(v).base;
-                        const existed = s.inv.some(x => parseItemQty(x).base === base);
+                        const key = parseItemQty(v).base;
+                        if (!seen.has(key)) { seen.add(key); uniqList.push(v); }
+                    });
+                    uniqList.slice(0, 8).forEach(v => {
                         invAdd(v, 1); // 数量合并；新 base 则新增条目
-                        if (!existed) {
-                            playSfx('pickup');
-                            // 累计收集种类计数（供成就"收集过N种"判定，丢弃后不清零）
-                            s.collectedTypesCount = (s.collectedTypesCount || 0) + 1;
-                        }
                     });
                     if (ch.aiList.length > 8) {
                         snotify('status', '物资限制', '单次收集已上限8种，多余物品未拾取');
@@ -2526,6 +2711,13 @@
                     addLogEntry('event', ch.event);
                 }
                 sst(s);
+                // ===== 线索完成自动检测：基于 mds 中可能附带的剧情描述 =====
+                if (ch.story || ch.narrative || ch.desc || ch.text) {
+                    try {
+                        const combined = [ch.story, ch.narrative, ch.desc, ch.text].filter(Boolean).join('\n');
+                        if (combined) checkAndRemoveCompletedClues(combined);
+                    } catch(e) { if (cfg().debug) console.warn(e); }
+                }
                 upui();
             }
 
@@ -2726,10 +2918,6 @@
                     }
                 } else {
                     if (Object.keys(ch).length) (window.mds || mds)(ch);
-                    // Refresh clue sidebar content on clue-related state mutations,
-                    // but NEVER auto-open the sidebar. The sidebar should only open
-                    // when the user explicitly clicks 回顾线索 / toggle button.
-                    // (Fixes "auto-pop without clue review requested" bug on mobile.)
                     if (notes.some(n => n.ty === 'clue')) {
                         renderClueSidebar();
                     }
@@ -2751,11 +2939,33 @@
                         else if (n.ty === 'memory') snotify('info', n.label || '关键记忆', n.val);
                     });
                 }
-                return tx.replace(/\n{3,}/g, '\n\n').trim();
+                // ===== 解析后的叙事文本：自动检测已完成的线索 =====
+                const finalNarrative = tx.replace(/\n{3,}/g, '\n\n').trim();
+                if (!silent && !_replayingHistory && finalNarrative) {
+                    try { checkAndRemoveCompletedClues(finalNarrative); }
+                    catch(e) { if (cfg().debug) console.warn(e); }
+                }
+                return finalNarrative;
             }
 
             // ===== Generate system prompt from template =====
+            // 性能 + Token 优化：60 秒内 gsp 若配置未变化直接返回缓存
+            let _gspCache = null;   // { hash, prompt, ts }
             function gsp() {
+                // 先尝试取缓存：gch/gst/f/clk 的关键摘要 hash，如果和 cache 的 hash 一致且 60s 内直接复用
+                if (_gspCache && (Date.now() - _gspCache.ts) < 60000) {
+                    try {
+                        const c = gch(), s = gst(), f = cfg(), cl = gclk();
+                        const curHash = _hashObj([
+                            c.cn, c.bg ? c.bg.slice(0, 40) : '', c.tp ? c.tp.length : 0, c.tn ? c.tn.length : 0,
+                            s.hp, s.hunger, s.thirst, s.fatigue, s.spirit, s.mentality, s.injury, s.location,
+                            f.difficulty, f.genre, f.debug ? 1 : 0, (f.censorshipLevel || 0),
+                            cl ? cl.day : 0, cl ? cl.weather : '', cl ? cl.season : '',
+                            Object.keys(gsbx()).map(k => gsbx()[k].title)
+                        ]);
+                        if (curHash === _gspCache.hash) return _gspCache.prompt;
+                    } catch(e) { _gspCache = null; }
+                }
                 const c = gch(), s = gst(), f = cfg(), cl = gclk();
                 const dn = { '休闲': '新手友好，物资充足，丧尸稀少', '轻度': '感染可控，适当降低难度', '标准': '写实公正判定，标准生存体验', '硬核': '残酷生存，感染几乎必死', '噩梦': '极限求生，丧尸成群，死亡率极高' };
                 const mentalMap = { '稳定': '心态稳定', '焦虑': '焦虑紧张', '悲痛': '悲痛低落', '坚定': '意志坚定', '创伤': '创伤应激' };
@@ -2797,9 +3007,9 @@
                     injury: s.injury, enc: s.enc, inv: s.inv.join('、') || '空',
                     clues: s.clues.join('；') || '暂无', it: c.it || '', sp: c.sp || '',
                     gameTime: fmtTime(cl.elapsedSec) + ' 第' + (cl.day || 1) + '天 ' + dayPhase(cl.elapsedSec),
-                    timeFlowMode: (cl.dayLenSec === 86400)
-                        ? '现实流速（1:1实时同步，游戏时间=现实时间，禁止使用[时间:+Xh]标签，时间由玩家设备时钟驱动）'
-                        : '加速流速（1秒现实≈' + Math.ceil(86400 / (cl.dayLenSec || 1200)) + '秒游戏，可使用[时间:+Xh]标签推进游戏时间）',
+                    timeFlowMode: (cl.dayLenSec === true || cl.dayLenSec === 86400)
+                        ? '跟随现实（游戏时间=玩家本地设备时钟，昼夜同步，不要使用[时间:+Xh]标签手动推进）'
+                        : '行动驱动（每次玩家行动自动推进约0.5-1小时，必要时可使用[时间:+Xh]标签手动推进更长时间）',
                     atmosphere: cl.temp != null ? cl.temp : '12',
                     season: cl.season || seasonFromDay(cl.day || 1),
                     sandboxInfo: sbxInfo, hiddenPresets: hiddenP,
@@ -2870,11 +3080,39 @@
                     const extCtx = window.__vnExtContext();
                     if (extCtx) p += '\n\n' + extCtx;
                 }
+                // ===== 写入 gsp 缓存（60 秒内同配置直接复用，减少 token + 计算） =====
+                try {
+                    const curHash = _hashObj([
+                        c.cn, c.bg ? c.bg.slice(0, 40) : '', c.tp ? c.tp.length : 0, c.tn ? c.tn.length : 0,
+                        s.hp, s.hunger, s.thirst, s.fatigue, s.spirit, s.mentality, s.injury, s.location,
+                        f.difficulty, f.genre, f.debug ? 1 : 0, (f.censorshipLevel || 0),
+                        cl ? cl.day : 0, cl ? cl.weather : '', cl ? cl.season : '',
+                        Object.keys(gsbx()).map(k => gsbx()[k].title)
+                    ]);
+                    _gspCache = { hash: curHash, prompt: p, ts: Date.now() };
+                } catch(e) { /* ignore */ }
                 return p;
             }
 
             function pai(raw, silent) {
-                const cl = ptg(raw, silent);
+                // ========== 提议：AI 框架统一接入 ==============
+                // 在解析/渲染前，对 AI 原始响应做：
+                //  - 标签白名单校验（防止非法 tag 崩解析）
+                //  - 补 [/choice] 等缺失的闭合标签
+                //  - 缺选项时，根据剧情上下文补兜底选项
+                //  - 规范选项文本字数、格式
+                let safeRaw = (raw == null ? '' : String(raw));
+                try {
+                    if (window.AI_FRAMEWORK && window.AI_FRAMEWORK.VALIDATORS
+                        && typeof window.AI_FRAMEWORK.VALIDATORS.validateOutput === 'function') {
+                        const v = window.AI_FRAMEWORK.VALIDATORS.validateOutput(safeRaw);
+                        if (v && v.raw && typeof v.raw === 'string') safeRaw = v.raw;
+                    }
+                } catch(e) {
+                    // 框架出错也不影响剧情渲染：打 debug 日志
+                    try { if (cfg && cfg() && cfg().debug) console.warn('[AI_FRAMEWORK] validateOutput in pai():', e); } catch(_) {}
+                }
+                const cl = ptg(safeRaw, silent);
                 const bb = [];
                 // Collect tagged segments and untagged narration
                 const tagRegex = /\[(npc[：:][^\]]+|player|system|chapter|whisper|monologue|clue|choice)\]([\s\S]*?)(?=\[(?:npc[：:]|player|system|chapter|whisper|monologue|clue|choice)\]|$)/g;
@@ -2935,6 +3173,11 @@
                 }
                 if (b.ty === 'choice') {
                     (b.opts || []).forEach((opt, i) => {
+                        // 选项文本显示用 normalized（纯文本、无标签、≤22字符）；
+                        // 填入输入栏用原始 opt 字符串（保留用户可能想看的语义信息）
+                        const displayOpt = (typeof _normalizeChoiceText === 'function')
+                            ? (_normalizeChoiceText(opt) || opt || '')
+                            : (opt || '');
                         const btn = document.createElement('div');
                         btn.className = 'vn-choice' + (i % 2 ? ' vn-choice--alt' : '');
                         // 序号徽标 + 文本两部分，textContent 安全渲染（防注入）
@@ -2943,10 +3186,10 @@
                         numEl.textContent = String(i + 1);
                         const txtEl = document.createElement('span');
                         txtEl.className = 'vn-choice-text';
-                        txtEl.textContent = opt || '';
+                        txtEl.textContent = displayOpt;
                         btn.appendChild(numEl);
                         btn.appendChild(txtEl);
-                        btn.title = '点击后填入输入栏，可二次编辑再发送';
+                        btn.title = opt ? ('点击填入输入栏：' + String(opt)) : '点击后填入输入栏，可二次编辑再发送';
                         btn.addEventListener('click', () => {
                             // 填入输入栏（不立即发送），给玩家二次编辑机会
                             try {
@@ -3210,32 +3453,76 @@
             // 安全切分 choice 选项：兼容 1. 2. 3. / A. B. C. / 、/ ，/ || / | / 分号 等常见分隔
             function safeSplitChoices(raw) {
                 if (!raw) return ['观察周围环境', '检查随身装备', '原地警戒片刻'];
-                let t = (raw || '').trim().replace(/^[\s\-—–•●*]+|[\s\-—–•●*]+$/g, '');
+                // ===== 选项纯文本化预处理：先把 AI 偶发带进来的 [choice]/[/choice] 标签完全剥除 =====
+                let t = (raw || '').replace(/\[\/?choice[^\]]*\]/gi, ' ').trim();
+                // 去除 AI 可能在单个选项文本内残留的 [x]、【x】、(x)、<x> 等标记符号（含中英文括号）
+                t = t.replace(/[\[【\(（][^\[\]【】\(\)（）]{0,10}[\]】\)）]\s*(?=[，。、：:；;,.!?！？]|$)/g, '');
+                t = t.replace(/^[\s\-—–•●*·]+|[\s\-—–•●*·]+$/g, '');
+                // 去除前后可能的"选项：""可选项：""请选择：""你可以选择："之类引导语前缀（AI 常误带）
+                t = t.replace(/^(选项|可选项|你可(以|要)?选择|请选择|可选行动|可选操作|行动选项|选择一|选择项|推荐选择|推荐操作|可能的行动)[：:、 ]*\s*/, '');
                 const numMatch = t.match(/(^|\s)(\d{1,2})[.)、\]】]\s*([^\n\r\d][^\n\r]*?)(?=(\s\d{1,2}[.)、\]】])|$)/g);
                 if (numMatch && numMatch.length >= 2) {
-                    const r = numMatch.map(s => s.replace(/^\s*(\d{1,2})[.)、\]】]\s*/, '').trim()).filter(Boolean);
+                    const r = numMatch.map(s => {
+                        let x = s.replace(/^\s*(\d{1,2})[.)、\]】]\s*/, '').trim();
+                        return _normalizeChoiceText(x);
+                    }).filter(Boolean);
                     if (r.length >= 2) return r.slice(0, 6);
                 }
                 const abcdMatch = t.match(/(^|\s)[A-Z][.)、\]】]\s*([^\n\rA-Z][^\n\r]*?)(?=(\s[A-Z][.)、\]】])|$)/g);
                 if (abcdMatch && abcdMatch.length >= 2) {
-                    const r = abcdMatch.map(s => s.replace(/^\s*[A-Z][.)、\]】]\s*/, '').trim()).filter(Boolean);
+                    const r = abcdMatch.map(s => {
+                        let x = s.replace(/^\s*[A-Z][.)、\]】]\s*/, '').trim();
+                        return _normalizeChoiceText(x);
+                    }).filter(Boolean);
                     if (r.length >= 2) return r.slice(0, 6);
                 }
                 if (/[\r\n]/.test(t)) {
-                    const r = t.split(/[\r\n]+/).map(s => s.replace(/^[\s\-—–•●*\d]+\s*[.)、\]】:：]?\s*/, '').trim()).filter(Boolean);
+                    const r = t.split(/[\r\n]+/).map(s => {
+                        let x = s.replace(/^[\s\-—–•●*\d①-⑳]+\s*[.)、\]】:：]?\s*/, '').trim();
+                        return _normalizeChoiceText(x);
+                    }).filter(Boolean);
                     if (r.length >= 2) return r.slice(0, 6);
                 }
                 if (t.includes('||')) {
-                    return t.split('||').map(s => s.trim()).filter(Boolean).slice(0, 6);
+                    return t.split('||').map(s => _normalizeChoiceText(s.trim())).filter(Boolean).slice(0, 6);
                 }
                 if (/[、；;]/.test(t)) {
-                    return t.split(/[、；;]+/).map(s => s.trim()).filter(Boolean).slice(0, 6);
+                    return t.split(/[、；;]+/).map(s => _normalizeChoiceText(s.trim())).filter(Boolean).slice(0, 6);
                 }
-                const byPipe = t.split('|').map(s => s.trim()).filter(Boolean);
+                const byPipe = t.split('|').map(s => _normalizeChoiceText(s.trim())).filter(Boolean);
                 if (byPipe.length >= 2) return byPipe.slice(0, 6);
-                // 收紧：无任何分隔符时不再按空格/逗号强行切分（避免把一句完整叙述误切成多个"选项"），整段作为单个选项
-                if (t) return [t];
+                if (t) {
+                    const nt = _normalizeChoiceText(t);
+                    return nt ? [nt] : ['观察周围环境', '检查随身装备', '原地警戒片刻'];
+                }
                 return ['观察周围环境', '检查随身装备', '原地警戒片刻'];
+            }
+            // ===== 选项纯文本化：去除标签、符号、序号、过度引导，展示在明面上的是纯行动短句 =====
+            function _normalizeChoiceText(s) {
+                if (!s) return '';
+                let x = String(s);
+                // 1) 先剥除 [xxx]/【xxx】/(xxx)/（xxx）/<xxx> 这种任何包裹性标签（AI 偶发夹带）
+                for (let i = 0; i < 3; i++) {
+                    const before = x;
+                    x = x.replace(/[\[【\(（<][^\[\]【】\(\)（）<>]{0,40}[\]】\)）>]/g, ' ');
+                    if (x === before) break;
+                }
+                // 2) 去除前后"序号/序号符号/分隔线"前缀（支持中文序号 一、二、…）
+                x = x.replace(/^\s*([\d①-⑳㉑-㊿]|[一二三四五六七八九十百千两零〇][、.]|[A-Za-z])\s*[.、)）\]】:：]?\s*/, '');
+                x = x.replace(/^\s*[\-—–•●*··]+\s*/, '');
+                // 3) 去除尾部常见标点与尾随分隔符
+                x = x.replace(/[\s|｜;；,，。、.!！?？\-—–•●*·]+$/g, '');
+                x = x.replace(/^\s+/, '').replace(/\s{2,}/g, ' ');
+                // 4) 去除典型引导前缀："（选项N）""选择：""可以：""建议：""去做："等
+                x = x.replace(/^(选项(之?[一二三四五六七八九十百千\d]+)?|推荐(选项|操作|行动)?|我(可以|要|建议)?(尝试|去|试着)?|你可以|可以选择|可以尝试|我打算|我想|准备|试着)\s*[:：]?\s*/, '');
+                x = x.trim();
+                // 5) 去除开头多余的引号
+                x = x.replace(/^[""''"`]+|[ ""''"`]+$/g, '').trim();
+                // 6) 如果仍然完全为空，返回空字符串（由上层过滤）
+                if (!x) return '';
+                // 7) 长度保护：单选项默认不超过 22 字符（约 2 行气泡内显示）
+                if (x.length > 24) x = x.slice(0, 22) + '…';
+                return x;
             }
             // 中性兜底选项：不涉及剧情方向，绝不与当前剧情冲突
             // （用于 AI 漏输出 [choice] 且补选项请求也失败时，替代旧的 generateDefaultChoices 兜底）
@@ -3246,6 +3533,13 @@
             async function hin(inp, isIdle, displayText, systemPromptExtra) {
                 if (busy) { tst('正在演算中，请稍候…'); return false; }
                 if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return false; }
+                // ============ 优化7/8：200ms 去抖（防连点/误触，减少不必要的 API token 消耗） ============
+                const _hinNow = Date.now();
+                if (!isIdle) {
+                    const _last = window._hinLastCallTs || 0;
+                    if (_hinNow - _last < 220) { tst('操作过快，请稍候再发送'); return false; }
+                    window._hinLastCallTs = _hinNow;
+                }
                 // 死亡状态拦截：角色已死亡（上帝模式除外）时禁止继续推进剧情，引导处理死亡结局
                 try {
                     const _st = gst();
@@ -3401,14 +3695,46 @@
                     try { scb(); } catch(_) {}
                     let sysPrompt = gsp();
                     if (isIdle) {
-                        const _isRealFlow = (gclk().dayLenSec === 86400);
-                        sysPrompt += '\n\n【挂机模式】当前为自动挂机模式，日志将以[monologue]（内心独白/系统日志）形式输出。请以简洁的日志式叙述输出角色自主行动结果，结合角色设定、环境、当前状态和沙盒参数，尽量避开危险行动，以生存、探索、休息、收集资源为主。输出控制在200字以内。请将行动日志包裹在[monologue]标签中。\n\n【挂机流速适配 — 关键】当前' + (_isRealFlow ? '现实流速' : '加速流速') + '。若为现实流速：每次挂机仅描述几分钟内的短时动作（整理装备/观察环境/简短对话/小规模搜索/喝水吃干粮），状态变化幅度小（疲劳±5、饱腹±3、口渴±3），禁止使用[时间:+Xh]标签，禁止描述"睡眠数小时""长途跋涉"等大耗时行动（这些由现实时钟自然推进）。若为加速流速：每次挂机可描述1-2小时的行动，状态变化按行动耗时参考表执行，使用[时间:+Xh]推进时间。\n\n【挂机自主决策优先级 — 必须按序决策】\n挂机不是随机游荡，角色应按以下优先级自主决策（高优先级需求未满足时不做低优先级事）：\n1. 生存急救（最高）：饱腹<30优先觅食；口渴<30优先找水；疲劳>70优先休息；受伤/感染优先治疗。状态危急时取消一切探索。\n2. 安全避险：夜间（22:00-6:00）优先寻找安全据点躲避；丧尸密集区优先撤离；天气极端（暴雪/暴雨）优先避难。\n3. 健康恢复：精神<30时安排休息或轻松活动（整理物资/回忆）；体温异常时调节环境（添衣/取暖/降温）。\n4. 资源储备：状态稳定时搜索附近物资，优先补充消耗品（水/食物/药品）。\n5. 探索发展：资源充足时谨慎探索新区域，标记线索，避免深入未知。\n6. 社交关系：遇到友好NPC时适度互动，不主动挑衅敌对势力。\n挂机风险评估：每轮行动前评估"失败最坏后果"，若可能致死或重伤则放弃该行动改选保守方案。挂机期间禁止主动挑起战斗（除非被攻击），禁止进入标注高危的区域。';
+                        const _clkNow = gclk();
+                        const _isRealFlow = (_clkNow.dayLenSec === true || _clkNow.dayLenSec === 86400);
+                        sysPrompt += '\n\n【挂机模式】当前为自动挂机模式，日志将以[monologue]（内心独白/系统日志）形式输出。请以简洁的日志式叙述输出角色自主行动结果，结合角色设定、环境、当前状态和沙盒参数，尽量避开危险行动，以生存、探索、休息、收集资源为主。输出控制在200字以内。请将行动日志包裹在[monologue]标签中。\n\n【挂机流速适配 — 关键】当前' + (_isRealFlow ? '跟随现实（游戏时间=本地时钟）' : '行动驱动（每次挂机自动推进0.5小时）') + '。若为跟随现实：每次挂机仅描述数分钟内的短时动作（整理装备/观察环境/简短对话/小规模搜索/喝水吃干粮），状态变化幅度小，禁止描述跨越数小时的行动。若为行动驱动：每次挂机可描述约30分钟的行动，状态变化按实际耗时适度调整，无需手动附加[时间:+Xh]标签。\n\n【挂机自主决策优先级 — 必须按序决策】\n挂机不是随机游荡，角色应按以下优先级自主决策（高优先级需求未满足时不做低优先级事）：\n1. 生存急救（最高）：饱腹<30优先觅食；口渴<30优先找水；疲劳>70优先休息；受伤/感染优先治疗。状态危急时取消一切探索。\n2. 安全避险：夜间（22:00-6:00）优先寻找安全据点躲避；丧尸密集区优先撤离；天气极端（暴雪/暴雨）优先避难。\n3. 健康恢复：精神<30时安排休息或轻松活动（整理物资/回忆）；体温异常时调节环境（添衣/取暖/降温）。\n4. 资源储备：状态稳定时搜索附近物资，优先补充消耗品（水/食物/药品）。\n5. 探索发展：资源充足时谨慎探索新区域，标记线索，避免深入未知。\n6. 社交关系：遇到友好NPC时适度互动，不主动挑衅敌对势力。\n挂机风险评估：每轮行动前评估"失败最坏后果"，若可能致死或重伤则放弃该行动改选保守方案。挂机期间禁止主动挑起战斗（除非被攻击），禁止进入标注高危的区域。';
                     }
                     // Inject extra system prompt context (e.g., decision assistance)
                     if (systemPromptExtra) {
                         sysPrompt += '\n\n' + systemPromptExtra;
                     }
-                    const msgs = [{ role: 'system', content: sysPrompt }, ...hist.slice(-f.ctx * 2)];
+                    // ============ Token 优化：发送前的"温和历史压缩" ============
+                    // 单条过长截短 + 中间旧选项省略（保留头尾最新的上下文语义，不破坏后续对话逻辑）
+                    const ctxWindow = Math.max(1, (f.ctx || 24) * 2);
+                    let compressedHist = hist.slice();
+                    if (compressedHist.length > ctxWindow) compressedHist = compressedHist.slice(-ctxWindow);
+                    compressedHist = compressedHist.map((m, idx) => {
+                        try {
+                            // 距离末尾太近（最近 6 条）保留原始；否则进入压缩
+                            const tailDist = compressedHist.length - 1 - idx;
+                            const nm = { role: m.role, content: m.content || '' };
+                            if (tailDist <= 6) return nm;
+                            const raw = nm.content;
+                            if (!raw || typeof raw !== 'string') return nm;
+                            // 用户消息 >400 字 → 截短到 300 字
+                            if (nm.role === 'user' && raw.length > 400) {
+                                nm.content = raw.slice(0, 300) + '\n…(前文已省略)';
+                            }
+                            // Assistant 消息：距离末尾 >= 12 条的，[choice] 标签内容整体省略（保留标签语法不破坏 pai 解析框架）
+                            if (nm.role === 'assistant' && tailDist >= 12) {
+                                nm.content = raw.replace(/\[choice\][\s\S]*?\[\/choice\]/gi, '[choice](选项省略，以压缩上下文)[/choice]');
+                                // Assistant 超长剧情（>1200 字）也截到 700
+                                if (nm.content.length > 1200) {
+                                    nm.content = nm.content.slice(0, 700) + '\n…(中景剧情已摘要省略)';
+                                }
+                            } else if (nm.role === 'assistant' && nm.content.length > 2000) {
+                                // 距离近但也过于超长的（>2000 字），截到 1100
+                                nm.content = nm.content.slice(0, 1100) + '\n…(超长部分已省略)';
+                            }
+                            return nm;
+                        } catch(_) { return m; }
+                    });
+                    const msgs = [{ role: 'system', content: sysPrompt }, ...compressedHist];
                     // 关键：必填字段完整性校验（部分服务商 400 可能是 max_tokens/ctx/model 无效，或 messages 为空）
                     if (!msgs.length) {
                         throw new Error('上下文为空，请重新生成角色或从存档载入');
@@ -3570,6 +3896,24 @@
                         }
                         hist.push({ role: 'assistant', content: full });
                         svh(hist);
+                        // ===== 时间系统重构：玩家行动 → 推进游戏时间 =====
+                        // 规则：
+                        // - 挂机（isIdle=true）：每次推进 0.5 小时
+                        // - 白天常规行动：推进 1 小时
+                        // - 夜晚常规行动：推进 0.5 小时（慢节奏，营造危机感）
+                        // - 如果 AI 回复中已带 [advTime:X] 标签（pai 会解析 ch.advTime 调用），
+                        //   则由 mds 统一负责，此处不再重复推进
+                        try {
+                            const _clk = gclk();
+                            const _actionHadExplicitTimeTag = /\[advTime\s*[:：]\s*[+-]?\d*\.?\d+\s*(?:h|小时)?\s*\]/i.test(full);
+                            const _autoTimeMode = (_clk.dayLenSec === false); // 仅在"行动驱动"模式下自动推进时间；跟随现实模式交给时钟
+                            if (_autoTimeMode && !_actionHadExplicitTimeTag) {
+                                const _curH = Math.floor((_clk.elapsedSec || 0) / 3600) % 24;
+                                const _isNight = _curH >= 20 || _curH < 6;
+                                const _push = isIdle ? 0.5 : (_isNight ? 0.5 : 1);
+                                if (_push > 0) advTime(_push);
+                            }
+                        } catch (_advErr) { console.warn('[hin] auto advTime failed:', _advErr); }
                     }
                 } catch (e) {
                     // 出现任何异常先清除 indicator，防止永远显示"演算中"
@@ -3826,8 +4170,9 @@
                 const f = cfg();
                 const c = gch();
                 const mentalMap = { '稳定': '心态稳定', '焦虑': '焦虑紧张', '悲痛': '悲痛低落', '坚定': '意志坚定', '创伤': '创伤应激' };
-                apb({ ty: 'narration', tx: '地点：' + c.sp + '。天色灰蒙，远处传来低吼。系统正在初始化你的生存状态…' }, 0);
-                const initPrompt = `根据以下角色设定，生成写实的初始生存状态。角色已经在末世中生存了一段时间，请合理分配各项数值。\n\n角色：${c.cn}，${c.ca}岁，${c.gd}，体型${c.bt}，职业${c.job}\n背景：${c.bg}\n心理：${mentalMap[c.mental] || c.mental}\n特质：正面[${(c.tp||[]).join('、')}] 负面[${(c.tn||[]).join('、')}]\n初始物品：${c.it}\n地点：${c.sp}\n\n请直接输出数字，格式如下（每行一个）：\n饱腹:50\n口渴:45\n疲劳:35\n体温:36.8\n伤势:无\n负重:5\n心态:${c.mental||'稳定'}\n精神:${c.mental==='创伤'?30:c.mental==='悲痛'?40:75}\n欢愉:0\n\n只输出数值和标签，不要其他文字。数值应在合理范围内，体现角色经历了一段求生经历后的状态。`;
+                // ===== 修复：开局不重复播报位置/状态（由后续 AI 剧情统一叙述即可）=====
+                // 这里删除重复的"地点：xxx。天色灰蒙…初始化状态"提示气泡
+                const initPrompt = `根据以下角色设定，生成写实的初始生存状态。角色已经在末世中生存了一段时间，请合理分配各项数值。\n\n角色：${c.cn}，${c.ca}岁，${c.gd}，体型${c.bt}，职业${c.job}\n背景：${c.bg}\n心理：${mentalMap[c.mental] || c.mental}\n特质：正面[${(c.tp||[]).join('、')}] 负面[${(c.tn||[]).join('、')}]\n初始物品：${c.it}\n地点：${c.sp}\n\n请直接输出数字，格式如下（每行一个）：\n饱腹:50\n口渴:45\n疲劳:35\n体温:36.8\n伤势:无\n负重:5\n心态:${c.mental||'稳定'}\n精神:${c.mental==='创伤'?30:c.mental==='悲痛'?40:75}\n欢愉:0\n\n只输出数值和标签，不要其他文字。数值应在合理范围内，体现角色经历了一段求生经历后的状态。\n★ 最重要：开局随机状态不得低于正常阈值——饱腹≥35，口渴≥35，体温在 35–37.5 之间，精神≥40，伤势只能是 无/轻伤/轻微 三种之一。`;
                 try {
                     const msgs = [
                         { role: 'system', content: '你是写实生存游戏的数据初始化系统。根据角色背景生成合理的初始状态数值。' },
@@ -3849,24 +4194,35 @@
                         const m = line.match(/^\s*(饱腹|口渴|疲劳|体温|伤势|负重|心态|精神|欢愉)\s*[:：]\s*(.+?)\s*$/);
                         if (!m) return;
                         const k = m[1], v = m[2].trim();
-                        if (k === '饱腹') s.hunger = Math.max(0, Math.min(100, parseInt(v) || 50));
-                        else if (k === '口渴') s.thirst = Math.max(0, Math.min(100, parseInt(v) || 50));
-                        else if (k === '疲劳') s.fatigue = Math.max(0, Math.min(100, parseInt(v) || 30));
-                        else if (k === '体温') s.bodyTemp = parseFloat(v) || 37;
-                        else if (k === '伤势') s.injury = v;
+                        if (k === '饱腹') s.hunger = Math.max(35, Math.min(100, parseInt(v) || 50)); // 阈值：≥35
+                        else if (k === '口渴') s.thirst = Math.max(35, Math.min(100, parseInt(v) || 50)); // 阈值：≥35
+                        else if (k === '疲劳') s.fatigue = Math.max(0, Math.min(75, parseInt(v) || 30));
+                        else if (k === '体温') { const t = parseFloat(v) || 36.5; s.bodyTemp = Math.max(35, Math.min(37.5, t)); } // 阈值 35-37.5
+                        else if (k === '伤势') {
+                            // 伤势只能是 无/轻伤/轻微
+                            if (/重伤|严重|骨折|大出血/.test(v)) s.injury = '轻伤';
+                            else s.injury = v || '无';
+                        }
                         else if (k === '负重') s.enc = parseFloat(v) || 5;
                         else if (k === '心态') s.mentality = v;
-                        else if (k === '精神') s.spirit = Math.max(0, Math.min(100, parseInt(v) || 75));
+                        else if (k === '精神') s.spirit = Math.max(40, Math.min(100, parseInt(v) || 75)); // 阈值：≥40
                         else if (k === '欢愉') { const j = parseInt(v) || 0; s.joy = Math.max(0, Math.min(100, j)); if (j > 0) s.pleasureUnlocked = true; }
                     });
                     sst(s);
                     upui();
-                    // Generate initial narration
-                    const initMsg = `你醒来在${c.sp}。外面的风呜咽着穿过破碎的窗户。你摸了摸自己——${s.injury !== '无' ? '身上带着' + s.injury + '，' : ''}${s.hunger < 40 ? '肚子饿得发慌，' : s.hunger > 70 ? '还算饱腹，' : '有些饥饿，'}${s.thirst < 40 ? '口渴得厉害，' : s.thirst > 70 ? '饮水充足，' : '有些口渴，'}${s.fatigue > 60 ? '身体疲惫不堪，' : s.fatigue > 40 ? '略感疲劳，' : '精神尚可，'}${mentalityLabel(s.mentality)}的你需要继续活下去。`;
-                    apb({ ty: 'narration', tx: initMsg }, 0);
-                    apb({ ty: 'system', tx: '自由输入行动开始。' }, 0);
+                    // ===== 修复开局重复提示：删除 initMsg 这段又说一遍位置+状态的冗余文字 =====
+                    // 改为简短引导，让 AI 真正接手第一回合剧情
+                    apb({ ty: 'narration', tx: '你睁开双眼，意识渐渐回笼。' }, 0);
+                    // 立即调用 hin 让 AI 生成真实的开局剧情（位置、感官、细节统一由 AI 写，不再重复）
+                    setTimeout(() => {
+                        try {
+                            if (typeof hin === 'function') {
+                                hin('环顾四周，描述当前的位置、环境和自身状态，然后给出2-4个初始行动选项', false, '（开局剧情）');
+                            }
+                        } catch(e) {}
+                    }, 120);
                 } catch (e) {
-                    apb({ ty: 'narration', tx: '地点：' + c.sp + '。天色灰蒙，远处传来低吼。你醒来时浑身酸痛，不知道自己昏迷了多久。外面的风呜咽着穿过破碎的窗户。' }, 0);
+                    apb({ ty: 'narration', tx: '你睁开双眼，' + c.sp + '的景象缓缓映入眼帘——风声和远处的低吼混在一起。你得先弄清楚自己现在的状况。' }, 0);
                     apb({ ty: 'system', tx: '自由输入行动开始。（AI初始化失败，使用默认数值）' }, 0);
                 }
             }
@@ -5722,8 +6078,20 @@
                     // Reset game state but keep character
                     ccb();
                     hist = [];
-                    // 区分跨存档永久数据 vs 单局数据：永久保留、单局清空
-                    // 永久保留: unlockedAchievements(成就), cfg配置, 角色设定(ch保留)
+                    // ===== 快速重开：成就以及相关的一切统计都必须重置 =====
+                    // 永久数据也随重开清空：成就、成就解锁记录、物品收集统计、死亡统计彩蛋等
+                    try {
+                        // 清空内存中已解锁成就集合
+                        if (window._unlockedAchievements && typeof window._unlockedAchievements.clear === 'function') {
+                            window._unlockedAchievements.clear();
+                        }
+                        // 清空 localStorage 成就记录
+                        try { localStorage.removeItem('vn_achievements'); } catch(_) {}
+                        try { localStorage.removeItem('vn_ach_first'); } catch(_) {}
+                        try { localStorage.removeItem('dz_death_info'); } catch(_) {} // 跨死亡彩蛋也重置
+                        try { localStorage.removeItem('vn_collectedTypes'); } catch(_) {}
+                        try { localStorage.removeItem('vn_npcHistory'); } catch(_) {}
+                    } catch(e) { console.warn('[QuickRestart] 成就重置失败：', e); }
                     // 单局清理: 关键记忆, 日志书签, NPC遭遇记录, 沙盘npcRel局部状态, heacCount/nightSurvived
                     try { keyMemories.length = 0; localStorage.removeItem('vn_keyMemories'); } catch(e) {}
                     try { logBookmarks.length = 0; localStorage.removeItem('vn_logBookmarks'); } catch(e) {}
