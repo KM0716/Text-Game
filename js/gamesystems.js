@@ -38,31 +38,71 @@
 })();
 
 (function innerIIFE() {
-        // Cross-script access to core functions from main IIFE
-        const gch = window.gch, gst = window.gst, gclk = window.gclk, cfg = window.cfg;
-        const sch = window.sch, sst = window.sst, sclk = window.sclk, scf = window.scf;
-        const mds = window.mds, pai = window.pai;
-        const buildInvAndEquipFromItems = window.buildInvAndEquipFromItems;
-        const getItemInfo = window.getItemInfo, getItemBaseName = window.getItemBaseName;
-        const stopIdle = window.stopIdle;
-        // Additional functions from main IIFE
-        const rbt = window.rbt, upui = window.upui, stg = window.stg;
-        const ccb = window.ccb, svh = window.svh, apb = window.apb, scb = window.scb;
-        const hin = window.hin, abold = window.abold;
-        const migrateSta = window.migrateSta, migrateChr = window.migrateChr, migrateCfg = window.migrateCfg;
-        const mergeSbx = window.mergeSbx, ssbx = window.ssbx, gsbx = window.gsbx;
-        const ldh = window.ldh, ssv = window.ssv, gsv = window.gsv, gsp = window.gsp;
-        const spBar = window.spBar, mentalityLabel = window.mentalityLabel, itemEmoji = window.itemEmoji;
-        const fmtTime = window.fmtTime, dayPhase = window.dayPhase;
-        const seasonFromDay = window.seasonFromDay, randWeather = window.randWeather, randTemp = window.randTemp;
-        const aiInitStats = window.aiInitStats, fillCharModal = window.fillCharModal;
-        const sketchConfirm = window.sketchConfirm, sketchPrompt = window.sketchPrompt;
-        const _getHist = window._getHist, _setHist = window._setHist;
-        const _getSbx = window._getSbx, _setSbx = window._setSbx;
-        const hasHover = window.hasHover;
-        // Helpers needed by playSfx override and status effect system
-        const playSfx = window.playSfx, playTone = window.playTone, snotify = window.snotify, tst = window.tst;
-        const esc = window.esc, escAttr = window.escAttr;
+        // ===== 跨脚本核心函数访问（运行时动态解析，修复脚本加载顺序缺陷）=====
+        // 重要：game.html 中 gamesystems.js（L818）先于 main.js（L821）加载。
+        // 若在顶层用 const 快照（如 const gst = window.gst），捕获到的是上方 initDefaults
+        // 兜底的空函数桩（调用返回 undefined），会导致本文件内 gst()/gclk()/sst() 等全部失效：
+        // 战斗/事件掉落物资无法入包、死亡结局 gclk().day 崩溃等均源于此。
+        // 因此统一改为箭头包装，调用时才从 window 解析真实实现（与下方 bgm 包装同模式）。
+        const gch = (...a) => window.gch(...a);
+        const gst = (...a) => window.gst(...a);
+        const gclk = (...a) => window.gclk(...a);
+        const cfg = (...a) => window.cfg(...a);
+        const sch = (...a) => window.sch(...a);
+        const sst = (...a) => window.sst(...a);
+        const sclk = (...a) => window.sclk(...a);
+        const scf = (...a) => window.scf(...a);
+        const mds = (...a) => window.mds(...a);
+        const pai = (...a) => window.pai(...a);
+        const buildInvAndEquipFromItems = (...a) => window.buildInvAndEquipFromItems(...a);
+        const getItemInfo = (...a) => window.getItemInfo(...a);
+        const getItemBaseName = (...a) => window.getItemBaseName(...a);
+        const stopIdle = (...a) => { if (typeof window.stopIdle === 'function') window.stopIdle(...a); };
+        const rbt = (...a) => window.rbt(...a);
+        const upui = (...a) => window.upui(...a);
+        const stg = (...a) => { if (typeof window.stg === 'function') window.stg(...a); };
+        const ccb = (...a) => window.ccb(...a);
+        const svh = (...a) => window.svh(...a);
+        const apb = (...a) => window.apb(...a);
+        const scb = (...a) => { if (typeof window.scb === 'function') window.scb(...a); };
+        const hin = (...a) => window.hin(...a);
+        const abold = (t) => window.abold ? window.abold(t) : (t || '');
+        const migrateSta = (...a) => window.migrateSta(...a);
+        const migrateChr = (...a) => window.migrateChr(...a);
+        const migrateCfg = (...a) => window.migrateCfg(...a);
+        const mergeSbx = (...a) => window.mergeSbx(...a);
+        const ssbx = (...a) => window.ssbx(...a);
+        const gsbx = (...a) => window.gsbx(...a);
+        const ldh = (...a) => window.ldh(...a);
+        const ssv = (...a) => window.ssv(...a);
+        const gsv = (...a) => window.gsv(...a);
+        const gsp = (...a) => window.gsp(...a);
+        const spBar = (...a) => window.spBar(...a);
+        const mentalityLabel = (v) => window.mentalityLabel ? window.mentalityLabel(v) : '';
+        const itemEmoji = (n) => window.itemEmoji ? window.itemEmoji(n) : '';
+        const fmtTime = (...a) => window.fmtTime(...a);
+        const dayPhase = (...a) => window.dayPhase(...a);
+        const seasonFromDay = (...a) => window.seasonFromDay(...a);
+        const randWeather = (...a) => window.randWeather(...a);
+        const randTemp = (...a) => window.randTemp(...a);
+        const aiInitStats = (...a) => window.aiInitStats(...a);
+        const fillCharModal = (...a) => window.fillCharModal(...a);
+        const sketchConfirm = (...a) => window.sketchConfirm ? window.sketchConfirm(...a) : Promise.resolve(false);
+        const sketchPrompt = (...a) => window.sketchPrompt ? window.sketchPrompt(...a) : Promise.resolve('');
+        const _getHist = (...a) => window._getHist(...a);
+        const _setHist = (...a) => window._setHist(...a);
+        const _getSbx = (...a) => window._getSbx(...a);
+        const _setSbx = (...a) => window._setSbx(...a);
+        // hasHover 是布尔值（main.js 由 matchMedia 计算），同样运行时读取
+        const hasHover = () => !!window.hasHover;
+        // 音效/提示函数：audio.js 先加载但为彻底解除顺序依赖也动态解析。
+        // 注意：playSfx 在本文件 L1382 会被覆盖为扩展版（内部仅调 playTone/playNoiseAmbient，无递归风险）
+        const playSfx = (...a) => { if (typeof window.playSfx === 'function') window.playSfx(...a); };
+        const playTone = (...a) => { if (typeof window.playTone === 'function') window.playTone(...a); };
+        const snotify = (...a) => { if (typeof window.snotify === 'function') window.snotify(...a); };
+        const tst = (...a) => { if (typeof window.tst === 'function') window.tst(...a); };
+        const esc = (s) => (typeof window.esc === 'function') ? window.esc(s) : String(s == null ? '' : s);
+        const escAttr = (s) => (typeof window.escAttr === 'function') ? window.escAttr(s) : String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
         const _bgmInit = () => { if (typeof window.bgmInit === 'function') window.bgmInit(); };
         const _bgmPlay = (f) => { if (typeof window.bgmPlay === 'function') window.bgmPlay(f); };
         const _bgmPlayCategory = (c, r) => { if (typeof window.bgmPlayCategory === 'function') window.bgmPlayCategory(c, r); };
@@ -219,11 +259,14 @@
                 if (Math.random() < 0.3) {
                     const lootPool = ['压缩饼干', '瓶装水', '绷带', '抗生素', '金属', '零件', '手电筒', '止痛药', '火柴', '巧克力'];
                     const loot = lootPool[Math.floor(Math.random() * lootPool.length)];
-                    const cs = gst();
-                    cs.inv.push(loot);
-                    sst(cs);
+                    // 统一走 invAdd（数量合并），并弹侧边获得通知
+                    if (window.invAdd) window.invAdd(loot, 1); else { const cs = gst(); cs.inv.push(loot); sst(cs); }
+                    if (typeof snotify === 'function') snotify('add', '战利品', loot);
                     result.events.push('获得战利品：' + loot);
+                    addLogEntry('system', '获得战利品：' + (typeof iref === 'function' ? iref(loot) : loot));
                     playSfx('pickup');
+                    // 关键事件即时检查成就
+                    try { if (window._checkAchievements) window._checkAchievements(); } catch(e) {}
                 }
                 return result;
             }
@@ -320,11 +363,14 @@
                 consumeInventoryQty(s.inv, ingName, ingQty);
             });
             // 第三步：产出结果（如果结果带xN则直接推入，玩家使用时再解析）
-            s.inv.push(recipe.result);
+            if (window.invAdd) window.invAdd(recipe.result, 1); else s.inv.push(recipe.result);
             s.crafts = (s.crafts || 0) + 1;
-            if (typeof addLogEntry === 'function') addLogEntry('craft', '成功合成：' + recipe.result);
+            if (typeof addLogEntry === 'function') addLogEntry('craft', '成功合成：' + (typeof iref === 'function' ? iref(recipe.result) : recipe.result));
+            if (typeof snotify === 'function') snotify('add', '合成', recipe.result);
             sst(s);
             playSfx('craft');
+            // 关键事件即时检查成就
+            try { if (window._checkAchievements) window._checkAchievements(); } catch(e) {}
             return { success: true, message: '合成成功！获得 ' + recipe.result, item: recipe.result };
         }
 
@@ -517,11 +563,14 @@
                 if (event.type === 'loot' && event.maxItems) {
                     const lootPool = ['压缩饼干', '午餐肉罐头', '瓶装水', '绷带', '医疗包', '抗生素', '金属', '零件', '电池', '手电筒', '止痛药', '火柴', '方便面', '巧克力', '牛肉干', '9mm子弹', '5.56mm子弹', '绳子', '铁丝'];
                     const count = Math.floor(Math.random() * (event.maxItems - (event.minItems || 1) + 1)) + (event.minItems || 1);
+                    const gained = [];
                     for (let i = 0; i < count; i++) {
                         const item = lootPool[Math.floor(Math.random() * lootPool.length)];
-                        s.inv.push(item);
+                        if (window.invAdd) window.invAdd(item, 1); else s.inv.push(item);
+                        gained.push(item);
                     }
                     sst(s);
+                    gained.forEach(it => { if (typeof snotify === 'function') snotify('add', '事件物资', it); });
                     tst('🎁 ' + event.name + '！获得' + count + '件物资');
                     playSfx('pickup');
                 } else if (event.type === 'combat') {
@@ -562,7 +611,10 @@
                     addLogEntry('seasonal', ev.name + '：' + ev.text);
                     if (ev.items) {
                         const s = gst();
-                        ev.items.forEach(it => s.inv.push(it));
+                        ev.items.forEach(it => {
+                            if (window.invAdd) window.invAdd(it, 1); else s.inv.push(it);
+                            if (typeof snotify === 'function') snotify('add', '季节物资', it);
+                        });
                         sst(s);
                         tst('🎊 ' + ev.name + '！获得特殊物资');
                     } else {
@@ -844,7 +896,7 @@
                 const buildTooltip = window.buildItemTooltipHTML || function() { return null; };
                 const info = buildTooltip(name);
                 if (!info) return;
-                if (hasHover) {
+                if (hasHover()) {
                     // PC: hover to show tooltip
                     el.style.cursor = 'help';
                     el.addEventListener('mouseenter', () => _showLogTip(el, info, name));
@@ -1361,7 +1413,9 @@
             'ui_alert': { freq: [600, 800], type: 'sine', dur: 0.1, vol: 0.3 },
             'footstep': { freq: 200, type: 'triangle', dur: 0.05, vol: 0.15 },
             'door': { freq: 150, type: 'sawtooth', dur: 0.15, vol: 0.25 },
-            'danger_alarm': { freq: [400, 200, 400, 200], type: 'square', dur: 0.15, vol: 0.4 }
+            'danger_alarm': { freq: [400, 200, 400, 200], type: 'square', dur: 0.15, vol: 0.4 },
+            // 死亡结局音效（修复：此前 'death' 缺失导致 playSfx('death') 静默无声）
+            'death': { freq: [220, 174, 138, 110], type: 'sawtooth', dur: 0.32, vol: 0.42 }
         };
 
         // Update original playSfx to route through sfxExt first
@@ -1458,8 +1512,9 @@
         }
 
         function triggerDeathEnding(s) {
-            if (s.deathProcessed) return;
+            if (s.deathProcessed || window._deathLock) return;
             s.deathProcessed = true;
+            window._deathLock = true; // 防重入：弹窗生成前拦截重复触发
             playSfx('death');
             // Show death notification
             const deathReasons = [
@@ -1472,10 +1527,9 @@
             const reason = deathReasons[Math.floor(Math.random() * deathReasons.length)];
             // Add death scene to log
             addLogEntry('system', '【死亡结局】' + reason + ' 你存活了' + (gclk().day || 1) + '天。');
-            // Show ending modal after delay
-            setTimeout(() => {
-                generateDeathEnding(s, reason);
-            }, 2000);
+            // 立即展示死亡弹窗（移除原2秒延迟：延迟期间状态可能变化，且用户无处操作）
+            try { if (typeof tst === 'function') tst('💀 ' + reason); } catch(e) {}
+            generateDeathEnding(s, reason);
         }
         function generateDeathEnding(s, reason) {
             // Save death location for easter egg
@@ -1518,8 +1572,10 @@
                 '</div>' +
             '</div>';
             document.body.appendChild(d);
+            window._deathLock = false; // 弹窗已生成，解除防重入锁
             // Create new character
             d.querySelector('#deathNewChar').onclick = () => {
+              try {
                 d.remove();
                 ccb();
                 sst(JSON.parse(JSON.stringify(DSTA)));
@@ -1529,12 +1585,14 @@
                 // Clear death flag so new character can die
                 const newSta = gst();
                 if (newSta) { newSta.deathShown = false; newSta.deathProcessed = false; sst(newSta); }
-                $('charModal').style.display = 'flex';
+                const cm = document.getElementById('charModal');
+                if (cm) cm.style.display = 'flex';
+                else tst('角色创建面板未就绪，请刷新页面重试');
                 tst('新角色已创建。前一个角色的死亡地点：' + deathLocation);
+              } catch (e) { tst('创建新角色失败：' + (e && e.message ? e.message : e)); }
             };
             // Load most recent save
             d.querySelector('#deathLoadSave').onclick = () => {
-                d.remove();
                 // Try to load from slot 0 (auto-save) or most recent
                 const saves = [];
                 for (let i = 0; i < 10; i++) {
@@ -1547,9 +1605,11 @@
                     } catch(e) {}
                 }
                 if (saves.length === 0) {
+                    // 无存档时不关闭弹窗，保持死亡选项可用（修复"点击无反应"的观感）
                     tst('没有可用的存档');
                     return;
                 }
+                d.remove();
                 // Sort by time descending, get most recent
                 saves.sort((a, b) => (b.time || 0) - (a.time || 0));
                 const recent = saves[0];
@@ -1609,6 +1669,8 @@
         window._applyStatusEffect = applyStatusEffect;
         window._tickStatusEffects = tickStatusEffects;
         window._checkAchievements = checkAchievements;
+        // 死亡结局：main.js 的 mds() 裸引用 triggerDeathEnding，必须暴露到全局否则 ReferenceError
+        window.triggerDeathEnding = triggerDeathEnding;
         window.renderAchievementsPanel = renderAchievementsPanel;
         window.renderEventsPanel = renderEventsPanel;
         // Expose achievement state for cross-script access (main.js undo/redo needs it)

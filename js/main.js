@@ -529,6 +529,15 @@
                 if (el.tagName === 'TEXTAREA') { el.value = html; return; }
                 el.innerHTML = '';
             }
+            // 构造输入栏物品引用 chip 节点（insertItemChip 与 {{}} 实时转换共用）
+            function makeItemChipNode(itemName) {
+                const chip = document.createElement('span');
+                chip.className = 'item-chip';
+                chip.contentEditable = 'false';
+                chip.dataset.itemName = itemName;
+                chip.textContent = itemName;
+                return chip;
+            }
             function insertItemChip(itemName) {
                 const el = $('inputText');
                 if (!el) return;
@@ -538,11 +547,7 @@
                     el.value = el.value.slice(0, start) + '{{' + itemName + '}}' + el.value.slice(end);
                     return;
                 }
-                const chip = document.createElement('span');
-                chip.className = 'item-chip';
-                chip.contentEditable = 'false';
-                chip.dataset.itemName = itemName;
-                chip.textContent = itemName;
+                const chip = makeItemChipNode(itemName);
                 const selection = window.getSelection();
                 if (selection && selection.rangeCount > 0) {
                     const range = selection.getRangeAt(0);
@@ -560,6 +565,41 @@
                     el.appendChild(document.createTextNode(' '));
                 }
                 el.focus();
+            }
+            // 输入栏 {{物品名}} 实时转 chip（contentEditable 模式）：
+            // 修复"导出角色设定文本贴回输入栏后物品引用显示为纯文本"——粘贴/输入含 {{物品名}} 时自动转为可交互 chip 胶囊
+            function convertRefTokensToChips() {
+                const el = $('inputText');
+                if (!el || el.tagName === 'TEXTAREA' || !el.classList.contains('contenteditable-input')) return;
+                const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, null);
+                const pending = [];
+                let node;
+                while ((node = walker.nextNode())) {
+                    const txt = node.nodeValue || '';
+                    if (!txt.includes('{{')) continue;
+                    const m = txt.match(/\{\{([^}{]+)\}\}/);
+                    if (!m) continue;
+                    pending.push({ node, txt, m });
+                }
+                if (!pending.length) return;
+                pending.forEach(({ node, txt }) => {
+                    const frag = document.createDocumentFragment();
+                    let last = 0;
+                    const re = /\{\{([^}{]+)\}\}/g;
+                    let mm;
+                    while ((mm = re.exec(txt))) {
+                        if (mm.index > last) frag.appendChild(document.createTextNode(txt.slice(last, mm.index)));
+                        const name = mm[1].trim();
+                        // 已知物品才转 chip；未知物品保留原文本（发送后由 AI 侧渲染）
+                        const known = (typeof getItemInfo === 'function' && getItemInfo(name)) ||
+                                      (gst() && gst().inv || []).some(x => (x || '').split(/x\d+$/)[0] === name);
+                        if (known) frag.appendChild(makeItemChipNode(name));
+                        else frag.appendChild(document.createTextNode(mm[0]));
+                        last = mm.index + mm[0].length;
+                    }
+                    if (last < txt.length) frag.appendChild(document.createTextNode(txt.slice(last)));
+                    node.parentNode.replaceChild(frag, node);
+                });
             }
             function clearInput() {
                 const el = $('inputText');
@@ -1553,6 +1593,13 @@
                     const normalized = i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim();
                     if (normalized.length >= 2 && normalized !== i) names.push(normalized);
                 });
+                // 已装备物品也参与加粗匹配（装备后物品移出背包，但日志/叙事中提及仍应高亮）
+                if (s && s.equip) Object.values(s.equip).forEach(i => {
+                    if (!i || i.length < 2) return;
+                    names.push(i);
+                    const normalized = i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim();
+                    if (normalized.length >= 2 && normalized !== i) names.push(normalized);
+                });
                 const unique = [...new Set(names)];
                 if (unique.length) {
                     // Sort by length descending to match longer names first
@@ -2006,13 +2053,44 @@
                 mapHTML: '', mapHash: ''
             };
             function _hashObj(v) { try { return JSON.stringify(v); } catch(_) { return ''; } }
+            // ===== 属性数值动画辅助（修复"数值变化速度过快、低数值时无感知"）=====
+            // 数字平滑滚动：requestAnimationFrame + easeOutCubic，约450ms 从旧值插值到新值
+            function tweenNum(el, from, to, ms) {
+                if (!el) return;
+                if (el._raf) { cancelAnimationFrame(el._raf); el._raf = 0; }
+                const dur = ms || 450;
+                const f0 = parseFloat(from), f1 = parseFloat(to);
+                if (isNaN(f0) || isNaN(f1) || f0 === f1) { el.textContent = to; return; }
+                const decimals = (String(to).split('.')[1] || '').length;
+                const t0 = performance.now();
+                const step = (t) => {
+                    const p = Math.min(1, (t - t0) / dur);
+                    const e = 1 - Math.pow(1 - p, 3); // easeOutCubic
+                    el.textContent = (f0 + (f1 - f0) * e).toFixed(decimals);
+                    if (p < 1) el._raf = requestAnimationFrame(step);
+                    else { el._raf = 0; el.textContent = to; }
+                };
+                el._raf = requestAnimationFrame(step);
+            }
+            // 变化浮动指示：在数字旁生成 +N / -N 小浮层（上浮渐隐），低数值变化也一眼可见
+            function flashDelta(el, delta) {
+                if (!el || !delta || !isFinite(delta)) return;
+                try {
+                    const host = el.closest('.status-item') || el.parentElement;
+                    if (!host || host.querySelector('.st-delta')) return; // 同一时间只显示一个
+                    const d = document.createElement('span');
+                    d.className = 'st-delta' + (delta < 0 ? ' st-delta--down' : ' st-delta--up');
+                    d.textContent = (delta > 0 ? '+' : '') + delta;
+                    host.appendChild(d);
+                    setTimeout(() => { try { d.remove(); } catch(_) {} }, 950);
+                } catch(_) {}
+            }
             function _setInnerHTMLIfChanged(el, html, cacheKey, hashVal) {
                 if (!el) return;
                 if (_upuiCache[cacheKey + 'Hash'] === hashVal && _upuiCache[cacheKey + 'HTML'] === html) return;
                 _upuiCache[cacheKey + 'Hash'] = hashVal;
                 _upuiCache[cacheKey + 'HTML'] = html;
-                el.innerHTML = html;
-            }
+                el.innerHTML = html;            }
             function upui() {
                 const s = gst();
                 const ch = gch();
@@ -2080,15 +2158,15 @@
                     const html = '<div class="sp-card">' + ((tp || tn) ? (tp + tn) : '<span style="font-size:0.7rem;color:var(--ink-soft);">无特殊特质</span>') + '</div>';
                     _setInnerHTMLIfChanged($('sideTraits'), html, 'traits', hash);
                 }
-                // 顶部状态数字：仅在数值实际变化时更新 textContent（减少 DOM 写入）
-                if ($('stHunger')) { const v = Math.round(s.hunger); if ($('stHunger')._v !== v) { $('stHunger').textContent = v; $('stHunger')._v = v; } }
-                if ($('stThirst')) { const v = Math.round(s.thirst); if ($('stThirst')._v !== v) { $('stThirst').textContent = v; $('stThirst')._v = v; } }
-                if ($('stFatigue')) { const v = Math.round(s.fatigue); if ($('stFatigue')._v !== v) { $('stFatigue').textContent = v; $('stFatigue')._v = v; } }
-                if ($('stBodyTemp')) { const v = (Math.round((s.bodyTemp || 37) * 10) / 10).toFixed(1); if ($('stBodyTemp')._v !== v) { $('stBodyTemp').textContent = v; $('stBodyTemp')._v = v; } }
+                // 顶部状态数字：数值变化时平滑滚动 + 浮动 ±N 指示（低数值变化也可见）
+                if ($('stHunger')) { const v = Math.round(s.hunger); const el = $('stHunger'); if (el._v !== v) { const old = el._v; tweenNum(el, old != null ? old : v, v); flashDelta(el, old != null ? v - old : 0); el._v = v; } }
+                if ($('stThirst')) { const v = Math.round(s.thirst); const el = $('stThirst'); if (el._v !== v) { const old = el._v; tweenNum(el, old != null ? old : v, v); flashDelta(el, old != null ? v - old : 0); el._v = v; } }
+                if ($('stFatigue')) { const v = Math.round(s.fatigue); const el = $('stFatigue'); if (el._v !== v) { const old = el._v; tweenNum(el, old != null ? old : v, v); flashDelta(el, old != null ? v - old : 0); el._v = v; } }
+                if ($('stBodyTemp')) { const v = (Math.round((s.bodyTemp || 37) * 10) / 10).toFixed(1); const el = $('stBodyTemp'); if (el._v !== v) { tweenNum(el, el._v != null ? el._v : v, v); el._v = v; } }
                 if ($('stInjury')) { if ($('stInjury')._v !== s.injury) { $('stInjury').textContent = s.injury; $('stInjury')._v = s.injury; } }
                 if ($('stEnc')) { if ($('stEnc')._v !== s.enc) { $('stEnc').textContent = s.enc; $('stEnc')._v = s.enc; } }
                 if ($('stMentality')) { const v = mentalityLabel(s.mentality); if ($('stMentality')._v !== v) { $('stMentality').textContent = v; $('stMentality')._v = v; } }
-                if ($('stSpirit')) { const v = s.spirit != null ? Math.round(s.spirit) : '--'; if ($('stSpirit')._v !== v) { $('stSpirit').textContent = v; $('stSpirit')._v = v; } }
+                if ($('stSpirit')) { const v = s.spirit != null ? Math.round(s.spirit) : '--'; const el = $('stSpirit'); if (el._v !== v) { const old = el._v; tweenNum(el, old != null ? old : v, v); flashDelta(el, old != null ? v - old : 0); el._v = v; } }
                 if ($('stJoy')) {
                     const v = (s.pleasureUnlocked && s.joy != null) ? Math.round(s.joy) + '%' : '隐藏';
                     if ($('stJoy')._v !== v) { $('stJoy').textContent = v; $('stJoy')._v = v; }
@@ -2138,7 +2216,27 @@
                                 '</div>';
                         }).join('') + '</div>' : '') +
                         (s.bookmarks && s.bookmarks.length ? '<div class="sp-card"><div class="sp-row" style="font-size:0.66rem;color:var(--ink-soft);margin-bottom:4px;">★ 收藏夹 (' + s.bookmarks.length + ')</div>' + s.bookmarks.slice(-5).reverse().map(b => '<div class="sp-row" style="font-size:0.68rem;"><span class="sp-lbl" style="max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">' + esc(b.text) + '</span><span class="sp-val" style="font-size:0.58rem;color:var(--text-muted);">' + esc(b.time || '') + '</span></div>').join('') + '</div>' : '');
-                    _setInnerHTMLIfChanged($('sideProps'), html, 'props', hash);
+                    // 两帧法触发进度条过渡：innerHTML 重建会跳过 CSS transition，
+                    // 先记录旧宽度 → 新元素先设旧宽 → 下一帧恢复目标宽 → width 0.5s ease 生效
+                    const propsHost = $('sideProps');
+                    const oldBars = propsHost ? Array.from(propsHost.querySelectorAll('.sp-bar-fg')).map(e => e.style.width) : [];
+                    _setInnerHTMLIfChanged(propsHost, html, 'props', hash);
+                    if (propsHost && oldBars.length) {
+                        const newBars = propsHost.querySelectorAll('.sp-bar-fg');
+                        newBars.forEach((bar, i) => {
+                            if (i < oldBars.length && oldBars[i] && bar.style.width && bar.style.width !== oldBars[i]) {
+                                const target = bar.style.width; // 新渲染即目标宽度
+                                bar.style.transition = 'none';
+                                bar.style.width = oldBars[i];
+                                requestAnimationFrame(() => {
+                                    requestAnimationFrame(() => {
+                                        bar.style.transition = '';
+                                        bar.style.width = target;
+                                    });
+                                });
+                            }
+                        });
+                    }
                 }
                 if (sideMode === 'panel' && $('sideClues')) { /* sideClues removed, clues shown in floating sidebar */ }
                 if (sideMode === 'panel' && $('sideLocation')) {
@@ -2227,7 +2325,10 @@
                 // Check for death conditions
                 if (!cfg().debug && s.hp <= 0 && !s.deathShown) {
                     s.deathShown = true;
-                    triggerDeathEnding(s);
+                    // 死亡结局实现在 gamesystems.js，通过 window.triggerDeathEnding 暴露（裸引用会在其未加载时抛 ReferenceError）
+                    if (typeof triggerDeathEnding === 'function') triggerDeathEnding(s);
+                    else if (window.triggerDeathEnding) window.triggerDeathEnding(s);
+                    else console.error('[mds] triggerDeathEnding 不可用：gamesystems.js 未正确加载');
                 }
                 if (ch.wpnDurName && ch.wpnDurDelta !== undefined) {
                     if (!s.weaponDurability) s.weaponDurability = {};
@@ -2244,14 +2345,26 @@
                     else if (ch.battle === '伤') { s.injury = s.injury === '无' ? '轻伤' : s.injury; s.notify = '战斗中受伤'; playSfx('warn'); }
                 }
                 if (ch.hp !== undefined && ch.hp <= 30 && ch.hp > 0) playSfx('warn');
-                if (ch.ai) { if (!s.inv.includes(ch.ai)) { s.inv.push(ch.ai); playSfx('pickup'); } }
                 // Handle multiple item additions (ptg aiList) — 限制每次最多收集8种物品
+                // 修复：改用 invAdd（base 名去重 + 数量合并），不再因字符串严格相等而静默丢弃同名物品
                 if (ch.aiList && Array.isArray(ch.aiList)) {
-                    const newItems = ch.aiList.filter(v => v && !s.inv.includes(v)).slice(0, 8);
-                    newItems.forEach(v => { s.inv.push(v); playSfx('pickup'); });
+                    ch.aiList.slice(0, 8).forEach(v => {
+                        if (!v) return;
+                        const base = parseItemQty(v).base;
+                        const existed = s.inv.some(x => parseItemQty(x).base === base);
+                        invAdd(v, 1); // 数量合并；新 base 则新增条目
+                        if (!existed) {
+                            playSfx('pickup');
+                            // 累计收集种类计数（供成就"收集过N种"判定，丢弃后不清零）
+                            s.collectedTypesCount = (s.collectedTypesCount || 0) + 1;
+                        }
+                    });
                     if (ch.aiList.length > 8) {
                         snotify('status', '物资限制', '单次收集已上限8种，多余物品未拾取');
                     }
+                    upui();
+                    // 关键事件即时检查成就（避免 15 秒定时器延迟）
+                    try { (window._checkAchievements || function(){})(); } catch(e) {}
                 }
                 if (ch.bookmark) {
                     if (!s.bookmarks) s.bookmarks = [];
@@ -2371,17 +2484,17 @@
                             }
                         });
                         if (ingMatched === ingCount) {
-                            s.inv.push(recipe.result);
+                            if (window.invAdd) window.invAdd(recipe.result, 1); else s.inv.push(recipe.result);
                             s.crafts = (s.crafts || 0) + 1;
-                            addLogEntry('craft', '成功合成：' + recipe.result);
+                            addLogEntry('craft', '成功合成：' + iref(recipe.result));
                         } else {
-                            s.inv.push(ch.craftResult);
+                            if (window.invAdd) window.invAdd(ch.craftResult, 1); else s.inv.push(ch.craftResult);
                             s.crafts = (s.crafts || 0) + 1;
-                            addLogEntry('craft', 'AI合成：' + ch.craftResult);
+                            addLogEntry('craft', 'AI合成：' + iref(ch.craftResult));
                         }
                     } else {
-                        s.inv.push(ch.craftResult);
-                        addLogEntry('craft', 'AI合成：' + ch.craftResult);
+                        if (window.invAdd) window.invAdd(ch.craftResult, 1); else s.inv.push(ch.craftResult);
+                        addLogEntry('craft', 'AI合成：' + iref(ch.craftResult));
                     }
                 }
                 if (ch.skillAdd) {
@@ -2423,14 +2536,16 @@
                 const ch = {};
                 const notes = [];
                 const firedSet = new Set();
-                tx = tx.replace(/\[([^\]]+)\]/g, (m, tg) => {
+                tx = tx.replace(/\[([^\]]+)\]/g, (m, rawTg) => {
+                    // 标签归一化：兼容中文冒号「：」与冒号后空格等 AI 输出变体（如 [物品：+罐头] / [物品: +罐头]）
+                    const tg = rawTg.replace(/：/g, ':').replace(/:\s+/g, ':');
                     if (tg.startsWith('饱腹:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.hunger = v; const key = 'status:饱腹:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '饱腹', val: v + '%' }); } }
                     else if (tg.startsWith('口渴:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.thirst = v; const key = 'status:口渴:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '口渴', val: v + '%' }); } }
                     else if (tg.startsWith('疲劳:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.fatigue = v; const key = 'status:疲劳:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '疲劳', val: v + '%' }); } }
                     else if (tg.startsWith('体温:')) { const v = Math.max(30, Math.min(45, parseFloat(tg.split(':')[1]) || 37)); ch.bodyTemp = v; const key = 'status:体温:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '体温', val: v + '°C' }); } }
                     else if (tg.startsWith('伤势:')) { const v = tg.split(':').slice(1).join(':').trim(); ch.injury = v; const key = 'status:伤势:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '伤势', val: v }); } }
                     else if (tg.startsWith('负重:')) { const v = parseFloat(tg.split(':')[1]) || 0; ch.enc = v; const key = 'status:负重:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '负重', val: v + 'kg' }); } }
-                    else if (tg.startsWith('物品:+')) {
+                    else if (tg.startsWith('物品:+') || tg.startsWith('获得物品:+') || tg.startsWith('物品获得:+')) {
                         const v = tg.split(':+')[1].trim();
                         if (!ch.aiList) ch.aiList = [];
                         ch.aiList.push(v);
@@ -2822,7 +2937,15 @@
                     (b.opts || []).forEach((opt, i) => {
                         const btn = document.createElement('div');
                         btn.className = 'vn-choice' + (i % 2 ? ' vn-choice--alt' : '');
-                        btn.textContent = opt;
+                        // 序号徽标 + 文本两部分，textContent 安全渲染（防注入）
+                        const numEl = document.createElement('span');
+                        numEl.className = 'vn-choice-num';
+                        numEl.textContent = String(i + 1);
+                        const txtEl = document.createElement('span');
+                        txtEl.className = 'vn-choice-text';
+                        txtEl.textContent = opt || '';
+                        btn.appendChild(numEl);
+                        btn.appendChild(txtEl);
                         btn.title = '点击后填入输入栏，可二次编辑再发送';
                         btn.addEventListener('click', () => {
                             // 填入输入栏（不立即发送），给玩家二次编辑机会
@@ -3086,7 +3209,7 @@
             }
             // 安全切分 choice 选项：兼容 1. 2. 3. / A. B. C. / 、/ ，/ || / | / 分号 等常见分隔
             function safeSplitChoices(raw) {
-                if (!raw) return ['继续前进','观察环境','搜索物资','原地休息'];
+                if (!raw) return ['观察周围环境', '检查随身装备', '原地警戒片刻'];
                 let t = (raw || '').trim().replace(/^[\s\-—–•●*]+|[\s\-—–•●*]+$/g, '');
                 const numMatch = t.match(/(^|\s)(\d{1,2})[.)、\]】]\s*([^\n\r\d][^\n\r]*?)(?=(\s\d{1,2}[.)、\]】])|$)/g);
                 if (numMatch && numMatch.length >= 2) {
@@ -3110,16 +3233,27 @@
                 }
                 const byPipe = t.split('|').map(s => s.trim()).filter(Boolean);
                 if (byPipe.length >= 2) return byPipe.slice(0, 6);
-                if (t.length > 20) {
-                    const byComma = t.split(/[,，\s]{2,}/).map(s => s.trim()).filter(x => x.length > 2);
-                    if (byComma.length >= 2) return byComma.slice(0, 6);
-                }
-                return [t || '继续前进', '观察环境', '搜索物资'];
+                // 收紧：无任何分隔符时不再按空格/逗号强行切分（避免把一句完整叙述误切成多个"选项"），整段作为单个选项
+                if (t) return [t];
+                return ['观察周围环境', '检查随身装备', '原地警戒片刻'];
+            }
+            // 中性兜底选项：不涉及剧情方向，绝不与当前剧情冲突
+            // （用于 AI 漏输出 [choice] 且补选项请求也失败时，替代旧的 generateDefaultChoices 兜底）
+            function generateNeutralChoices() {
+                return ['观察周围环境', '检查随身装备', '原地警戒片刻'];
             }
 
             async function hin(inp, isIdle, displayText, systemPromptExtra) {
                 if (busy) { tst('正在演算中，请稍候…'); return false; }
                 if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return false; }
+                // 死亡状态拦截：角色已死亡（上帝模式除外）时禁止继续推进剧情，引导处理死亡结局
+                try {
+                    const _st = gst();
+                    if (_st && _st.deathShown && !(cfg() && cfg().debug)) {
+                        tst('角色已死亡，请在死亡结算弹窗中选择后续操作（新角色/读档/结局统计）');
+                        return false;
+                    }
+                } catch(_) {}
                 const tx = inp ? inp.trim() : ''; if (!tx) return false;
                 // 进入即兜底：确保 hist 绝对是数组，任何污染都会立刻重置，防止 undo/h.push 直接炸
                 if (!Array.isArray(hist)) {
@@ -3405,11 +3539,34 @@
                         if (isIdle && !/\[monologue\]/i.test(full)) {
                             full = '[monologue]' + full + '[/monologue]';
                         }
-                        // 检查AI是否输出了互动选项，缺失则补充默认选项（挂机模式除外）
+                        // 检查AI是否输出了互动选项：缺失时先请求AI补选项（贴合剧情），失败再回退中性选项（挂机模式除外）
                         if (!isIdle && !/\[choice\]/i.test(full)) {
-                            const defaultOpts = generateDefaultChoices();
-                            try { apb({ ty: 'choice', opts: defaultOpts }, 0); } catch(_) {}
-                            full += '\n[choice]' + defaultOpts.join('|') + '[/choice]';
+                            let topUpOpts = null;
+                            try {
+                                const f2 = cfg();
+                                if (f2.key && f2.model && f2.ep) {
+                                    const storyTail = full.slice(-2000);
+                                    const topUpMsgs = [
+                                        ...hist.slice(-2),
+                                        { role: 'user', content: '以下是刚才的剧情正文。请严格按格式输出3-4个承接剧情的具体行动选项，格式：[choice]选项1|选项2|选项3[/choice]。选项必须贴合剧情当前情境（地点/人物/事件），不要输出其他任何内容。\n\n' + storyTail }
+                                    ];
+                                    const ct2 = new AbortController();
+                                    const rp2 = await requestWithRetry(f2.ep, { model: f2.model.trim(), messages: topUpMsgs, max_tokens: 256, temperature: 0.7, stream: false }, f2.key, ct2.signal, false, 0, 8000);
+                                    const d2 = await rp2.json();
+                                    const ct = (d2.choices && d2.choices[0] && d2.choices[0].message && d2.choices[0].message.content) || '';
+                                    const cm = ct.match(/\[choice\]([\s\S]*?)\[\/choice\]/i);
+                                    if (cm) {
+                                        topUpOpts = safeSplitChoices(cm[1]).map(o => (o || '').trim()).filter(Boolean);
+                                    } else if (ct.trim()) {
+                                        // AI 返回了内容但未用标签：按行/|切分并去掉序号前缀
+                                        const lines = ct.split(/\n+|\|/).map(x => x.replace(/^\s*[\d①-⑳]+[.、)．]:]?\s*/, '').trim()).filter(x => x && x.length <= 40);
+                                        if (lines.length >= 2) topUpOpts = lines.slice(0, 4);
+                                    }
+                                }
+                            } catch(_) { /* 补选项失败静默回退 */ }
+                            const opts = (topUpOpts && topUpOpts.length >= 2) ? topUpOpts.slice(0, 4) : generateNeutralChoices();
+                            try { apb({ ty: 'choice', opts }, 0); } catch(_) {}
+                            // 注意：兜底/补选项均不拼回 full 与 hist，避免污染历史与后续重放
                         }
                         hist.push({ role: 'assistant', content: full });
                         svh(hist);
@@ -3448,10 +3605,11 @@
                         try { apb({ ty: 'choice', opts: ['重新发送本次行动', '取消，手动输入'] }, 0); } catch(_) {}
                         setTimeout(() => {
                             try {
-                                const choices = document.querySelectorAll('.vn-choice-bubble');
+                                // 修复：实际渲染的容器类名是 .vn-choice-container，按钮类名是 .vn-choice
+                                const choices = document.querySelectorAll('.vn-choice-container');
                                 if (!choices || !choices.length) return;
                                 const last = choices[choices.length - 1];
-                                const btns = last.querySelectorAll('button, .vn-choice-item');
+                                const btns = last.querySelectorAll('button, .vn-choice');
                                 if (btns[0]) btns[0].onclick = (ev) => { try { ev.stopPropagation(); } catch(_) {} if (window._retryLastAction) window._retryLastAction(); };
                                 if (btns[1]) btns[1].onclick = (ev) => { try { ev.stopPropagation(); } catch(_) {} const ie = $('inputText'); if (ie) try { ie.focus(); } catch(_) {} };
                             } catch(_) {}
@@ -3536,6 +3694,11 @@
             // Expose core functions for cross-script access
             window.gch = gch; window.gst = gst; window.gclk = gclk; window.cfg = cfg;
             window.sch = sch; window.sst = sst; window.sclk = sclk; window.scf = scf;
+            // 暴露规范入包函数给 gamesystems.js（战斗掉落/合成/事件物资统一走数量合并入包）
+            window.invAdd = invAdd; window.invRemove = invRemove;
+            // 物品引用标记工具：把物品名包成 {{名}}，供日志文本经 abold 渲染为 item-ref 胶囊（可悬停查看详情）
+            window.iref = iref;
+            function iref(name) { return (name != null && String(name).trim()) ? '{{' + String(name).trim() + '}}' : ''; }
             window.hasCustomCharacter = hasCustomCharacter;
             // 注：playSfx / tst / esc / scb 不在此处覆盖 window —— 它们在 main.js 中是 audio.js 同名函数的代理，
             // 若覆盖会导致代理函数调用自己形成无限循环（栈溢出）。audio.js 已暴露独立实现。
@@ -4320,7 +4483,7 @@
                                         if (s2.equip[chosenSlot]) invAdd(s2.equip[chosenSlot], 1);
                                         s2.equip[chosenSlot] = parseItemQty(item.name).base;
                                         invRemove(item.name, 1);
-                                        addLogEntry('system', '装备了 ' + item.name + ' → ' + slotLabel(chosenSlot));
+                                        addLogEntry('system', '装备了 ' + iref(item.name) + ' → ' + slotLabel(chosenSlot));
                                         checkAchievements();
                                         playSfx('equip');
                                         snotify('add', '装备', item.name + ' → ' + slotLabel(chosenSlot));
@@ -4340,7 +4503,7 @@
                             if (s.equip[slot]) invAdd(s.equip[slot], 1);
                             s.equip[slot] = parseItemQty(item.name).base;
                             invRemove(item.name, 1);
-                            addLogEntry('system', '装备了 ' + item.name);
+                            addLogEntry('system', '装备了 ' + iref(item.name));
                             checkAchievements();
                             playSfx('equip');
                             snotify('add', '装备', item.name + ' → ' + slotLabel(slot));
@@ -4419,7 +4582,7 @@
                             if (s.equip && s.equip[slotKey] && s.equip[slotKey] === itemName) {
                                 s.equip[slotKey] = '';
                                 invAdd(itemName, 1);
-                                addLogEntry('system', '卸下了 ' + itemName);
+                                addLogEntry('system', '卸下了 ' + iref(itemName));
                                 checkAchievements();
                                 playSfx('equip');
                                 snotify('remove', '装备', itemName);
@@ -4433,7 +4596,7 @@
                                     if (foundSlot) {
                                         s2.equip[foundSlot] = '';
                                         invAdd(itemName, 1);
-                                        addLogEntry('system', '卸下了 ' + itemName);
+                                        addLogEntry('system', '卸下了 ' + iref(itemName));
                                         checkAchievements();
                                         playSfx('equip');
                                         snotify('remove', '装备', itemName);
@@ -4800,10 +4963,10 @@
                                 const eff = applyItemEffect(item);
                                 // Remove item from inventory (decrement count)
                                 invRemove(item, 1);
-                                // Show usage feedback
+                                // Show usage feedback（物品名用 {{}} 包裹，渲染为可交互物品胶囊）
                                 const msg = eff && eff.length
-                                    ? '使用了 ' + item + '（效果：' + eff.join(' ') + '）'
-                                    : '使用了 ' + item;
+                                    ? '使用了 ' + iref(item) + '（效果：' + eff.join(' ') + '）'
+                                    : '使用了 ' + iref(item);
                                 apb({ ty: 'whisper', tx: msg }, 0);
                                 playSfx('heal');
                                 // Refresh backpack display
@@ -5052,6 +5215,12 @@
             $('inputText').addEventListener('input', function() {
                 this.style.height = 'auto';
                 this.style.height = Math.min(this.scrollHeight, 140) + 'px';
+                // {{物品名}} 实时转 chip（仅 contentEditable 模式生效）
+                try { convertRefTokensToChips(); } catch(_) {}
+            });
+            $('inputText').addEventListener('paste', () => {
+                // 粘贴后下一帧再转换（等浏览器完成默认粘贴插入）
+                setTimeout(() => { try { convertRefTokensToChips(); } catch(_) {} }, 0);
             });
             
             // ===== 仅移动端启用软键盘适配（统一使用 isMobile() 检测）=====
@@ -6946,6 +7115,7 @@ ${sumContent}
             $('btnCharSkip').addEventListener('click', () => { const d = JSON.parse(JSON.stringify(DCHR)); d._charCreated = true; sch(d); $('charModal').style.display = 'none'; stg(); });
             // Character export function
             function exportCharacter() {
+              try {
                 const c = gch();
                 // 生成可读的角色设定文本
                 const lines = [];
@@ -6981,7 +7151,10 @@ ${sumContent}
                     lines.push('');
                 }
                 lines.push('【初始状态】');
-                lines.push('初始物品：' + (c.it || '无'));
+                // 物品用 {{}} 引用标记包裹：贴回输入栏/发送后可渲染为可交互物品引用胶囊
+                const itemsRef = String(c.it || '').split(/[,，、]/).map(x => x.trim()).filter(Boolean)
+                    .map(x => '{{' + x + '}}').join('、');
+                lines.push('初始物品：' + (itemsRef || '无'));
                 lines.push('出生地点：' + (c.sp || '未知'));
                 lines.push('心理状态：' + (c.mental || '稳定'));
                 if (c.fear) lines.push('恐惧来源：' + c.fear);
@@ -7007,6 +7180,9 @@ ${sumContent}
                 setTimeout(() => URL.revokeObjectURL(url), 5000);
                 tst('角色设定已导出：' + fn);
                 playSfx('success');
+              } catch (e) {
+                tst('导出失败：' + (e && e.message ? e.message : String(e)));
+              }
             }
             function importCharacter(file) {
                 const reader = new FileReader();
@@ -7334,9 +7510,11 @@ ${sumContent}
             window._applyStatusEffect = (e,d,s) => applyStatusEffect(e,d,s);
             window._tickStatusEffects = () => tickStatusEffects();
             window._addKeyMemory = (t,ty) => addKeyMemory(t,ty);
-            // 注意：不要覆盖 window._addLogEntry — gamesystems.js 已在 L1591 设置真实实现
+            // 注意1：不要覆盖 window._addLogEntry — gamesystems.js 已在 L1591 设置真实实现
             // 如果覆盖会导致 main.js 的 addLogEntry 转发器 → window._addLogEntry → main.js.addLogEntry 的无限循环
-            window._checkAchievements = () => checkAchievements();
+            // 注意2：同理不要覆盖 window._checkAchievements — gamesystems.js 已设置真实实现；
+            // 此处曾用 `window._checkAchievements = () => checkAchievements()` 导致
+            // main.js 转发器(L3549) → window._checkAchievements → 自身 → 栈溢出，装备/卸下时成就检查全部静默失败（已修复删除）
             window._renderAchievementsPanel = () => renderAchievementsPanel();
             window._renderEventsPanel = () => renderEventsPanel();
 

@@ -39,19 +39,19 @@
         { id: 'night_owl', name: '夜行者', desc: '在夜间存活5天', icon: '🌙', check: () => { const s = window.gst(); return s && (s.nightSurvived || 0) >= 5; } },
         { id: 'dawn_watcher', name: '守夜人', desc: '在夜间存活15天', icon: '🌌', check: () => { const s = window.gst(); return s && (s.nightSurvived || 0) >= 15; } },
         { id: 'weather_warrior', name: '天气斗士', desc: '在暴雨中生存超过2小时', icon: '🌧️', check: () => { const s = window.gst(); return s && (s.rainSurvived || 0) >= 2; } },
-        { id: 'frost_resistant', name: '耐寒者', desc: '在暴风雪中存活', icon: '❄️', check: () => { const s = window.gst(); return s && s.snowSurvived; } },
+        { id: 'frost_resistant', name: '耐寒者', desc: '在暴风雪中存活', icon: '❄️', check: () => { const s = window.gst(); return s && (s.snowSurvived || 0) >= 2; } },
 
         // ===== 收集/制造成就 =====
         { id: 'first_craft', name: '手艺初成', desc: '首次成功合成', icon: '🔨', check: () => { const s = window.gst(); return s && (s.crafts || 0) >= 1; } },
         { id: 'craft_master', name: '制造大师', desc: '累计合成10件物品', icon: '⚒️', check: () => { const s = window.gst(); return s && (s.crafts || 0) >= 10; } },
         { id: 'craft_legend', name: '传奇工匠', desc: '累计合成50件物品', icon: '🏭', check: () => { const s = window.gst(); return s && (s.crafts || 0) >= 50; } },
-        { id: 'collector', name: '收藏家', desc: '收集20种不同物品', icon: '📦', check: () => { const s = window.gst(); return s && new Set((s.inv || []).map(i => i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim())).size >= 20; } },
-        { id: 'hoarder', name: '囤积狂', desc: '收集50种不同物品', icon: '🎒', check: () => { const s = window.gst(); return s && new Set((s.inv || []).map(i => i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim())).size >= 50; } },
-        { id: 'museum', name: '博物馆馆长', desc: '收集80种不同物品', icon: '🏛️', check: () => { const s = window.gst(); return s && new Set((s.inv || []).map(i => i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim())).size >= 80; } },
+        { id: 'collector', name: '收藏家', desc: '收集20种不同物品', icon: '📦', check: () => { const s = window.gst(); if (!s) return false; if (s.collectedTypesCount) return s.collectedTypesCount >= 20; return new Set((s.inv || []).map(i => i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim())).size >= 20; } },
+        { id: 'hoarder', name: '囤积狂', desc: '收集50种不同物品', icon: '🎒', check: () => { const s = window.gst(); if (!s) return false; if (s.collectedTypesCount) return s.collectedTypesCount >= 50; return new Set((s.inv || []).map(i => i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim())).size >= 50; } },
+        { id: 'museum', name: '博物馆馆长', desc: '收集80种不同物品', icon: '🏛️', check: () => { const s = window.gst(); if (!s) return false; if (s.collectedTypesCount) return s.collectedTypesCount >= 80; return new Set((s.inv || []).map(i => i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim())).size >= 80; } },
         { id: 'gear_head', name: '装备达人', desc: '同时装备4件物品', icon: '🛡️', check: () => { const s = window.gst(); const eq = s && s.equip; if (!eq) return false; return Object.values(eq).filter(v => v && v.trim()).length >= 4; } },
         { id: 'fully_geared', name: '全副武装', desc: '同时装备6件物品', icon: '🦾', check: () => { const s = window.gst(); const eq = s && s.equip; if (!eq) return false; return Object.values(eq).filter(v => v && v.trim()).length >= 6; } },
-        { id: 'weapon_enthusiast', name: '武器爱好者', desc: '拥有5种不同武器', icon: '🔫', check: () => { const s = window.gst(); const inv = (s && s.inv) || []; const weapons = new Set(); inv.forEach(i => { const name = i.replace(/\s*x\d+$/i, '').trim(); if (/枪|刀|斧|弓|弩|剑|锤|棍|棒|矛|炮|刃/.test(name)) weapons.add(name); }); return weapons.size >= 5; } },
-        { id: 'armor_collector', name: '盔甲收藏家', desc: '拥有5件不同防具', icon: '🥋', check: () => { const s = window.gst(); const inv = (s && s.inv) || []; const armors = new Set(); inv.forEach(i => { const name = i.replace(/\s*x\d+$/i, '').trim(); if (/甲|帽|靴|套|衣|服|盾|盔|披/.test(name)) armors.add(name); }); return armors.size >= 5; } },
+        { id: 'weapon_enthusiast', name: '武器爱好者', desc: '拥有5种不同武器', icon: '🔫', check: () => { const s = window.gst(); const inv = (s && s.inv) || []; const weapons = new Set(); inv.forEach(i => { const name = i.replace(/\s*x\d+$/i, '').trim(); if (!name) return; const info = (typeof window.getItemInfo === 'function') ? window.getItemInfo(name) : null; if (info && info.subCategory === 'weapon') { weapons.add(name); return; } if (/(?:枪|刀|斧|弓|弩|剑|锤|棍|棒|矛|炮|刃)$/.test(name)) weapons.add(name); }); return weapons.size >= 5; } },
+        { id: 'armor_collector', name: '盔甲收藏家', desc: '拥有5件不同防具', icon: '🥋', check: () => { const s = window.gst(); const inv = (s && s.inv) || []; const armors = new Set(); inv.forEach(i => { const name = i.replace(/\s*x\d+$/i, '').trim(); if (!name) return; const info = (typeof window.getItemInfo === 'function') ? window.getItemInfo(name) : null; if (info && info.subCategory === 'armor') { armors.add(name); return; } if (/(?:甲|帽|盔|靴|盾|披风|大衣|外套|夹克|防刺服)$/.test(name)) armors.add(name); }); return armors.size >= 5; } },
 
         // ===== 探索成就 =====
         { id: 'explorer', name: '探索者', desc: '解锁10个地点', icon: '🗺️', check: () => { const s = window.gst(); return s && (s.mapUnlock || []).length >= 10; } },
@@ -63,8 +63,8 @@
 
         // ===== 社交成就 =====
         { id: 'peacemaker', name: '调解者', desc: '建立2个以上NPC的信任关系', icon: '🤝', check: () => { const s = window.gst(); const rels = (s && s.npcRel) || {}; return Object.values(rels).filter(r => r && r.trust >= 50).length >= 2; } },
-        { id: 'social_butterfly', name: '社交达人', desc: '与5个以上NPC建立关系', icon: '💬', check: () => { const s = window.gst(); const rels = (s && s.npcRel) || {}; return Object.keys(rels).length >= 5; } },
-        { id: 'diplomat', name: '外交官', desc: '与10个NPC建立关系', icon: '🌐', check: () => { const s = window.gst(); const rels = (s && s.npcRel) || {}; return Object.keys(rels).length >= 10; } },
+        { id: 'social_butterfly', name: '社交达人', desc: '与5个以上NPC建立关系', icon: '💬', check: () => { const s = window.gst(); const rels = (s && s.npcRel) || {}; return Object.values(rels).filter(r => r && (r.trust || 0) >= 20).length >= 5; } },
+        { id: 'diplomat', name: '外交官', desc: '与10个NPC建立关系', icon: '🌐', check: () => { const s = window.gst(); const rels = (s && s.npcRel) || {}; return Object.values(rels).filter(r => r && (r.trust || 0) >= 20).length >= 10; } },
         { id: 'trustworthy', name: '值得信赖', desc: '获得3个NPC的完全信任', icon: '💖', check: () => { const s = window.gst(); const rels = (s && s.npcRel) || {}; return Object.values(rels).filter(r => r && r.trust >= 80).length >= 3; } },
         { id: 'rebel', name: '叛逆者', desc: '与3个NPC关系破裂', icon: '💔', check: () => { const s = window.gst(); const rels = (s && s.npcRel) || {}; return Object.values(rels).filter(r => r && r.trust <= 0).length >= 3; } },
         { id: 'leader', name: '领袖', desc: '成为5个NPC的领导者', icon: '👑', check: () => { const s = window.gst(); const rels = (s && s.npcRel) || {}; return Object.values(rels).filter(r => r && r.role === 'leader').length >= 5; } },

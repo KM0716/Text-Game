@@ -522,10 +522,42 @@
             border-radius: 7px 2px 5px 2px;
             border: 1px solid var(--border-light);
             font-size: 0.54rem;
+            position: relative;
         }
         .status-item .st-label {
             font-weight: bold;
             margin-right: 1px;
+        }
+        /* 属性数值变化浮动指示（+N / -N 上浮渐隐） */
+        .st-delta {
+            position: absolute;
+            top: -4px;
+            right: -2px;
+            z-index: 30;
+            font-size: 0.52rem;
+            font-weight: bold;
+            font-family: var(--font-main);
+            padding: 0 3px;
+            border-radius: 6px 2px 5px 2px;
+            pointer-events: none;
+            animation: stDeltaFade 0.95s ease-out forwards;
+            white-space: nowrap;
+        }
+        .st-delta--up {
+            color: #2e7d32;
+            background: rgba(120, 200, 120, 0.92);
+            border: 1px solid #6fae6f;
+        }
+        .st-delta--down {
+            color: #b71c1c;
+            background: rgba(240, 160, 150, 0.94);
+            border: 1px solid #d98a7a;
+        }
+        @keyframes stDeltaFade {
+            0% { opacity: 0; transform: translateY(4px) scale(0.85); }
+            18% { opacity: 1; transform: translateY(-2px) scale(1.05); }
+            70% { opacity: 1; transform: translateY(-8px) scale(1); }
+            100% { opacity: 0; transform: translateY(-14px) scale(0.95); }
         }
         .achievement-item {
             display: flex;
@@ -1232,7 +1264,9 @@
         }
         .vn-choice {
             position: relative;
-            display: block;
+            display: flex;
+            align-items: center;
+            gap: 10px;
             width: 100%;
             text-align: left;
             background: #fffdf8;
@@ -1252,6 +1286,29 @@
             transition: all 0.2s ease;
             user-select: none;
             transform: rotate(-0.3deg);
+        }
+        /* 选项序号徽标：圆形底 + 手绘描边风格 */
+        .vn-choice-num {
+            flex-shrink: 0;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #f0e3cc;
+            border: 1.5px solid #b58b5a;
+            color: #8a5a2a;
+            font-size: 0.68rem;
+            font-weight: bold;
+            font-family: var(--font-main);
+            line-height: 1;
+        }
+        .vn-choice-text {
+            flex: 1;
+            min-width: 0;
+            line-height: 1.5;
+            word-break: break-word;
         }
         .vn-choice:hover {
             transform: rotate(-0.5deg) translateY(-3px);
