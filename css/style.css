@@ -3707,3 +3707,92 @@
     .map-item.unlocked:hover, .map-item.current:hover { transform: none; }
 }
 
+/* ================================================================
+   实物面板样式（vn-panel）：手机/纸条/票据/档案/屏幕/告示/信件
+   ================================================================ */
+.vn-panel {
+    max-width: 380px;
+    margin: 6px auto;
+    padding: 0;
+    border-radius: 4px;
+    overflow: hidden;
+    font-size: 0.78rem;
+    line-height: 1.55;
+    box-shadow: 2px 3px 12px rgba(0,0,0,0.18);
+    transition: transform 0.2s;
+}
+.vn-panel:hover { transform: translateY(-1px); }
+.vn-panel-header {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    font-size: 0.68rem;
+    font-weight: bold;
+    color: var(--ink-soft);
+    border-bottom: 1px solid rgba(0,0,0,0.08);
+    background: rgba(0,0,0,0.04);
+}
+.vn-panel-icon { font-size: 0.9rem; }
+.vn-panel-title { font-size: 0.68rem; }
+.vn-panel-body {
+    padding: 8px 12px;
+    color: var(--ink);
+    font-family: 'Courier New', 'SimSun', monospace;
+    white-space: pre-wrap;
+    word-break: break-all;
+}
+/* 手机屏幕 */
+.vn-panel--phone {
+    background: #1a1a2e;
+    color: #e0e0e0;
+    border: 2px solid #333;
+    border-radius: 12px;
+}
+.vn-panel--phone .vn-panel-header { background: #16213e; color: #8a8a9a; border-bottom: 1px solid #2a2a4a; }
+.vn-panel--phone .vn-panel-body { color: #c0c0d0; font-family: 'Courier New', monospace; }
+/* 纸条 */
+.vn-panel--note {
+    background: #fffde8;
+    border: 1px solid #d4c896;
+    transform: rotate(-0.5deg);
+    box-shadow: 3px 3px 8px rgba(0,0,0,0.12);
+}
+.vn-panel--note .vn-panel-body { font-family: 'SimSun', 'KaiTi', serif; color: #4a3a2a; }
+/* 票据 */
+.vn-panel--receipt {
+    background: #f5f5f5;
+    border: 1px dashed #888;
+    border-top: 2px solid #555;
+}
+.vn-panel--receipt .vn-panel-body { font-family: 'Courier New', monospace; font-size: 0.72rem; }
+/* 档案 */
+.vn-panel--file {
+    background: #e8e4d0;
+    border: 2px solid #6a5a3a;
+    border-left: 4px solid #4a3a2a;
+}
+.vn-panel--file .vn-panel-body { font-family: 'SimSun', serif; }
+/* 屏幕 */
+.vn-panel--screen {
+    background: #0a0a0a;
+    color: #00ff00;
+    border: 1px solid #2a4a2a;
+}
+.vn-panel--screen .vn-panel-header { background: #0f1f0f; color: #2a8a2a; }
+.vn-panel--screen .vn-panel-body { color: #00cc00; font-family: 'Courier New', monospace; text-shadow: 0 0 4px rgba(0,255,0,0.3); }
+/* 告示 */
+.vn-panel--sign {
+    background: #d4a868;
+    border: 2px solid #6a4a1a;
+    transform: rotate(0.3deg);
+}
+.vn-panel--sign .vn-panel-body { font-family: 'SimHei', 'Heiti SC', sans-serif; font-weight: bold; color: #2a1a0a; }
+/* 信件 */
+.vn-panel--letter {
+    background: #faf6ef;
+    border: 1px solid #c8b896;
+    border-left: 3px double #8a6b3a;
+}
+.vn-panel--letter .vn-panel-body { font-family: 'KaiTi', 'SimSun', serif; color: #3a2a1a; }
+

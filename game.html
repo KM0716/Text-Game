@@ -773,6 +773,20 @@
         <button class="modal-close" id="modalCloseSandbox">x</button><h3>沙盒参数配置</h3>
         <p class="field-hint" style="text-align:center;margin-bottom:6px;">修改以下参数可自定义游戏世界的核心规则。点击分组标题可折叠/展开。</p>
         <div id="sandboxContainer"></div>
+        <hr style="border:none;border-top:1px dashed var(--divider);margin:8px 0;">
+        <h4 style="font-size:0.8rem;margin-bottom:4px;">叙事与阅读设置</h4>
+        <div id="writingGuidelinesContainer" style="max-height:280px;overflow-y:auto;padding:4px;"></div>
+        <hr style="border:none;border-top:1px dashed var(--divider);margin:8px 0;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+            <label style="font-size:0.72rem;white-space:nowrap;">正文目标字数</label>
+            <select id="targetWordCountSelect" style="flex:1;font-size:0.7rem;">
+                <option value="0">不限（自由发挥）</option>
+                <option value="300">约 300 字（紧凑）</option>
+                <option value="500">约 500 字（标准）</option>
+                <option value="800">约 800 字（丰富）</option>
+                <option value="1200">约 1200 字（长篇）</option>
+            </select>
+        </div>
         <div class="btn-row">
             <button class="btn-modal" id="btnCancelSandbox">取消</button>
             <button class="btn-modal primary" id="btnApplySandbox">应用沙盒设置</button>
@@ -816,6 +830,10 @@
     <script src="js/npc_data.js"></script>
     <!-- 1c. AI 调用框架/模板系统：标准三段式输出模板 + 标签白名单 + 校验/兜底（零依赖，在任何用到的模块前加载） -->
     <script src="js/ai_framework.js"></script>
+    <!-- 1d. 写作准绳系统：可开关的写作约束规则（零依赖，在 main.js 之前加载） -->
+    <script src="js/writing_guidelines.js"></script>
+    <!-- 1e. 记忆系统：每轮事实压缩 + 长期记忆合成（依赖 cfg/gst 等全局函数，在 main.js 之前加载，运行时调用） -->
+    <script src="js/memory_system.js"></script>
     <script src="js/achievements.js"></script>
     <script src="js/events.js"></script>
     <!-- 2. audio.js：音效/BGM/Toast/对话框工具（依赖data.js常量+BGM/SE资源路径） -->

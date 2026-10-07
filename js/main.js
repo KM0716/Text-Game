@@ -178,7 +178,8 @@
                 ep: 'https://api.openai.com/v1/chat/completions', key: '', model: 'gpt-4o',
                 maxT: 2048, temp: 0.7, ctx: 24, tspd: 20, strm: true, fsz: '15px',
                 prompt: DPROMPT, idleInt: 60, idleOn: false, idleDir: '休养', idleCustom: '',
-                worldLock: false, lastSlot: null, debug: false
+                worldLock: false, lastSlot: null, debug: false,
+                targetWordCount: 0  // 正文目标字数：0=不限，>0=每轮正文约N字
             };
             const DSTA = { hunger: 70, thirst: 70, fatigue: 20, bodyTemp: 36.8, injury: '无', enc: 5, hp: 100, maxHp: 100, inv: ['破损背包', '半瓶水', '手电筒', '压缩饼干x2', '绷带x2'], clues: [], status: [], vehicle: '无', mapUnlock: [], mentality: '稳定', spirit: 85, joy: 0, pleasureUnlocked: false, actionBar: [], location: '废弃公寓', traits: ['生存本能', '警觉'],
                 equip: { head: '', body: '', legs: '', feet: '', weapon: '', offhand: '', backpack: '破损背包', accessory: '' },
@@ -1476,10 +1477,15 @@
             function updClockUI() {
                 const c = gclk();
                 const season = c.season || seasonFromDay(c.day || 1);
-                if ($('stTime')) $('stTime').textContent = fmtTime(c.elapsedSec) + ' D' + (c.day || 1) + ' ' + season;
+                const dayName = '第' + (c.day || 1) + '天';
+                const phaseLabel = dayPhase(c.elapsedSec);
+                // 日历增强：显示星期几（以游戏内第1天为周一推算）
+                const dowNames = ['周一','周二','周三','周四','周五','周六','周日'];
+                const dow = ((c.day || 1) - 1) % 7;
+                if ($('stTime')) $('stTime').textContent = fmtTime(c.elapsedSec) + ' ' + dayName + ' ' + dowNames[dow] + ' ' + season;
                 if ($('stWeather')) $('stWeather').textContent = c.weather || '晴';
-                if ($('stTemp')) $('stTemp').textContent = c.temp != null ? (Math.round(c.temp * 10) / 10).toFixed(1) : '--';
-                if ($('stDayPhase')) $('stDayPhase').textContent = dayPhase(c.elapsedSec);
+                if ($('stTemp')) $('stTemp').textContent = c.temp != null ? (Math.round(c.temp * 10) / 10).toFixed(1) + '°C' : '--';
+                if ($('stDayPhase')) $('stDayPhase').textContent = phaseLabel;
             }
             function advTime(hours) {
                 const c = gclk();
@@ -1498,6 +1504,11 @@
                     s.hunger = Math.max(0, (s.hunger ?? 50) - 3);
                     s.thirst = Math.max(0, (s.thirst ?? 50) - 4);
                     sst(s);
+                    // ===== 日历系统：跨日提示 =====
+                    const dowNames = ['周一','周二','周三','周四','周五','周六','周日'];
+                    const dow = ((c.day || 1) - 1) % 7;
+                    snotify('info', '新的一天', '第' + c.day + '天 ' + dowNames[dow] + ' ' + season);
+                    addLogEntry('system', '——— 第' + c.day + '天 ' + dowNames[dow] + ' ' + season + ' ———');
                 }
                 decayStatus(hours);
                 // 小时级变化：环境小事件、温度更新、夜晚提示（从 startClock 移到此处）
@@ -3179,6 +3190,27 @@
                     const extCtx = window.__vnExtContext();
                     if (extCtx) p += '\n\n' + extCtx;
                 }
+                // ===== 写作准绳注入：只注入开启的规则 =====
+                try {
+                    if (window.WRITING_GUIDELINES && typeof window.WRITING_GUIDELINES.generatePromptInjection === 'function') {
+                        const wgPrompt = window.WRITING_GUIDELINES.generatePromptInjection();
+                        if (wgPrompt) p += '\n' + wgPrompt;
+                    }
+                } catch(e) {}
+                // ===== 记忆系统注入：长期记忆 + 压缩事实记录 =====
+                try {
+                    if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.getMemoryContext === 'function') {
+                        const memCtx = window.MEMORY_SYSTEM.getMemoryContext(hist, f.ctx || 24);
+                        if (memCtx) p += '\n\n' + memCtx;
+                    }
+                } catch(e) {}
+                // ===== 正文目标字数（用户可选）=====
+                try {
+                    const targetLen = cfg().targetWordCount || 0;
+                    if (targetLen > 0) {
+                        p += `\n\n【正文篇幅】本轮正文目标字数约 ${targetLen} 字（±20%），状态更新块不在此限制内，仍需完整输出。`;
+                    }
+                } catch(e) {}
                 // ===== 写入 gsp 缓存（60 秒内同配置直接复用，减少 token + 计算） =====
                 try {
                     const curHash = _hashObj([
@@ -3214,7 +3246,7 @@
                 const cl = ptg(safeRaw, silent);
                 const bb = [];
                 // Collect tagged segments and untagged narration
-                const tagRegex = /\[(npc[：:][^\]]+|player|system|chapter|whisper|monologue|clue|choice)\]([\s\S]*?)(?=\[(?:npc[：:]|player|system|chapter|whisper|monologue|clue|choice)\]|$)/g;
+                const tagRegex = /\[(npc[：:][^\]]+|panel[：:][^\]]+|player|system|chapter|whisper|monologue|clue|choice)\]([\s\S]*?)(?=\[(?:npc[：:]|panel[：:]|player|system|chapter|whisper|monologue|clue|choice)\]|$)/g;
                 let lastIdx = 0;
                 let m;
                 while ((m = tagRegex.exec(cl)) !== null) {
@@ -3224,10 +3256,14 @@
                         if (narr) bb.push({ ty: 'narration', tx: narr });
                     }
                     const tag = m[1];
-                    const tx = m[2].replace(/\[\/(?:choice|clue)\]/gi, '').trim();
+                    const tx = m[2].replace(/\[\/(?:choice|clue|panel)\]/gi, '').trim();
                     if (tag.startsWith('npc')) {
                         const nm = tag.split(/[:：]/)[1].trim();
                         bb.push({ ty: 'npc', nm, tx });
+                    } else if (tag.startsWith('panel')) {
+                        // ===== 实物面板：[panel:类型] 内容 [/panel] =====
+                        const pType = (tag.split(/[:：]/)[1] || 'note').trim();
+                        bb.push({ ty: 'panel', panelType: pType, tx });
                     } else if (tag === 'player') bb.push({ ty: 'player', tx });
                     else if (tag === 'system') bb.push({ ty: 'system', tx });
                     else if (tag === 'chapter') bb.push({ ty: 'chapter', tx });
@@ -3261,12 +3297,29 @@
                 else if (b.ty === 'chapter') cls = 'vn-chapter';
                 else if (b.ty === 'clue') cls = 'vn-clue';
                 else if (b.ty === 'choice') cls = 'vn-choice-container';
+                else if (b.ty === 'panel') cls = 'vn-panel vn-panel--' + (b.panelType || 'note');
                 el.className = cls;
                 if (b.ty === 'npc') { const tg = document.createElement('span'); tg.className = 'vn-tag'; tg.textContent = b.nm; el.appendChild(tg); }
                 if (b.ty === 'player') { const tg = document.createElement('span'); tg.className = 'vn-tag'; tg.textContent = '我'; el.appendChild(tg); }
                 if (b.ty === 'system') { /* No tag for system messages — clean hand-drawn frame only */ }
                 if (b.ty === 'clue') {
                     const ct = document.createElement('div'); ct.className = 'typing-target'; ct.innerHTML = abold(b.tx || ''); el.appendChild(ct);
+                    el._ft = b.tx || ''; el._bolded = true;
+                    return el;
+                }
+                if (b.ty === 'panel') {
+                    // ===== 实物面板渲染：根据类型生成不同样式 =====
+                    const pt = b.panelType || 'note';
+                    const icons = { phone: '📱', note: '📝', receipt: '🧾', file: '📄', screen: '💻', sign: '🪧', letter: '✉️' };
+                    const titles = { phone: '手机屏幕', note: '纸条', receipt: '票据', file: '档案', screen: '屏幕', sign: '告示', letter: '信件' };
+                    const header = document.createElement('div');
+                    header.className = 'vn-panel-header';
+                    header.innerHTML = '<span class="vn-panel-icon">' + (icons[pt] || '📝') + '</span><span class="vn-panel-title">' + (titles[pt] || '实物') + '</span>';
+                    el.appendChild(header);
+                    const body = document.createElement('div');
+                    body.className = 'vn-panel-body';
+                    body.innerHTML = esc(b.tx || '').replace(/\n/g, '<br>');
+                    el.appendChild(body);
                     el._ft = b.tx || ''; el._bolded = true;
                     return el;
                 }
@@ -3670,6 +3723,12 @@
                         });
                     }
                     undo = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), ach: _getUnlockedAchievements().size ? [..._getUnlockedAchievements()] : [], bubbleCount: $('chatArea') ? $('chatArea').children.length : 0, turnId: Date.now() };
+                    // ===== 记忆系统快照（供完整回合撤回）=====
+                    try {
+                        if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.snapshot === 'function') {
+                            undo.memSnap = window.MEMORY_SYSTEM.snapshot();
+                        }
+                    } catch(e) {}
                     snotifyStartBatch();
                     // 重置 pai 事件触发的 turn 标记（防止跨回合误触发）
                     if (typeof window._paiSetTurn === 'function') window._paiSetTurn(undo.turnId);
@@ -3995,6 +4054,17 @@
                         }
                         hist.push({ role: 'assistant', content: full });
                         svh(hist);
+                        // ===== 记忆系统：异步压缩本轮对话（不阻塞 UI）=====
+                        try {
+                            if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.recordTurn === 'function') {
+                                const _userMsg = tx || '';
+                                const _aiResp = full || '';
+                                // 异步执行，不等待
+                                window.MEMORY_SYSTEM.recordTurn(_userMsg, _aiResp).catch(e => {
+                                    if (cfg().debug) console.warn('[memory] compress failed:', e);
+                                });
+                            }
+                        } catch(e) {}
                         // ===== 时间系统重构：玩家行动 → 推进游戏时间 =====
                         // 规则：
                         // - 挂机（isIdle=true）：每次推进 0.5 小时
@@ -6269,6 +6339,12 @@
                     // 单局清理: 关键记忆, 日志书签, NPC遭遇记录, 沙盘npcRel局部状态, heacCount/nightSurvived
                     try { keyMemories.length = 0; localStorage.removeItem('vn_keyMemories'); } catch(e) {}
                     try { logBookmarks.length = 0; localStorage.removeItem('vn_logBookmarks'); } catch(e) {}
+                    // ===== 记忆系统重置 =====
+                    try {
+                        if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.reset === 'function') {
+                            window.MEMORY_SYSTEM.reset();
+                        }
+                    } catch(e) {}
                     // Reset state with default DSTA but rebuild from character items
                     const baseState = JSON.parse(JSON.stringify(DSTA));
                     // 清理状态中累计计数（避免跨局继承）
@@ -6784,6 +6860,10 @@ ${sumContent}
                         }
                         if (typeof window.renderAchievementsPanel === 'function') window.renderAchievementsPanel();
                     }
+                    // ===== 记忆系统恢复 =====
+                    if (undo.memSnap && window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.restore === 'function') {
+                        window.MEMORY_SYSTEM.restore(undo.memSnap);
+                    }
                     // Remove all chat bubbles added since the undo point (player + all AI bubbles)
                     const ca = $('chatArea');
                     if (ca && undo.bubbleCount != null) {
@@ -6858,12 +6938,37 @@ ${sumContent}
             $('bpViewCat') && $('bpViewCat').addEventListener('click', () => { bpView = 'cat'; bpPage = 0; renderBackpack(); });
             $('bpViewAll') && $('bpViewAll').addEventListener('click', () => { bpView = 'all'; bpPage = 0; renderBackpack(); });
             $('bpViewStar') && $('bpViewStar').addEventListener('click', () => { bpView = 'star'; bpPage = 0; renderBackpack(); });
-            $('btnOpenSandbox') && $('btnOpenSandbox').addEventListener('click', () => { renderSandbox(); $('sandboxModal').style.display = 'flex'; });
-            $('btnOpenSandbox2') && $('btnOpenSandbox2').addEventListener('click', () => { renderSandbox(); $('sandboxModal').style.display = 'flex'; });
-            $('btnSideSandbox') && $('btnSideSandbox').addEventListener('click', () => { renderSandbox(); $('sandboxModal').style.display = 'flex'; });
-            $('btnApplySandbox') && $('btnApplySandbox').addEventListener('click', () => { ssbx(gsbx()); $('sandboxModal').style.display = 'none'; tst('沙盒设置已应用'); });
+            $('btnOpenSandbox') && $('btnOpenSandbox').addEventListener('click', () => { renderSandbox(); openSandboxExtras(); $('sandboxModal').style.display = 'flex'; });
+            $('btnOpenSandbox2') && $('btnOpenSandbox2').addEventListener('click', () => { renderSandbox(); openSandboxExtras(); $('sandboxModal').style.display = 'flex'; });
+            $('btnSideSandbox') && $('btnSideSandbox').addEventListener('click', () => { renderSandbox(); openSandboxExtras(); $('sandboxModal').style.display = 'flex'; });
+            $('btnApplySandbox') && $('btnApplySandbox').addEventListener('click', () => { ssbx(gsbx()); applySandboxExtras(); $('sandboxModal').style.display = 'none'; tst('沙盒设置已应用'); });
             $('btnCancelSandbox') && $('btnCancelSandbox').addEventListener('click', () => { $('sandboxModal').style.display = 'none'; });
             $('modalCloseSandbox') && $('modalCloseSandbox').addEventListener('click', () => { $('sandboxModal').style.display = 'none'; });
+            // ===== 写作准绳 + 正文目标字数：打开沙盒面板时渲染 =====
+            function openSandboxExtras() {
+                try {
+                    const wgContainer = $('writingGuidelinesContainer');
+                    if (wgContainer && window.WRITING_GUIDELINES) {
+                        window.WRITING_GUIDELINES.renderSettings(wgContainer);
+                    }
+                } catch(e) {}
+                try {
+                    const sel = $('targetWordCountSelect');
+                    if (sel) {
+                        const cur = cfg().targetWordCount || 0;
+                        sel.value = String(cur);
+                    }
+                } catch(e) {}
+            }
+            function applySandboxExtras() {
+                try {
+                    const sel = $('targetWordCountSelect');
+                    if (sel) {
+                        const v = parseInt(sel.value) || 0;
+                        scf({ ...cfg(), targetWordCount: v });
+                    }
+                } catch(e) {}
+            }
 
             // ===== Floating clue sidebar toggle & drag =====
             const clueSb = $('clueSidebar');
