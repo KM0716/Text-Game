@@ -4193,8 +4193,29 @@
                     try {
                         indicatorEl = document.createElement('div');
                         indicatorEl.className = 'typing-indicator';
-                        indicatorEl.innerHTML = '<span>' + (isIdle ? '挂机演算中' : '演算中') + '</span><div class="typing-dots"><span></span><span></span><span></span></div>';
+                        // ===== 实时等待时长 + 阶段提示 =====
+                        indicatorEl.innerHTML =
+                            '<div class="ti-inner">' +
+                                '<div class="ti-stage" id="tiStage">⏳ ' + (isIdle ? '挂机演算中' : '正在生成正文…') + '</div>' +
+                                '<div class="typing-dots"><span></span><span></span><span></span></div>' +
+                                '<div class="ti-timer" id="tiTimer">0.0s</div>' +
+                            '</div>';
                         if ($('chatArea')) $('chatArea').appendChild(indicatorEl);
+                        // 启动计时器
+                        const _tiStart = Date.now();
+                        indicatorEl._tiTimer = setInterval(() => {
+                            const el = indicatorEl.querySelector('#tiTimer');
+                            if (el) {
+                                const sec = (Date.now() - _tiStart) / 1000;
+                                el.textContent = sec.toFixed(1) + 's';
+                            }
+                        }, 100);
+                        indicatorEl._tiStart = _tiStart;
+                        // 切换阶段提示
+                        indicatorEl._setStage = function(stageText) {
+                            const el = indicatorEl.querySelector('#tiStage');
+                            if (el) el.innerHTML = stageText;
+                        };
                     } catch(_) {}
                     try { scb(); } catch(_) {}
                     let sysPrompt = gsp();
@@ -4302,6 +4323,10 @@
                             }
                             const allBubbles = (window.pai || pai)(full, true);
                             while (bubblesInDOM.length < allBubbles.length) {
+                                // 第一个气泡出现时切换阶段提示为「核验设定」
+                                if (bubblesInDOM.length === 0 && indicatorEl && indicatorEl._setStage) {
+                                    indicatorEl._setStage('🔍 核验设定与状态…');
+                                }
                                 bubblesInDOM.push(apb(allBubbles[bubblesInDOM.length], -1));
                             }
                             if (bubblesInDOM.length > 0 && allBubbles.length > 0) {
@@ -4325,10 +4350,14 @@
                                 full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
                                 if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; try { snotify('warn', 'AI回复', '内容超长已截断'); } catch(_) {} }
                                 if (full) {
-                                    const bb = (window.pai || pai)(full, false);
-                                    for (const b of bb) apb(b, f.tspd);
-                                    try { checkChatFold(); } catch(_) {}
+                                // 非流式：解析完成后切换阶段提示
+                                if (indicatorEl && indicatorEl._setStage) {
+                                    indicatorEl._setStage('🔍 核验设定与状态…');
                                 }
+                                const bb = (window.pai || pai)(full, false);
+                                for (const b of bb) apb(b, f.tspd);
+                                try { checkChatFold(); } catch(_) {}
+                            }
                             } catch {
                                 full = '[system]无法解析AI响应';
                                 try { apb({ ty: 'system', tx: full }, 0); } catch(_) {}
@@ -4345,6 +4374,10 @@
                         const d = await rp.json();
                         full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
                         if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; try { snotify('warn', 'AI回复', '内容超长已截断'); } catch(_) {} }
+                        // 非流式收到响应：切换阶段提示
+                        if (indicatorEl && indicatorEl._setStage) {
+                            indicatorEl._setStage('🔍 核验设定与状态…');
+                        }
                         const bb = (window.pai || pai)(full, false);
                         for (const b of bb) apb(b, f.tspd);
                         try { checkChatFold(); } catch(_) {}
@@ -4354,8 +4387,12 @@
                         try { (window.pai || pai)(full, false).forEach(b => apb(b, 0)); } catch(_) {}
                         try { checkChatFold(); } catch(_) {}
                     }
-                    if (indicatorEl && indicatorEl.parentNode) try { indicatorEl.remove(); } catch(_) {}
-                    indicatorEl = null;
+                    // ===== 移除指示器：输出正文后提示消失（清理计时器） =====
+                    if (indicatorEl) {
+                        try { if (indicatorEl._tiTimer) clearInterval(indicatorEl._tiTimer); } catch(_) {}
+                        if (indicatorEl.parentNode) try { indicatorEl.remove(); } catch(_) {}
+                        indicatorEl = null;
+                    }
                     if (full && full.length > 60000) { full = full.slice(0, 60000) + '\n\n[系统：回复超长严重截断]'; }
                     if (full) {
                         // 补充缺失的属性/时间标签（挂机模式也补充）
@@ -4432,8 +4469,11 @@
                     }
                 } catch (e) {
                     // 出现任何异常先清除 indicator，防止永远显示"演算中"
-                    if (indicatorEl && indicatorEl.parentNode) try { indicatorEl.remove(); } catch(_) {}
-                    indicatorEl = null;
+                    if (indicatorEl) {
+                        try { if (indicatorEl._tiTimer) clearInterval(indicatorEl._tiTimer); } catch(_) {}
+                        if (indicatorEl.parentNode) try { indicatorEl.remove(); } catch(_) {}
+                        indicatorEl = null;
+                    }
                     let errMsg = '错误：' + (e && e.message ? e.message : String(e));
                     if (/认证失败|密钥|API.*key/i.test(errMsg)) {
                         errMsg += '\n（可点击右上角「设置」按钮修改API配置）';

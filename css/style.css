@@ -1174,6 +1174,33 @@
             align-self: center;
             letter-spacing: 0.4px;
         }
+        /* ===== 实时等待时长指示器 ===== */
+        .typing-indicator .ti-inner {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            background: var(--bg-paper-alt);
+            border: 1.5px dashed var(--accent);
+            border-radius: 16px 4px 16px 4px / 4px 16px 4px 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+            font-style: normal;
+        }
+        .typing-indicator .ti-stage {
+            color: var(--ink);
+            font-weight: bold;
+            font-size: 0.74rem;
+            letter-spacing: 0.3px;
+        }
+        .typing-indicator .ti-timer {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.74rem;
+            font-variant-numeric: tabular-nums;
+            min-width: 42px;
+            text-align: right;
+            font-family: var(--font-mono, monospace);
+        }
         .typing-dots span {
             width: 4px;
             height: 4px;
