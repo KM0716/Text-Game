@@ -1995,7 +1995,10 @@
                     else if (pct < 50) color = 'var(--color-warn)';
                     else if (pct < 75) color = 'var(--notify-add)';
                 }
-                return '<div class="sp-bar-row"><span class="sp-bar-lbl">' + label + '</span><div class="sp-bar-bg"><div class="sp-bar-fg" style="width:' + pct + '%;background:' + color + ';"></div></div><span class="sp-bar-val">' + display + '</span></div>';
+                // 状态条值可点击修改（作弊面板）：给数值 span 加 data-stat-field
+                const statFieldMap = { '● 血量':'hp','● 饱腹':'hunger','● 口渴':'thirst','● 疲劳':'fatigue','● 体温':'bodyTemp','● 精神':'spirit','● 欢愉':'joy' };
+                const fieldAttr = statFieldMap[label] ? ' data-stat-field="' + statFieldMap[label] + '" style="cursor:pointer;"' : '';
+                return '<div class="sp-bar-row"><span class="sp-bar-lbl">' + label + '</span><div class="sp-bar-bg"><div class="sp-bar-fg" style="width:' + pct + '%;background:' + color + ';"></div></div><span class="sp-bar-val"' + fieldAttr + '>' + display + '</span></div>';
             }
             function upWelcome() {
                 const el = $('welcomeText');
@@ -2571,6 +2574,12 @@
                 }
                 renderClueSidebar();
                 updClockUI();
+                // ===== 绑定作弊面板点击事件 =====
+                try {
+                    if (window.STATE_VALIDATOR && typeof window.STATE_VALIDATOR.bindStatClickListeners === 'function') {
+                        window.STATE_VALIDATOR.bindStatClickListeners();
+                    }
+                } catch(e) {}
                 // Auto-refresh backpack if it's currently open (so new items appear immediately)
                 const bpModal = $('backpackModal');
                 if (bpModal && bpModal.style.display === 'flex' && typeof renderBackpack === 'function') {
@@ -2593,6 +2602,64 @@
                 } catch(e) {}
                 const s = gst();
                 const c = gch();
+                // ===== 状态验证闸门：AI 标签只是建议，程序验证后才执行 =====
+                // 1. 取旧值快照
+                let _oldSnap = {};
+                let _ctx = { hasItemUse: false, hasEventEffect: false, hasCombatResult: false, hasSleep: false };
+                try {
+                    if (window.STATE_VALIDATOR) {
+                        _oldSnap = window.STATE_VALIDATOR.snapshot();
+                        // 分析上下文：AI 列表中是否有食物/水/药品（豁免大幅变化）
+                        if (ch.aiList && ch.aiList.length) {
+                            _ctx.hasItemUse = ch.aiList.some(it => /食|水|饼|罐头|药|绷带|急救|饮料|汤|肉|菜|饭|面包|巧克力|酒/.test(it));
+                        }
+                        if (ch.battle) _ctx.hasCombatResult = true;
+                        if (ch.trauma || ch.event) _ctx.hasEventEffect = true;
+                        // 睡眠检测：如果 advTime > 4h 且疲劳下降，可能是睡眠
+                        if (ch.advTime && ch.advTime >= 4 && ch.fatigue !== undefined && ch.fatigue < _oldSnap.fatigue) {
+                            _ctx.hasSleep = true;
+                        }
+                    }
+                } catch(e) {}
+
+                // 2. 验证 AI 建议的变更（超出幅度的被截断）
+                let validatedCh = ch;
+                try {
+                    if (window.STATE_VALIDATOR && _oldSnap && Object.keys(_oldSnap).length) {
+                        // 逐字段验证
+                        ['hp','hunger','thirst','fatigue','spirit','joy','bodyTemp','enc'].forEach(field => {
+                            if (ch[field] !== undefined) {
+                                ch[field] = window.STATE_VALIDATOR.validateChange(field, ch[field], _oldSnap[field], _ctx);
+                            }
+                        });
+                    }
+                } catch(e) { /* 验证失败时使用原始值 */ }
+
+                // 3. 自动衰减：如果 AI 没有输出某个状态标签，程序自动执行衰减
+                try {
+                    if (window.STATE_VALIDATOR && ch.advTime && ch.advTime > 0) {
+                        const decay = window.STATE_VALIDATOR.autoDecay(ch.advTime);
+                        if (decay) {
+                            // AI 没输出的状态，用自动衰减值
+                            if (ch.hunger === undefined) ch.hunger = decay.hunger;
+                            else {
+                                // AI 有输出但可能被截断了：在自动衰减基础上做校准
+                                const aiLimit = window.STATE_VALIDATOR.AI_CALIBRATION_LIMIT.hunger || 8;
+                                const diff = ch.hunger - decay.hunger;
+                                if (Math.abs(diff) > aiLimit) ch.hunger = decay.hunger + (diff > 0 ? aiLimit : -aiLimit);
+                            }
+                            if (ch.thirst === undefined) ch.thirst = decay.thirst;
+                            else {
+                                const aiLimit = window.STATE_VALIDATOR.AI_CALIBRATION_LIMIT.thirst || 8;
+                                const diff = ch.thirst - decay.thirst;
+                                if (Math.abs(diff) > aiLimit) ch.thirst = decay.thirst + (diff > 0 ? aiLimit : -aiLimit);
+                            }
+                            if (ch.fatigue === undefined) ch.fatigue = decay.fatigue;
+                            if (ch.spirit === undefined) ch.spirit = decay.spirit;
+                        }
+                    }
+                } catch(e) {}
+
                 if (ch.hp !== undefined) { 
                     s.hp = Math.max(0, Math.min(s.maxHp || 100, ch.hp)); 
                     if (s.hp <= 0 && !cfg().debug) { 
