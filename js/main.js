@@ -181,7 +181,7 @@
                 worldLock: false, lastSlot: null, debug: false,
                 targetWordCount: 0  // 正文目标字数：0=不限，>0=每轮正文约N字
             };
-            const DSTA = { hunger: 70, thirst: 70, fatigue: 20, bodyTemp: 36.8, injury: '无', enc: 5, hp: 100, maxHp: 100, inv: ['破损背包', '半瓶水', '手电筒', '压缩饼干x2', '绷带x2'], clues: [], status: [], vehicle: '无', mapUnlock: [], mentality: '稳定', spirit: 85, joy: 0, pleasureUnlocked: false, actionBar: [], location: '废弃公寓', traits: ['生存本能', '警觉'],
+            const DSTA = { hunger: 70, thirst: 70, fatigue: 20, bodyTemp: 36.8, injury: '无', enc: 5, hp: 100, maxHp: 100, inv: ['破损背包', '半瓶水', '手电筒', '压缩饼干x2', '绷带x2'], clues: [], status: [], vehicle: '无', mapUnlock: [], visited: [], mentality: '稳定', spirit: 85, joy: 0, pleasureUnlocked: false, actionBar: [], location: '废弃公寓', traits: ['生存本能', '警觉'],
                 equip: { head: '', body: '', legs: '', feet: '', weapon: '', offhand: '', backpack: '破损背包', accessory: '' },
                 weaponDurability: {}, // 武器耐久: { '手枪': 85, '砍刀': 100 }
                 ammo: {}, // 弹药: { '手枪子弹': 12, '步枪子弹': 30 }
@@ -2356,14 +2356,71 @@
                 if (sideMode === 'profile' && $('sideProfile')) {
                     const abilityDisp = ch.extraFeature === '异能' && ch.abilityName;
                     const abName = abilityDisp ? (ABILITIES[ch.abilityName] ? ABILITIES[ch.abilityName].name : ch.abilityName) : '';
-                    const hash = _hashObj([ch.cn, ch.gd, ch.ca, ch.bt, ch.ht, ch.wt, ch.job, ch.pers, ch.app, ch.fear, ch.skl, abName]);
+                    // 角色卡预览：头像 + 关键标识 + 关键状态摘要
+                    const jobEmoji = (function() {
+                        const j = (ch.job || '').toString();
+                        const map = {
+                            '学生':'🧑‍🎓','医生':'🩺','护士':'💉','消防员':'🚒','警察':'👮','退伍军人':'🎖️',
+                            '机械师':'🔧','工程师':'⚙️','木工':'🪚','电工':'💡','厨师':'🍳','猎人':'🏹',
+                            '司机':'🚗','程序员':'💻','白领':'💼','保安':'🛡️','拳击手':'🥊','记者':'📰',
+                            '科学家':'🔬','教师':'📚','飞行员':'✈️','农民':'🌾','律师':'⚖️'
+                        };
+                        if (map[j]) return map[j];
+                        if (/医|医者/.test(j)) return '🩺';
+                        if (/军|警|战/.test(j)) return '🎖️';
+                        if (/技|工|机械/.test(j)) return '🔧';
+                        return '🧍';
+                    })();
+                    // 主势力：基于 npcRel 平均信任度最高的势力
+                    let primaryFaction = null;
+                    try {
+                        const npcRel = s.npcRel || {};
+                        const NPC_DATA = window.NPC_DATA || {};
+                        const NPC_FACTIONS = window.NPC_FACTIONS || {};
+                        const facStats = {};
+                        Object.entries(npcRel).forEach(([name, rel]) => {
+                            const data = NPC_DATA[name] || {};
+                            const fKey = data.faction || 'unknown';
+                            if (!facStats[fKey]) facStats[fKey] = { sum: 0, count: 0 };
+                            facStats[fKey].sum += (rel.trust || 0);
+                            facStats[fKey].count += 1;
+                        });
+                        let bestAvg = -1;
+                        Object.entries(facStats).forEach(([fKey, st]) => {
+                            const avg = st.sum / st.count;
+                            if (avg > bestAvg && NPC_FACTIONS[fKey]) { bestAvg = avg; primaryFaction = fKey; }
+                        });
+                    } catch(_) {}
+                    const facInfo = primaryFaction ? (window.NPC_FACTIONS || {})[primaryFaction] : null;
+                    // 关键状态：HP / 精神 mini bars
+                    const hpVal = (s.hp != null ? s.hp : 100);
+                    const maxHp = (s.maxHp || 100);
+                    const hpPct = Math.max(0, Math.min(100, (hpVal / maxHp) * 100));
+                    const hpColor = hpPct > 60 ? 'var(--notify-add, #4a9a6f)' : hpPct > 30 ? 'var(--color-warn, #b58a3a)' : 'var(--color-danger, #8a3a3a)';
+                    const spiritVal = (s.spirit != null ? s.spirit : 0);
+                    const spiritPct = Math.max(0, Math.min(100, spiritVal));
+                    const spiritColor = spiritPct > 60 ? 'var(--accent)' : spiritPct > 30 ? 'var(--color-warn)' : 'var(--color-danger)';
+                    const hash = _hashObj([ch.cn, ch.gd, ch.ca, ch.bt, ch.ht, ch.wt, ch.job, ch.pers, ch.app, ch.fear, ch.skl, abName, primaryFaction, Math.round(hpPct), Math.round(spiritPct), s.mentality]);
                     const html =
+                        // 角色卡预览：头像 + 标题区
+                        '<div class="cc-header sp-card">' +
+                            '<div class="cc-avatar">' + jobEmoji + '</div>' +
+                            '<div class="cc-title">' +
+                                '<div class="cc-name">' + esc(ch.cn || '幸存者') + '</div>' +
+                                '<div class="cc-sub">' + esc(ch.gd || '?') + ' · ' + esc(ch.ca || '?') + '岁 · ' + esc(ch.job || '未设定') + '</div>' +
+                                (facInfo ? '<div class="cc-faction"><span class="cc-fac-icon">' + facInfo.icon + '</span><span class="cc-fac-name">' + esc(facInfo.name) + '</span></div>' : '') +
+                            '</div>' +
+                        '</div>' +
+                        // 关键状态 mini bars
+                        '<div class="sp-card cc-vitals">' +
+                            '<div class="cc-vital-row"><span class="cc-vital-lbl">血量</span><div class="cc-vital-bg"><div class="cc-vital-fg" style="width:' + hpPct + '%;background:' + hpColor + ';"></div></div><span class="cc-vital-val">' + Math.round(hpVal) + '/' + maxHp + '</span></div>' +
+                            '<div class="cc-vital-row"><span class="cc-vital-lbl">精神</span><div class="cc-vital-bg"><div class="cc-vital-fg" style="width:' + spiritPct + '%;background:' + spiritColor + ';"></div></div><span class="cc-vital-val">' + Math.round(spiritVal) + '%</span></div>' +
+                            '<div class="cc-vital-row"><span class="cc-vital-lbl">心态</span><span class="cc-vital-val" style="flex:1;text-align:right;">' + esc(mentalityLabel(s.mentality)) + '</span></div>' +
+                        '</div>' +
+                        // 详细信息卡
                         '<div class="sp-card">' +
-                        '<div class="sp-row"><span class="sp-lbl">姓名</span><span class="sp-val">' + esc(ch.cn || '幸存者') + '</span></div>' +
-                        '<div class="sp-row"><span class="sp-lbl">性别</span><span class="sp-val">' + esc(ch.gd || '未设定') + ' / ' + esc(ch.ca || '未知') + '</span></div>' +
                         '<div class="sp-row"><span class="sp-lbl">体型</span><span class="sp-val">' + esc(ch.bt || '未设定') + ' / ' + (ch.ht || '--') + 'cm / ' + (ch.wt || '--') + 'kg</span></div>' +
-                        '<div class="sp-row"><span class="sp-lbl">职业</span><span class="sp-val">' + esc(ch.job || '未设定') + '</span></div>' +
-                        '<div class="sp-row"><span class="sp-lbl">性格</span><span class="sp-val">' + esc(ch.pers || '未设定') + '</span></div>' +
+                        '<div class="sp-row"><span class="sp-lbl">性格</span><span class="sp-val" style="max-width:180px;">' + esc(ch.pers || '未设定') + '</span></div>' +
                         '<div class="sp-row"><span class="sp-lbl">外貌</span><span class="sp-val" style="max-width:180px;">' + esc(ch.app || '未设定') + '</span></div>' +
                         '<div class="sp-row"><span class="sp-lbl">恐惧</span><span class="sp-val">' + esc(ch.fear || '无') + '</span></div>' +
                         '</div>' +
@@ -2469,6 +2526,69 @@
                     }
                 }
                 if (sideMode === 'panel' && $('sideClues')) { /* sideClues removed, clues shown in floating sidebar */ }
+                // ===== 势力声望摘要（基于 npcRel 聚合到 NPC_FACTIONS） =====
+                if (sideMode === 'panel' && $('sideFaction')) {
+                    const npcRel = s.npcRel || {};
+                    const NPC_DATA = window.NPC_DATA || {};
+                    const NPC_FACTIONS = window.NPC_FACTIONS || {};
+                    const facStats = {};
+                    Object.entries(npcRel).forEach(([name, rel]) => {
+                        const data = NPC_DATA[name] || {};
+                        const fKey = data.faction || 'unknown';
+                        if (!facStats[fKey]) facStats[fKey] = { sumTrust: 0, sumAff: 0, count: 0, npcs: [] };
+                        facStats[fKey].sumTrust += (rel.trust != null ? rel.trust : (data.trust || 0));
+                        facStats[fKey].sumAff += (rel.affinity != null ? rel.affinity : (data.affinity || 0));
+                        facStats[fKey].count += 1;
+                        facStats[fKey].npcs.push(name);
+                    });
+                    const hash = _hashObj([facStats]);
+                    if (_upuiCache['factionHash'] !== hash) {
+                        let html = '';
+                        const facEntries = Object.entries(facStats);
+                        if (facEntries.length === 0) {
+                            html = '<div class="sp-card" style="font-size:0.72rem;color:var(--ink-soft);text-align:center;">尚未与任何势力接触</div>';
+                        } else {
+                            // 按平均信任度降序
+                            facEntries.sort((a, b) => (b[1].sumTrust / b[1].count) - (a[1].sumTrust / a[1].count));
+                            facEntries.forEach(([fKey, st]) => {
+                                const fac = NPC_FACTIONS[fKey];
+                                const facName = fac ? fac.name : '未知势力';
+                                const facIcon = fac ? fac.icon : '❓';
+                                const facDesc = fac ? fac.desc : '';
+                                const avgTrust = Math.round(st.sumTrust / st.count);
+                                const avgAff = Math.round(st.sumAff / st.count);
+                                // 综合声望 = 0.6 * 信任 + 0.4 * 好感
+                                const rep = Math.round(avgTrust * 0.6 + avgAff * 0.4);
+                                const repLevel = rep >= 80 ? '盟友' : rep >= 60 ? '友好' : rep >= 40 ? '普通' : rep >= 20 ? '冷淡' : '敌对';
+                                const repColor = rep >= 80 ? '#4a9a6f' : rep >= 60 ? '#6faa4a' : rep >= 40 ? '#8a7a4a' : rep >= 20 ? '#8a5a3a' : '#8a3a3a';
+                                const hostility = fac ? (fac.hostility || 0) : 50;
+                                // 玩家在该势力 NPC 数量
+                                const npcCount = st.count;
+                                const npcPreview = st.npcs.slice(0, 3).map(n => esc(n)).join('、') + (st.npcs.length > 3 ? '…' : '');
+                                html += '<div class="fac-card">' +
+                                    '<div class="fac-header">' +
+                                        '<span class="fac-icon">' + facIcon + '</span>' +
+                                        '<span class="fac-name">' + esc(facName) + '</span>' +
+                                        '<span class="fac-rep-badge" style="background:' + repColor + ';color:#fff;">' + esc(repLevel) + '</span>' +
+                                    '</div>' +
+                                    '<div class="fac-rep-row">' +
+                                        '<span class="fac-rep-lbl">声望</span>' +
+                                        '<div class="fac-rep-bar"><div class="fac-rep-fg" style="width:' + rep + '%;background:' + repColor + ';"></div></div>' +
+                                        '<span class="fac-rep-val" style="color:' + repColor + ';">' + rep + '</span>' +
+                                    '</div>' +
+                                    '<div class="fac-meta">' +
+                                        '<span>信任 ' + avgTrust + '</span>' +
+                                        '<span>好感 ' + avgAff + '</span>' +
+                                        '<span>成员 ' + npcCount + '</span>' +
+                                        '<span title="势力对玩家默认敌意">敌意 ' + hostility + '</span>' +
+                                    '</div>' +
+                                    (npcPreview ? '<div class="fac-npcs">' + npcPreview + '</div>' : '') +
+                                '</div>';
+                            });
+                        }
+                        _setInnerHTMLIfChanged($('sideFaction'), html, 'faction', hash);
+                    }
+                }
                 if (sideMode === 'panel' && $('sideLocation')) {
                     const txt = esc(s.location || ch.sp || '未知');
                     const hash = (s.location || '') + '|' + (ch.sp || '');
@@ -2476,13 +2596,18 @@
                 }
                 if (sideMode === 'panel' && $('sideMap')) {
                     const unlocked = s.mapUnlock || [];
+                    const visited = s.visited || [];
                     const rawMap = (ch.map || '').split(/[、，,;；\n]/).map(x => x.trim()).filter(Boolean);
                     const rawLocs = (ch.loc || '').split(/[、，,;；\n]/).map(x => x.trim()).filter(Boolean);
                     const defaultAreas = (DCHR.map || '').split(/[、，,;；\n]/).map(x => x.trim()).filter(Boolean);
                     const allAreas = rawMap.length ? rawMap : (rawLocs.length ? rawLocs : defaultAreas);
                     const curLoc = s.location || ch.sp || '';
-                    const hash = _hashObj([unlocked, allAreas, curLoc]);
+                    const hash = _hashObj([unlocked, visited, allAreas, curLoc]);
                     if (_upuiCache['mapHash'] !== hash) {
+                        // 危险等级颜色映射（伪危险，仅视觉参考）
+                        const dangerColors = ['#4a9a6f', '#8a9a4a', '#b58a3a', '#b55a3a', '#8a3a3a'];
+                        const dangerLabels = ['安全', '低危', '中危', '高危', '极危'];
+                        const dangerBorders = ['#4a9a6f', '#8a9a4a', '#b58a3a', '#b55a3a', '#8a3a3a'];
                         const cols = Math.min(3, allAreas.length);
                         const rows = Math.ceil(allAreas.length / cols);
                         const cellW = 100 / cols;
@@ -2495,6 +2620,11 @@
                             const y = startY + row * cellH;
                             const isUnlocked = unlocked.some(u => area.includes(u) || u.includes(area));
                             const isCurrent = curLoc && (curLoc.includes(area) || area.includes(curLoc));
+                            const isVisited = visited.some(v => area.includes(v) || v.includes(area));
+                            // 危险等级种子（基于 area 名 + 角色名）
+                            let seed = 0; const seedStr = area + (ch.cn || '');
+                            for (let k = 0; k < seedStr.length; k++) seed = ((seed << 5) - seed + seedStr.charCodeAt(k)) | 0;
+                            const dangerSeed = Math.abs(seed) % 5;
                             if (i > 0) {
                                 const prevCol = (i - 1) % cols, prevRow = Math.floor((i - 1) / cols);
                                 const prevX = startX + prevCol * cellW;
@@ -2505,33 +2635,48 @@
                             if (i === 0) {
                                 svg += '<line x1="' + startX + '" y1="' + startY + '" x2="' + x + '" y2="' + y + '" stroke="' + (isUnlocked ? 'var(--accent)' : 'var(--border-light)') + '" stroke-width="0.5"/>';
                             }
-                            const fill = isCurrent ? 'var(--accent)' : isUnlocked ? '#8b4513' : '#b0a090';
-                            const radius = isCurrent ? '3' : '2';
-                            svg += '<circle cx="' + x + '" cy="' + y + '" r="' + radius + '" fill="' + fill + '" opacity="' + (isUnlocked || isCurrent ? '1' : '0.4') + '"/>';
+                            // 危险颜色编码：当前位置-强调色，未解锁-灰，已解锁-按危险色，已访问-加边框
+                            let fill = isCurrent ? 'var(--accent)' : isUnlocked ? dangerColors[dangerSeed] : '#b0a090';
+                            const radius = isCurrent ? '3' : '2.4';
+                            const opacity = (isUnlocked || isCurrent) ? '1' : '0.45';
+                            svg += '<circle cx="' + x + '" cy="' + y + '" r="' + radius + '" fill="' + fill + '" opacity="' + opacity + '"' + (isVisited && !isCurrent ? ' stroke="' + dangerColors[dangerSeed] + '" stroke-width="0.5"' : '') + '/>';
+                            // 已访问标记：小✓
+                            if (isVisited && !isCurrent) {
+                                svg += '<text x="' + (x + 2.5) + '" y="' + (y - 1.5) + '" text-anchor="middle" font-size="2" fill="' + dangerColors[dangerSeed] + '" font-weight="bold">✓</text>';
+                            }
                             svg += '<text x="' + x + '" y="' + (y + 4.5) + '" text-anchor="middle" font-size="2.6" fill="' + (isUnlocked || isCurrent ? 'var(--ink)' : 'var(--text-muted)') + '">' + esc(area.length > 6 ? area.slice(0, 6) : area) + '</text>';
                         });
                         svg += '</svg>';
-                        let listHTML = '';
+                        let listHTML = '<div class="map-legend">';
+                        dangerLabels.forEach((lbl, idx) => {
+                            listHTML += '<span class="map-legend-item"><span class="map-legend-dot" style="background:' + dangerColors[idx] + ';"></span>' + lbl + '</span>';
+                        });
+                        listHTML += '<span class="map-legend-item"><span class="map-legend-dot" style="background:var(--accent);"></span>当前</span>';
+                        listHTML += '<span class="map-legend-item"><span class="map-legend-dot" style="background:#b0a090;"></span>未知</span>';
+                        listHTML += '<span class="map-legend-item"><span style="font-weight:bold;">✓</span>已访问</span>';
+                        listHTML += '</div>';
                         allAreas.forEach((area, idx) => {
                             const isUnlocked = unlocked.some(u => area.includes(u) || u.includes(area));
                             const isCurrent = curLoc && (curLoc.includes(area) || area.includes(curLoc));
-                            // v2 互动：data-location 携带地点名 + data-title 做 tooltip（危险等级/解锁状态）
-                            // 伪危险等级：按字符串 hash 生成一个稳定等级（纯视觉参考，不影响实际游戏判定）
+                            const isVisited = visited.some(v => area.includes(v) || v.includes(area));
+                            // 危险等级种子
                             let seed = 0; const seedStr = area + (ch.cn || '');
                             for (let k = 0; k < seedStr.length; k++) seed = ((seed << 5) - seed + seedStr.charCodeAt(k)) | 0;
                             const dangerSeed = Math.abs(seed) % 5;
-                            const dangerLabels = ['安全', '低危', '中危', '高危', '极危'];
-                            const title = isCurrent ? '当前位置 · ' + esc(area)
-                                : isUnlocked ? '已解锁 · ' + dangerLabels[dangerSeed] + ' · 点击前往'
+                            const title = isCurrent ? '当前位置 · ' + esc(area) + ' · ' + dangerLabels[dangerSeed]
+                                : isUnlocked ? '已解锁 · ' + dangerLabels[dangerSeed] + (isVisited ? ' · 已访问' : '') + ' · 点击前往'
                                 : '未解锁 · ' + dangerLabels[dangerSeed];
-                            listHTML += '<div class="map-item ' + (isUnlocked ? 'unlocked' : 'locked') + (isCurrent ? ' current' : '') + '"'
+                            // 危险等级 css 类
+                            const dangerCls = ' danger-' + dangerSeed;
+                            listHTML += '<div class="map-item ' + (isUnlocked ? 'unlocked' : 'locked') + (isCurrent ? ' current' : '') + (isVisited ? ' visited' : '') + dangerCls + '"'
                                 + ' data-location="' + escAttr(area) + '"'
                                 + ' data-title="' + escAttr(title) + '"'
                                 + ' data-idx="' + idx + '">'
-                                + (isCurrent ? '★ ' : isUnlocked ? '◆ ' : '◇ ') + esc(area)
+                                + (isCurrent ? '★ ' : isVisited ? '✓ ' : isUnlocked ? '◆ ' : '◇ ') + esc(area)
+                                + (isUnlocked ? '<span class="map-danger-badge" style="color:' + dangerColors[dangerSeed] + ';">[' + dangerLabels[dangerSeed] + ']</span>' : '')
                                 + '</div>';
                         });
-                        const fullHtml = svg + '<div style="max-height:120px;overflow-y:auto;margin-top:4px;">' + listHTML + '</div>';
+                        const fullHtml = svg + '<div style="max-height:140px;overflow-y:auto;margin-top:4px;">' + listHTML + '</div>';
                         _setInnerHTMLIfChanged($('sideMap'), fullHtml, 'map', hash);
                         // ==== v2 地图点击移动：事件委托（只绑定一次） ====
                         const sideMapEl = $('sideMap');
@@ -2560,7 +2705,18 @@
                                     catch(e) { confirm = true; }
                                 }
                                 if (!confirm) return;
+                                // 记录访问：原位置 → visited 列表
+                                if (!st.visited) st.visited = [];
+                                if (curLoc && !st.visited.some(v => curLoc.includes(v) || v.includes(curLoc))) {
+                                    st.visited.push(curLoc);
+                                    if (st.visited.length > 50) st.visited.shift();
+                                }
                                 st.location = area;
+                                // 新位置也加入 visited
+                                if (!st.visited.some(v => area.includes(v) || v.includes(area))) {
+                                    st.visited.push(area);
+                                    if (st.visited.length > 50) st.visited.shift();
+                                }
                                 sst(st);
                                 if (!gclk().dayLenSec) {
                                     try { advTime(1); } catch(e) {}
@@ -4976,13 +5132,52 @@
                 $('bpPageInfo').textContent = (bpPage + 1) + '/' + totalPages;
                 $('bpPrev').disabled = bpPage <= 0;
                 $('bpNext').disabled = bpPage >= totalPages - 1;
+                // 容量计算：基础30kg + 体型/特质修正 + 背包物品修正
+                const _cur = gst();
+                const _ch = gch();
+                let encCap = 30;
+                if (_ch.bt === '健壮') encCap += 5;
+                else if (_ch.bt === '瘦削') encCap -= 5;
+                try {
+                    const traits = Array.isArray(_ch.tp) ? _ch.tp : [];
+                    if (traits.includes('强健体魄')) encCap += 5;
+                    if (traits.includes('弱体质')) encCap -= 5;
+                } catch(_) {}
+                // 背包物品修正（包含"背包"关键字的物品增加容量）
+                try {
+                    const inv = _cur.inv || [];
+                    inv.forEach(it => {
+                        const base = getItemBaseName(it);
+                        if (/军用背包|战术背包|大型背包/.test(base)) encCap += 15;
+                        else if (/背包/.test(base) && !/破损|损坏/.test(base)) encCap += 10;
+                        else if (/破损背包|损坏背包/.test(base)) encCap += 5;
+                    });
+                } catch(_) {}
+                const encVal = Math.max(0, _cur.enc || 0);
+                const encPct = Math.min(100, (encVal / encCap) * 100);
+                const encColor = encPct < 60 ? 'var(--notify-add, #4a9a6f)' : encPct < 90 ? 'var(--color-warn, #b58a3a)' : 'var(--color-danger, #8a3a3a)';
+                const encStatus = encPct < 60 ? '轻松' : encPct < 90 ? '吃力' : encPct < 100 ? '超载' : '严重超载';
+                const totalItems = (_cur.inv || []).length;
+                const starredCount = (_cur.stars || []).length;
+                let infoHtml = '<div class="bp-stats-bar">' +
+                    '<div class="bp-stat-block">' +
+                        '<span class="bp-stat-lbl">负重</span>' +
+                        '<div class="bp-enc-bar-bg"><div class="bp-enc-bar-fg" style="width:' + encPct + '%;background:' + encColor + ';"></div></div>' +
+                        '<span class="bp-stat-val" style="color:' + encColor + ';">' + encVal + '/' + encCap + 'kg · ' + encStatus + '</span>' +
+                    '</div>' +
+                    '<div class="bp-stat-block">' +
+                        '<span class="bp-stat-lbl">物品</span>' +
+                        '<span class="bp-stat-val">' + totalItems + ' 件' + (starredCount ? ' · ★' + starredCount : '') + '</span>' +
+                    '</div>' +
+                '</div>';
                 if (bpView === 'cat') {
-                    $('bpInfo').textContent = '本类 ' + filtered.length + ' 件 / 共 ' + (gst().inv || []).length + ' 件 | 负重 ' + gst().enc + 'kg';
+                    infoHtml += '<div class="bp-info-text">本类 ' + filtered.length + ' 件 / 共 ' + totalItems + ' 件</div>';
                 } else if (bpView === 'all') {
-                    $('bpInfo').textContent = '共 ' + summarizeInvSummary().length + ' 类 / 总数量 ' + (gst().inv || []).length + ' 件 | 负重 ' + gst().enc + 'kg';
+                    infoHtml += '<div class="bp-info-text">共 ' + summarizeInvSummary().length + ' 类 / 总数量 ' + totalItems + ' 件</div>';
                 } else {
-                    $('bpInfo').textContent = '常用 ' + (gst().stars || []).length + ' 类';
+                    infoHtml += '<div class="bp-info-text">常用 ' + starredCount + ' 类</div>';
                 }
+                $('bpInfo').innerHTML = infoHtml;
             }
             let _bpSearchInited = false;
             function openBackpack() {
@@ -6846,6 +7041,15 @@ ${sumContent}
             $('modalCloseAchievements') && $('modalCloseAchievements').addEventListener('click', () => {
                 $('achievementsModal').style.display = 'none';
             });
+            // 行动日志按钮：接入 gamesystems.js 的 openLogViewer
+            $('btnActionLog') && $('btnActionLog').addEventListener('click', () => {
+                try {
+                    const fn = window._openLogViewer || window.openLogViewer;
+                    if (typeof fn === 'function') fn();
+                    else if (typeof openLogViewer === 'function') openLogViewer();
+                    else snotify('warn', '日志', '日志查看器未加载');
+                } catch(e) { if (cfg().debug) console.warn('[btnActionLog]', e); }
+            });
             $('btnEvents') && $('btnEvents').addEventListener('click', () => {
                 const f = window.renderEventsPanel; if (f) f();
                 $('eventsModal').style.display = 'flex';
@@ -6870,31 +7074,51 @@ ${sumContent}
                 const metNames = Object.keys(npcRel);
                 const NPC_DATA = window.NPC_DATA || {};
                 const NPC_FACTIONS = window.NPC_FACTIONS || {};
+                // 持久化搜索/排序状态
+                if (renderCodexPanel._q === undefined) renderCodexPanel._q = '';
+                if (renderCodexPanel._sort === undefined) renderCodexPanel._sort = 'trust';
+                if (filterFaction === undefined) filterFaction = renderCodexPanel._fac || null;
+                renderCodexPanel._fac = filterFaction;
+                const searchQ = renderCodexPanel._q.toLowerCase();
+                const sortBy = renderCodexPanel._sort;
+                // 发现进度统计：已遇到 / 全部 NPC_DATA
+                const totalKnown = Object.keys(NPC_DATA).length;
+                const discovered = metNames.length;
+                const discPct = totalKnown > 0 ? Math.min(100, (discovered / totalKnown) * 100) : 0;
                 if (metNames.length === 0) {
                     list.innerHTML = '';
                     empty.style.display = 'block';
+                    filters.innerHTML = '<div class="codex-progress"><span class="codex-prog-lbl">发现进度</span><div class="codex-prog-bar"><div class="codex-prog-fg" style="width:0%;"></div></div><span class="codex-prog-val">0/' + totalKnown + '</span></div>' +
+                        '<div class="codex-toolbar"><input type="text" id="codexSearch" class="codex-search" placeholder="🔍 搜索 NPC 名字/特征/职业…" value="' + esc(searchQ) + '"><select id="codexSort" class="codex-sort"><option value="trust"' + (sortBy === 'trust' ? ' selected' : '') + '>按信任度</option><option value="affinity"' + (sortBy === 'affinity' ? ' selected' : '') + '>按好感度</option><option value="name"' + (sortBy === 'name' ? ' selected' : '') + '>按名字</option></select></div>';
+                    _bindCodexToolbar(filterFaction);
                     return;
                 }
                 empty.style.display = 'none';
+                // Render progress + toolbar + faction filter
+                filters.innerHTML = '<div class="codex-progress"><span class="codex-prog-lbl">发现进度</span><div class="codex-prog-bar"><div class="codex-prog-fg" style="width:' + discPct + '%;"></div></div><span class="codex-prog-val">' + discovered + '/' + totalKnown + '</span></div>' +
+                    '<div class="codex-toolbar"><input type="text" id="codexSearch" class="codex-search" placeholder="🔍 搜索 NPC 名字/特征/职业…" value="' + esc(searchQ) + '"><select id="codexSort" class="codex-sort"><option value="trust"' + (sortBy === 'trust' ? ' selected' : '') + '>按信任度</option><option value="affinity"' + (sortBy === 'affinity' ? ' selected' : '') + '>按好感度</option><option value="name"' + (sortBy === 'name' ? ' selected' : '') + '>按名字</option></select></div>' +
+                    '<div class="codex-fac-row"><span class="codex-fac-lbl">势力筛选:</span>' +
+                    '<button class="btn-codex-filter' + (!filterFaction ? ' active' : '') + '" data-faction="all">全部</button>';
                 // Render faction filter
                 const factionsInUse = new Set();
                 metNames.forEach(name => {
                     const data = NPC_DATA[name];
                     if (data && data.faction) factionsInUse.add(data.faction);
                 });
-                filters.innerHTML = '<span style="font-size:0.7rem;color:var(--text-muted);margin-right:4px;">势力筛选:</span>' +
-                    '<button class="btn-codex-filter' + (!filterFaction ? ' active' : '') + '" data-faction="all">全部</button>';
+                let facButtonsHtml = '';
                 factionsInUse.forEach(f => {
                     const fac = NPC_FACTIONS[f];
                     if (fac) {
-                        filters.innerHTML += '<button class="btn-codex-filter' + (filterFaction === f ? ' active' : '') + '" data-faction="' + f + '">' + fac.icon + ' ' + fac.name + '</button>';
+                        facButtonsHtml += '<button class="btn-codex-filter' + (filterFaction === f ? ' active' : '') + '" data-faction="' + f + '">' + fac.icon + ' ' + fac.name + '</button>';
                     }
                 });
+                filters.innerHTML += facButtonsHtml + '</div>';
+                _bindCodexToolbar(filterFaction);
                 filters.querySelectorAll('.btn-codex-filter').forEach(btn => {
                     btn.addEventListener('click', () => renderCodexPanel(btn.dataset.faction === 'all' ? null : btn.dataset.faction));
                 });
-                // Group by faction
-                const grouped = {};
+                // 收集 + 搜索过滤 + 排序
+                const allCollected = [];
                 metNames.forEach(name => {
                     const data = NPC_DATA[name] || {
                         // 为 AI 叙事中动态出现的 NPC 创建基础条目
@@ -6905,11 +7129,39 @@ ${sumContent}
                         notes: []
                     };
                     if (filterFaction && data.faction !== filterFaction) return;
-                    const facKey = data.faction || 'unknown';
+                    allCollected.push({ name, data, rel: npcRel[name] || {} });
+                });
+                // 搜索过滤
+                let filteredNpcs = allCollected;
+                if (searchQ) {
+                    filteredNpcs = allCollected.filter(({ name, data }) => {
+                        const notes = (data.notes || []).join(' ');
+                        const hay = (name + ' ' + (data.personality || '') + ' ' + (data.occupation || '') + ' ' + (data.backstory || '') + ' ' + notes).toLowerCase();
+                        return hay.includes(searchQ);
+                    });
+                }
+                // 排序
+                filteredNpcs.sort((a, b) => {
+                    const ta = a.rel.trust != null ? a.rel.trust : (a.data.trust || 0);
+                    const tb = b.rel.trust != null ? b.rel.trust : (b.data.trust || 0);
+                    const aa = a.rel.affinity != null ? a.rel.affinity : (a.data.affinity || 0);
+                    const ab_ = b.rel.affinity != null ? b.rel.affinity : (b.data.affinity || 0);
+                    if (sortBy === 'trust') return tb - ta;
+                    if (sortBy === 'affinity') return ab_ - aa;
+                    return a.name.localeCompare(b.name, 'zh');
+                });
+                // Group by faction
+                const grouped = {};
+                filteredNpcs.forEach(entry => {
+                    const facKey = entry.data.faction || 'unknown';
                     if (!grouped[facKey]) grouped[facKey] = [];
-                    grouped[facKey].push({ name, data, rel: npcRel[name] || {} });
+                    grouped[facKey].push(entry);
                 });
                 list.innerHTML = '';
+                if (filteredNpcs.length === 0) {
+                    list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;font-style:italic;">🔍 未找到匹配的 NPC<br><span style="font-size:0.7rem;">试试其他关键词或势力筛选</span></div>';
+                    return;
+                }
                 Object.entries(grouped).forEach(([facKey, npcs]) => {
                     const fac = NPC_FACTIONS[facKey];
                     const facName = fac ? fac.name : '未知势力';
@@ -6944,6 +7196,27 @@ ${sumContent}
                     });
                     list.appendChild(section);
                 });
+            }
+            function _bindCodexToolbar(currentFac) {
+                const si = $('codexSearch');
+                const so = $('codexSort');
+                if (si && !si._bound) {
+                    si._bound = true;
+                    si.addEventListener('input', () => {
+                        renderCodexPanel._q = si.value;
+                        renderCodexPanel(currentFac);
+                        // 重新聚焦
+                        const ni = $('codexSearch');
+                        if (ni) { ni.focus(); ni.setSelectionRange(si.value.length, si.value.length); }
+                    });
+                }
+                if (so && !so._bound) {
+                    so._bound = true;
+                    so.addEventListener('change', () => {
+                        renderCodexPanel._sort = so.value;
+                        renderCodexPanel(currentFac);
+                    });
+                }
             }
             // Expose for external calls
             window.renderCodexPanel = renderCodexPanel;

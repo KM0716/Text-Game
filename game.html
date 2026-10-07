@@ -237,6 +237,7 @@
                                 <button class="btn-header" id="btnEvents" title="突发事件">事件</button>
                             </div>
                             <div class="nav-menu-row">
+                                <button class="btn-header" id="btnActionLog" title="行动日志">日志</button>
                                 <button class="btn-header" id="btnIdle">挂机</button>
                             </div>
                         </div>
@@ -294,6 +295,7 @@
             <!-- Panel view content -->
             <div id="sidePanelView" style="display:none;">
                 <h4>状态面板</h4><div id="sideProps"></div>
+                <h4>势力声望</h4><div id="sideFaction" class="side-faction"></div>
                 <h4>所在地</h4><div id="sideLocation" class="side-location"></div>
                 <h4>地图</h4><div id="sideMap" class="side-map"></div>
                 <div style="margin-top:8px;padding-top:8px;border-top:1px dashed var(--divider);">
@@ -328,7 +330,7 @@
         <div class="modal-panel" style="max-width:560px;">
             <button class="modal-close" id="modalCloseCodex">x</button>
             <h3>幸存者图鉴</h3>
-            <div class="codex-filters" id="codexFilters" style="display:flex;gap:4px;flex-wrap:wrap;margin-bottom:8px;"></div>
+            <div class="codex-filters" id="codexFilters" style="margin-bottom:8px;"></div>
             <div id="codexList" style="display:flex;flex-direction:column;gap:6px;max-height:500px;overflow-y:auto;"></div>
             <div class="codex-empty" id="codexEmpty" style="display:none;text-align:center;color:var(--text-muted);padding:20px;font-style:italic;">
                 尚未遇到任何幸存者。继续探索以发现更多人物。
