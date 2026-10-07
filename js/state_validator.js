@@ -240,6 +240,10 @@
                 if (typeof addLogEntry === 'function') {
                     addLogEntry('system', '[作弊] ' + label + ' → ' + clamped + unit);
                 }
+                // ===== 手动校准后自动存档 =====
+                if (window.autoSaveAll && typeof window.autoSaveAll === 'function') {
+                    window.autoSaveAll('cheat');
+                }
             } catch (e) {
                 tst('修改失败：' + e.message);
             }

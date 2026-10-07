@@ -3252,25 +3252,32 @@
                 for (const [k, v] of Object.entries(vals)) {
                     p = p.replace(new RegExp('\\{\\{' + k + '\\}\\}', 'g'), v);
                 }
-                // Inject extended context (key memories, skills, status, NPC relationships)
+                // ===== 前置注入：玩家档案、记忆、写作准绳作为 AI 思考前的前置提示 =====
+                // 这些是 AI 必须"先看到再落笔"的约束，不是可选追加
+                let _preContext = '';
+                // 1. 扩展上下文（关键记忆、技能、状态效果、NPC关系）
                 if (typeof window.__vnExtContext === 'function') {
                     const extCtx = window.__vnExtContext();
-                    if (extCtx) p += '\n\n' + extCtx;
+                    if (extCtx) _preContext += extCtx + '\n\n';
                 }
-                // ===== 写作准绳注入：只注入开启的规则 =====
-                try {
-                    if (window.WRITING_GUIDELINES && typeof window.WRITING_GUIDELINES.generatePromptInjection === 'function') {
-                        const wgPrompt = window.WRITING_GUIDELINES.generatePromptInjection();
-                        if (wgPrompt) p += '\n' + wgPrompt;
-                    }
-                } catch(e) {}
-                // ===== 记忆系统注入：长期记忆 + 压缩事实记录 =====
+                // 2. 记忆系统（长期记忆 + 压缩事实记录）
                 try {
                     if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.getMemoryContext === 'function') {
                         const memCtx = window.MEMORY_SYSTEM.getMemoryContext(hist, f.ctx || 24);
-                        if (memCtx) p += '\n\n' + memCtx;
+                        if (memCtx) _preContext += memCtx + '\n\n';
                     }
                 } catch(e) {}
+                // 3. 写作准绳（只注入开启的规则）
+                try {
+                    if (window.WRITING_GUIDELINES && typeof window.WRITING_GUIDELINES.generatePromptInjection === 'function') {
+                        const wgPrompt = window.WRITING_GUIDELINES.generatePromptInjection();
+                        if (wgPrompt) _preContext += wgPrompt + '\n\n';
+                    }
+                } catch(e) {}
+                // 将前置上下文插入到提示词最前面（AI 先读到约束再读世界设定）
+                if (_preContext) {
+                    p = _preContext + '\n' + p;
+                }
                 // ===== 正文目标字数（用户可选）=====
                 try {
                     const targetLen = cfg().targetWordCount || 0;
@@ -3280,12 +3287,27 @@
                 } catch(e) {}
                 // ===== 写入 gsp 缓存（60 秒内同配置直接复用，减少 token + 计算） =====
                 try {
+                    // 缓存 hash 增加写作准绳开关状态 + 记忆系统记录数的摘要
+                    let _wgHash = 0, _memHash = 0;
+                    try {
+                        if (window.WRITING_GUIDELINES) {
+                            const st = window.WRITING_GUIDELINES.getState();
+                            _wgHash = Object.values(st).filter(Boolean).length;
+                        }
+                    } catch(_) {}
+                    try {
+                        if (window.MEMORY_SYSTEM) {
+                            const recs = window.MEMORY_SYSTEM.loadRecords();
+                            _memHash = (recs.turns ? recs.turns.length : 0) + (recs.longTerm ? recs.longTerm.length : 0) * 100;
+                        }
+                    } catch(_) {}
                     const curHash = _hashObj([
                         c.cn, c.bg ? c.bg.slice(0, 40) : '', c.tp ? c.tp.length : 0, c.tn ? c.tn.length : 0,
                         s.hp, s.hunger, s.thirst, s.fatigue, s.spirit, s.mentality, s.injury, s.location,
                         f.difficulty, f.genre, f.debug ? 1 : 0, (f.censorshipLevel || 0),
                         cl ? cl.day : 0, cl ? cl.weather : '', cl ? cl.season : '',
-                        Object.keys(gsbx()).map(k => gsbx()[k].title)
+                        Object.keys(gsbx()).map(k => gsbx()[k].title),
+                        _wgHash, _memHash, f.targetWordCount || 0
                     ]);
                     _gspCache = { hash: curHash, prompt: p, ts: Date.now() };
                 } catch(e) { /* ignore */ }
@@ -3749,6 +3771,43 @@
                 return ['观察周围环境', '检查随身装备', '原地警戒片刻'];
             }
 
+            // ===== 统一自动存档函数：每轮结束、手动校准后、退出前调用 =====
+            // reason: 'turn' | 'cheat' | 'unload' — 用于调试日志
+            function autoSaveAll(reason) {
+                if (!Array.isArray(hist) || hist.length === 0) return;
+                try {
+                    const curSvs = gsv();
+                    const curCfg = cfg();
+                    // 过滤空值，防止把空 API key 写入存档覆盖已有配置
+                    const cleanCfg = {};
+                    Object.keys(curCfg).forEach(k => {
+                        const v = curCfg[k];
+                        if (v === '' || v === null || v === undefined) return;
+                        try { cleanCfg[k] = JSON.parse(JSON.stringify(v)); } catch(_) { cleanCfg[k] = v; }
+                    });
+                    curSvs['auto'] = {
+                        hi: JSON.parse(JSON.stringify(hist)),
+                        st: JSON.parse(JSON.stringify(gst())),
+                        ch: JSON.parse(JSON.stringify(gch())),
+                        clk: JSON.parse(JSON.stringify(gclk())),
+                        sbx: JSON.parse(JSON.stringify(gsbx())),
+                        cfg: cleanCfg,
+                        tm: Date.now()
+                    };
+                    ssv(curSvs);
+                    // 同时把各子状态写入独立 localStorage 键（双重保障）
+                    try { svh(hist); } catch(_) {}
+                    try { sst(gst()); } catch(_) {}
+                    try { sch(gch()); } catch(_) {}
+                    try { sclk(gclk()); } catch(_) {}
+                    if (cfg().debug) console.log('[autoSaveAll] saved, reason=' + reason);
+                } catch (e) {
+                    if (cfg().debug) console.warn('[autoSaveAll] failed:', e);
+                }
+            }
+            // 暴露到 window 供外部调用
+            window.autoSaveAll = autoSaveAll;
+
             async function hin(inp, isIdle, displayText, systemPromptExtra) {
                 if (busy) { tst('正在演算中，请稍候…'); return false; }
                 if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return false; }
@@ -4209,29 +4268,8 @@
                     // Auto-save after each game action (keep auto-slot in sync)
                     // ALWAYS save, even during idle mode, to prevent data loss on refresh
                     // IMPORTANT: NEVER save empty API key into auto-save slot
-                    if (Array.isArray(hist) && hist.length > 0) {
-                        try {
-                            const curSvs = gsv();
-                            const curCfg = cfg();
-                            // Filter out empty values from cfg to prevent API key loss on save
-                            const cleanCfg = {};
-                            Object.keys(curCfg).forEach(k => {
-                                const v = curCfg[k];
-                                if (v === '' || v === null || v === undefined) return;
-                                cleanCfg[k] = JSON.parse(JSON.stringify(v));
-                            });
-                            curSvs['auto'] = {
-                                hi: JSON.parse(JSON.stringify(hist)),
-                                st: JSON.parse(JSON.stringify(gst())),
-                                ch: JSON.parse(JSON.stringify(gch())),
-                                clk: JSON.parse(JSON.stringify(gclk())),
-                                sbx: JSON.parse(JSON.stringify(gsbx())),
-                                cfg: cleanCfg,
-                                tm: Date.now()
-                            };
-                            ssv(curSvs);
-                        } catch (e) { /* silent fail */ }
-                    }
+                    // ===== 优化：抽取为 autoSaveAll() 供多处复用 =====
+                    try { autoSaveAll('turn'); } catch(e) {}
                 }
             }
 
@@ -8154,27 +8192,8 @@ ${sumContent}
             // Stop idle when page unload
             window.addEventListener('beforeunload', () => {
                 stopIdle();
-                // 最后一次强制保存所有关键状态（防止异步save未完成）
-                try {
-                    if (hist && hist.length) svh(hist);
-                    if (sta) sst(sta);
-                    if (chr) sch(chr);
-                    if (clk) sclk(clk);
-                    if (typeof gsv === 'function' && typeof ssv === 'function') {
-                        // 同步auto-save slot
-                        try {
-                            const cs = gsv() || {};
-                            const cc = cfg();
-                            let cleanCfg = {};
-                            for (const [k, v] of Object.entries(cc)) {
-                                if (typeof v === 'string' && /api.*key|sk-/i.test(k) && (!v || v.length < 4)) continue;
-                                try { cleanCfg[k] = JSON.parse(JSON.stringify(v)); } catch { cleanCfg[k] = v; }
-                            }
-                            cs['auto'] = { hi: JSON.parse(JSON.stringify(hist)), st: JSON.parse(JSON.stringify(gst())), ch: JSON.parse(JSON.stringify(gch())), clk: JSON.parse(JSON.stringify(gclk())), sbx: JSON.parse(JSON.stringify(gsbx())), cfg: cleanCfg, tm: Date.now() };
-                            ssv(cs);
-                        } catch(e) {}
-                    }
-                } catch(e) {}
+                // ===== 使用统一 autoSaveAll 保存（退出再进来接着上次）=====
+                try { autoSaveAll('unload'); } catch(e) {}
             });
 
             window.addEventListener('error', function(ev) {
@@ -8683,34 +8702,7 @@ ${sumContent}
                     document.addEventListener('touchstart', startBgmOnce);
                 }
                 // ===== Safety: auto-save before page unload (prevents data loss on refresh/close) =====
-                // Use window.xxx to ensure cross-scope access (inner IIFE → outer IIFE → window)
-                window.addEventListener('beforeunload', () => {
-                    try {
-                        const _gsv = window.gsv, _cfg = window.cfg, _gst = window.gst, _gch = window.gch;
-                        const _gclk = window.gclk, _gsbx = window.gsbx, _ssv = window.ssv;
-                        const _hist = window._getHist ? window._getHist() : [];
-                        if (_hist.length > 0 && _gsv) {
-                            const curSvs = _gsv();
-                            const curCfg = _cfg();
-                            const cleanCfg = {};
-                            Object.keys(curCfg).forEach(k => {
-                                const v = curCfg[k];
-                                if (v === '' || v === null || v === undefined) return;
-                                cleanCfg[k] = JSON.parse(JSON.stringify(v));
-                            });
-                            curSvs['auto'] = {
-                                hi: JSON.parse(JSON.stringify(_hist)),
-                                st: JSON.parse(JSON.stringify(_gst())),
-                                ch: JSON.parse(JSON.stringify(_gch())),
-                                clk: JSON.parse(JSON.stringify(_gclk())),
-                                sbx: JSON.parse(JSON.stringify(_gsbx())),
-                                cfg: cleanCfg,
-                                tm: Date.now()
-                            };
-                            _ssv(curSvs);
-                        }
-                    } catch {}
-                });
+                // 已由上方的统一 autoSaveAll('unload') 处理，此处不再重复
                 // 启动恢复: 刷新页面前未消费的通知队列
                 try {
                     const raw = sessionStorage.getItem('vn_notifyQueue');
