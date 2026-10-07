@@ -2816,15 +2816,16 @@
                     }
                 } catch(e) {}
 
-                if (ch.hp !== undefined) { 
-                    s.hp = Math.max(0, Math.min(s.maxHp || 100, ch.hp)); 
-                    if (s.hp <= 0 && !cfg().debug) { 
+                if (ch.hp !== undefined) {
+                    s.hp = Math.max(0, Math.min(s.maxHp || 100, ch.hp));
+                    if (s.hp <= 0 && !cfg().debug) {
                         s.injury = s.injury === '无' ? '致命伤' : s.injury + '（致命）';
                         s.deathTriggered = true;
-                    } 
+                    }
                 }
                 // Check for death conditions
-                // ===== 修复：不仅 HP，饱腹/口渴/精神/体温任意一个到达致命阈值也必须触发死亡结局 =====
+                // ===== 死亡触发优化：HP / 饱腹 / 口渴 / 精神 / 体温 任意一个到致命阈值都触发死亡 =====
+                // 同时支持 AI 显式标记死亡：ch.dead === true 或 ch.dead === 'reason'
                 let deathCause = null;
                 if (s.hp <= 0) deathCause = 'HP归零';
                 else if (s.hunger <= 0) deathCause = '饥饿过度';
@@ -2832,6 +2833,16 @@
                 else if (s.spirit <= 0) deathCause = '精神崩溃';
                 else if (s.bodyTemp <= 32) deathCause = '失温症';
                 else if (s.bodyTemp >= 42) deathCause = '中暑高热';
+                // AI 显式死亡标记
+                if (ch.dead === true && !deathCause) deathCause = '剧情死亡';
+                else if (typeof ch.dead === 'string' && ch.dead && !deathCause) deathCause = ch.dead;
+                // 持续重伤累计：致命伤持续 3 回合以上强制触发（防止 AI 反复加伤不杀）
+                if (!deathCause && s.injury && /致命/.test(s.injury)) {
+                    s._fatalInjuryTurns = (s._fatalInjuryTurns || 0) + 1;
+                    if (s._fatalInjuryTurns >= 3) deathCause = '致命伤不治';
+                } else {
+                    s._fatalInjuryTurns = 0;
+                }
                 if (!cfg().debug && deathCause && !s.deathShown) {
                     s.deathShown = true;
                     s.deathTriggered = true;
@@ -3964,6 +3975,57 @@
             // 暴露到 window 供外部调用
             window.autoSaveAll = autoSaveAll;
 
+            // ===== AI 生成上锁/解锁：busy 时禁用可能修改状态/数据的按钮和模态 =====
+            const _AI_LOCKED_IDS = [
+                'btnNewGame', 'btnAchievements', 'btnEvents', 'btnActionLog', 'btnSave',
+                'btnSettings', 'btnExport', 'btnImport', 'btnReset', 'btnCheat',
+                'btnIdle', 'btnBpToggle', 'btnMapToggle', 'btnCodex', 'btnFactionToggle'
+            ];
+            function _setAILock(locked) {
+                // 添加/移除 body 类，全局遮罩
+                document.body.classList.toggle('ai-locked', !!locked);
+                // 顶部徽章提示
+                let badge = document.getElementById('aiLockBadge');
+                if (locked) {
+                    if (!badge) {
+                        badge = document.createElement('div');
+                        badge.id = 'aiLockBadge';
+                        badge.className = 'ai-lock-badge';
+                        badge.textContent = '⚙ 演算中…';
+                        document.body.appendChild(badge);
+                    }
+                } else {
+                    if (badge) badge.remove();
+                }
+                // 禁用/恢复关键按钮
+                _AI_LOCKED_IDS.forEach(id => {
+                    const el = $(id);
+                    if (!el) return;
+                    if (locked) {
+                        if (el.dataset._aiLockSaved === undefined) {
+                            el.dataset._aiLockSaved = el.disabled ? '1' : '0';
+                        }
+                        el.disabled = true;
+                        el.style.pointerEvents = 'none';
+                    } else {
+                        const was = el.dataset._aiLockSaved;
+                        delete el.dataset._aiLockSaved;
+                        el.disabled = (was === '1');
+                        el.style.pointerEvents = '';
+                    }
+                });
+                // 关闭/禁止打开状态校准/重置等弹窗
+                if (locked) {
+                    // 如果有打开的 cheat/state_validator 面板，标记禁止提交
+                    const cheatPanel = document.querySelector('#cheatPanel, .state-validator-panel');
+                    if (cheatPanel) cheatPanel.dataset.aiLocked = '1';
+                } else {
+                    const cheatPanel = document.querySelector('#cheatPanel, .state-validator-panel');
+                    if (cheatPanel) delete cheatPanel.dataset.aiLocked;
+                }
+            }
+            window._setAILock = _setAILock;
+
             async function hin(inp, isIdle, displayText, systemPromptExtra) {
                 if (busy) { tst('正在演算中，请稍候…'); return false; }
                 if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return false; }
@@ -4021,6 +4083,8 @@
                     if (typeof window._paiClearEventTimers === 'function') window._paiClearEventTimers();
                     if (!isIdle && $('btnSend')) $('btnSend').disabled = true;
                     try { $('inputText').classList.add('busy'); } catch(_) {}
+                    // ===== AI 生成上锁：禁止玩家修改数据导致错误 =====
+                    try { _setAILock(true); } catch(_) {}
                     // 玩家气泡不渲染item-ref样式，将{{物品名}}转为纯文本【物品名】
                     const playerDisplayText = (isIdle ? '[自主] ' : '') + showText.replace(/\{\{([^}]+)\}\}/g, '【$1】');
                     try { apb({ ty: 'player', tx: playerDisplayText }, 0); } catch(_) {}
@@ -4415,6 +4479,8 @@
                 } finally {
                     try { busy = false; } catch(e) {}
                     try { snotifyEndBatch(); } catch(e) {}
+                    // ===== AI 生成解锁：恢复交互 =====
+                    try { _setAILock(false); } catch(_) {}
                     try { if (!isIdle && !idleLocked && $('btnSend')) $('btnSend').disabled = false; } catch(e) {}
                     try { if (!isIdle) $('inputText').classList.remove('busy'); } catch(e) {}
                     try { if (!isIdle && !idleLocked && !isMobile()) $('inputText').focus(); } catch(e) {}
@@ -4748,9 +4814,28 @@
                 d.className = 'modal-overlay';
                 d.style.zIndex = '10000';
                 const dirOptions = ['休养', '探索', '自定义'];
-                const dirLabels = { '休养': '休养为主', '探索': '探索为主', '自定义': '自定义' };
+                const dirLabels = { '休养': '🛌 休养为主（恢复状态）', '探索': '🔍 探索为主（推进剧情）', '自定义': '✏️ 自定义行动' };
+                // 当前状态预览 + 风险评估
+                const s4 = gst();
+                let riskHtml = '';
+                const risks = [];
+                if (s4) {
+                    if ((s4.hp ?? 100) <= 50) risks.push({ lbl: 'HP偏低', lvl: 'warn' });
+                    if ((s4.hunger ?? 70) <= 30) risks.push({ lbl: '饥饿', lvl: 'warn' });
+                    if ((s4.thirst ?? 70) <= 30) risks.push({ lbl: '口渴', lvl: 'warn' });
+                    if ((s4.fatigue ?? 0) >= 60) risks.push({ lbl: '疲劳', lvl: 'warn' });
+                    if ((s4.spirit ?? 85) <= 40) risks.push({ lbl: '精神低', lvl: 'warn' });
+                    if ((s4.bodyTemp ?? 37) <= 34 || (s4.bodyTemp ?? 37) >= 40) risks.push({ lbl: '体温异常', lvl: 'danger' });
+                }
+                if (risks.length > 0) {
+                    const dangerCount = risks.filter(r => r.lvl === 'danger').length;
+                    riskHtml = '<div class="ic-risk' + (dangerCount > 0 ? ' danger' : '') + '">⚠️ 当前风险：' + risks.map(r => r.lbl).join('、') + (dangerCount > 0 ? '（高危，不建议挂机）' : '') + '</div>';
+                } else {
+                    riskHtml = '<div class="ic-risk safe">✓ 当前状态稳定，可放心挂机</div>';
+                }
                 d.innerHTML = '<div class="idle-config-panel">' +
                     '<h3>⚙ 挂机配置</h3>' +
+                    riskHtml +
                     '<div class="ic-field">' +
                         '<label>行动方向</label>' +
                         '<select id="icDir">' +
@@ -4766,6 +4851,11 @@
                         '<label>行动间隔（秒，最小5秒）</label>' +
                         '<input type="number" id="icInt" min="5" max="300" value="' + (f.idleInt || 60) + '">' +
                         '<div class="ic-hint">挂机模式下每次自动行动的间隔时间</div>' +
+                    '</div>' +
+                    '<div class="ic-tips">' +
+                        '<div class="ic-tip-item">🛌 休养：在营地休息、整理装备、恢复状态</div>' +
+                        '<div class="ic-tip-item">🔍 探索：自动探索周边推进剧情</div>' +
+                        '<div class="ic-tip-item">🛑 任一状态过低将自动停止挂机</div>' +
                     '</div>' +
                     '<div class="ic-buttons">' +
                         '<button class="ic-btn cancel" id="icCancel">取消</button>' +
@@ -4784,6 +4874,7 @@
                     const intInput = d.querySelector('#icInt');
                     const v = parseInt(intInput.value) || 60;
                     if (v < 5) { tst('最小5秒'); return; }
+                    if (dir === '自定义' && !custom.trim()) { tst('请输入自定义行动内容'); return; }
                     f.idleDir = dir;
                     if (dir === '自定义') f.idleCustom = custom;
                     f.idleInt = v;
@@ -6262,6 +6353,14 @@
                     }
                     try { if (typeof fillCharModal === 'function') fillCharModal(); } catch(e) { console.warn('[NewGame] fillCharModal 出错：', e); }
                     try { if ($('charModal')) $('charModal').style.display = 'flex'; } catch {}
+                    // ===== 显示"应用设定（不重开）"按钮：游戏进行中允许修改角色卡/世界设定 =====
+                    try {
+                        const applyBtn = $('btnCharApplyOnly');
+                        if (applyBtn) {
+                            const hasExistingGame = hist.length > 0 || (curSt && curSt.inv && curSt.inv.length > 0);
+                            applyBtn.style.display = hasExistingGame ? 'inline-block' : 'none';
+                        }
+                    } catch(_) {}
                 } catch(e) {
                     console.error('[NewGame] 开局按钮出错：', e);
                     try { tst('开局功能出错：' + (e.message || '未知错误'), 'warn'); } catch {}
@@ -8079,28 +8178,24 @@ ${sumContent}
                 } catch { tst('网络错误：无法连接到服务器，请检查网络或端点地址'); }
             });
 
-            $('btnCharConfirm').addEventListener('click', () => {
+            // 共享：从表单读取角色卡（供"开始游戏"和"应用设定不重开"复用）
+            function _collectCharFromForm() {
                 const pRaw = $('charTraitsPos').value.split('\n').map(s => s.trim()).filter(Boolean);
                 const nRaw = $('charTraitsNeg').value.split('\n').map(s => s.trim()).filter(Boolean);
-                // Check if a job preset was selected
                 const selectedJobPreset = window._selectedJobPreset || '';
                 const hidden = [];
                 const jobPresetCodes = Object.keys(JOB_PRESETS);
-                // Apply selected job preset bonuses
                 if (selectedJobPreset && JOB_PRESETS[selectedJobPreset]) {
                     const hp = JOB_PRESETS[selectedJobPreset];
                     hidden.push(selectedJobPreset);
                     if (hp.bonus) hp.bonus.forEach(item => { if (!$('charItems').value.includes(item)) $('charItems').value += '、' + item; });
                     if (hp.skills && !$('charSkills').value.includes(hp.skills.split('\n')[0])) $('charSkills').value += '\n' + hp.skills;
-                    // Set job name if not manually changed
                     if (!$('charJob').value || $('charJob').value === JOB_PRESETS[selectedJobPreset].name) {
                         $('charJob').value = hp.name;
                     }
                 }
-                // Also check for backward compatibility with hidden codes in traits
                 const p = pRaw.filter(t => { if (jobPresetCodes.includes(t)) { if (!hidden.includes(t)) hidden.push(t); return false; } return true; });
                 const n = nRaw.filter(t => { if (jobPresetCodes.includes(t)) { if (!hidden.includes(t)) hidden.push(t); return false; } return true; });
-                // Apply any additional hidden preset bonuses from traits (backward compat)
                 hidden.forEach(code => {
                     if (code !== selectedJobPreset && JOB_PRESETS[code]) {
                         const hp = JOB_PRESETS[code];
@@ -8108,7 +8203,7 @@ ${sumContent}
                         if (hp.skills && !$('charSkills').value.includes(hp.skills.split('\n')[0])) $('charSkills').value += '\n' + hp.skills;
                     }
                 });
-                sch({
+                return {
                     dn: $('charDisasterName').value || DCHR.dn, days: $('charDays').value || DCHR.days,
                     zr: DCHR.zr, env: $('charEnv').value || DCHR.env,
                     geo: $('charGeo').value || DCHR.geo, loc: $('charLocations').value || DCHR.loc,
@@ -8132,10 +8227,34 @@ ${sumContent}
                     abilityDesc: $('charAbilityDesc').value || (ABILITIES[$('charAbilityPreset').value] || {}).desc || '',
                     abilityPreset: $('charAbilityPreset').value || '',
                     _charCreated: true
-                });
-                if (hidden.length) tst('已选择预设职业：' + hidden.map(h => JOB_PRESETS[h] ? JOB_PRESETS[h].name : h).join('、'));
+                };
+            }
+            $('btnCharConfirm').addEventListener('click', () => {
+                const c = _collectCharFromForm();
+                sch(c);
+                if (c.hiddenPresets && c.hiddenPresets.length) tst('已选择预设职业：' + c.hiddenPresets.map(h => JOB_PRESETS[h] ? JOB_PRESETS[h].name : h).join('、'));
                 $('charModal').style.display = 'none';
                 stg();
+            });
+            // 新增：仅应用设定（不重开），用于游戏进行中修改角色卡/世界设定
+            $('btnCharApplyOnly') && $('btnCharApplyOnly').addEventListener('click', () => {
+                try {
+                    const c = _collectCharFromForm();
+                    // 保留 _prevDeath 等元数据
+                    const oldChr = gch() || {};
+                    if (oldChr._prevDeath) c._prevDeath = oldChr._prevDeath;
+                    sch(c);
+                    // 应用后立刻自动存档
+                    if (window.autoSaveAll && typeof window.autoSaveAll === 'function') {
+                        window.autoSaveAll('charEdit');
+                    }
+                    if (upui) try { upui(); } catch(_) {}
+                    $('charModal').style.display = 'none';
+                    tst('✎ 角色卡与世界设定已更新（保留进度/状态）');
+                    snotify('info', '设定已应用', '保留当前进度，仅修改角色卡与世界设定');
+                } catch (e) {
+                    tst('应用设定失败：' + (e && e.message ? e.message : e));
+                }
             });
             $('btnCharSkip').addEventListener('click', () => { const d = JSON.parse(JSON.stringify(DCHR)); d._charCreated = true; sch(d); $('charModal').style.display = 'none'; stg(); });
             // Character export function

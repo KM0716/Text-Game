@@ -1162,11 +1162,52 @@
             });
         }
         // 渲染成就面板
-        function renderAchievementsPanel() {
+        function renderAchievementsPanel(filter) {
             const list = $('achievementsList');
             if (!list) return;
+            // 持久化筛选状态
+            if (renderAchievementsPanel._filter === undefined) renderAchievementsPanel._filter = 'all';
+            if (filter === undefined) filter = renderAchievementsPanel._filter;
+            renderAchievementsPanel._filter = filter;
+            // 进度统计
+            const total = ACHIEVEMENTS.length;
+            const unlockedCount = ACHIEVEMENTS.filter(a => unlockedAchievements.has(a.id)).length;
+            const pct = total > 0 ? Math.round((unlockedCount / total) * 100) : 0;
             list.innerHTML = '';
-            ACHIEVEMENTS.forEach(a => {
+            // 顶部：进度条 + 筛选
+            const headerDiv = document.createElement('div');
+            headerDiv.className = 'ach-header-bar';
+            headerDiv.innerHTML = '<div class="ach-progress">' +
+                '<span class="ach-prog-lbl">成就进度</span>' +
+                '<div class="ach-prog-bar"><div class="ach-prog-fg" style="width:' + pct + '%;"></div></div>' +
+                '<span class="ach-prog-val">' + unlockedCount + '/' + total + ' (' + pct + '%)</span>' +
+            '</div>' +
+            '<div class="ach-filters">' +
+                '<button class="btn-ach-filter' + (filter === 'all' ? ' active' : '') + '" data-filter="all">全部 ' + total + '</button>' +
+                '<button class="btn-ach-filter' + (filter === 'unlocked' ? ' active' : '') + '" data-filter="unlocked">已解锁 ' + unlockedCount + '</button>' +
+                '<button class="btn-ach-filter' + (filter === 'locked' ? ' active' : '') + '" data-filter="locked">未解锁 ' + (total - unlockedCount) + '</button>' +
+            '</div>';
+            list.appendChild(headerDiv);
+            // 筛选按钮事件
+            headerDiv.querySelectorAll('.btn-ach-filter').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    renderAchievementsPanel(btn.dataset.filter);
+                });
+            });
+            // 成就列表（按筛选）
+            const filtered = ACHIEVEMENTS.filter(a => {
+                if (filter === 'unlocked') return unlockedAchievements.has(a.id);
+                if (filter === 'locked') return !unlockedAchievements.has(a.id);
+                return true;
+            });
+            if (filtered.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'ach-empty';
+                empty.textContent = '暂无成就';
+                list.appendChild(empty);
+                return;
+            }
+            filtered.forEach(a => {
                 const unlocked = unlockedAchievements.has(a.id);
                 const el = document.createElement('div');
                 el.className = 'achievement-item' + (unlocked ? '' : ' locked');
@@ -1186,18 +1227,65 @@
             if (eventDisplayLog.length > 50) eventDisplayLog.pop();
         }
         // 渲染事件面板
-        function renderEventsPanel() {
+        function renderEventsPanel(filter) {
             const list = $('eventsList');
             if (!list) return;
+            // 持久化筛选
+            if (renderEventsPanel._filter === undefined) renderEventsPanel._filter = 'all';
+            if (filter === undefined) filter = renderEventsPanel._filter;
+            renderEventsPanel._filter = filter;
             if (eventDisplayLog.length === 0) {
-                list.innerHTML = '<div style="text-align:center;color:var(--text-muted);padding:20px;">暂无突发事件记录</div>';
+                list.innerHTML = '<div class="ev-empty">暂无突发事件记录<br><span class="ev-empty-hint">事件会在游戏中自然触发（状态过低、夜晚、尸群威胁等）</span></div>';
                 return;
             }
             list.innerHTML = '';
-            eventDisplayLog.forEach(e => {
+            // 类型映射：颜色 + 标签
+            const typeMap = {
+                danger: { color: 'var(--color-danger, #8a3a3a)', icon: '⚠️', label: '危险' },
+                warning: { color: 'var(--color-warn, #b58a3a)', icon: '⚡', label: '警告' },
+                info: { color: 'var(--accent)', icon: 'ℹ️', label: '信息' },
+                achievement: { color: 'var(--notify-add, #4a9a6f)', icon: '🏆', label: '成就' },
+                status: { color: 'var(--text-secondary)', icon: '📊', label: '状态' }
+            };
+            // 统计各类型数量
+            const counts = {};
+            eventDisplayLog.forEach(e => { counts[e.type] = (counts[e.type] || 0) + 1; });
+            // 筛选条
+            const filterBar = document.createElement('div');
+            filterBar.className = 'ev-filter-bar';
+            const filterKeys = ['all', 'danger', 'warning', 'info', 'achievement'];
+            filterBar.innerHTML = filterKeys.map(k => {
+                if (k === 'all') {
+                    return '<button class="btn-ev-filter' + (filter === 'all' ? ' active' : '') + '" data-filter="all">全部 ' + eventDisplayLog.length + '</button>';
+                }
+                const cnt = counts[k] || 0;
+                const m = typeMap[k];
+                return '<button class="btn-ev-filter' + (filter === k ? ' active' : '') + '" data-filter="' + k + '" style="border-color:' + (filter === k ? m.color : 'var(--border-light)') + ';">' + m.icon + ' ' + m.label + ' ' + cnt + '</button>';
+            }).join('');
+            list.appendChild(filterBar);
+            // 筛选按钮事件
+            filterBar.querySelectorAll('.btn-ev-filter').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    renderEventsPanel(btn.dataset.filter);
+                });
+            });
+            // 事件列表
+            const filtered = eventDisplayLog.filter(e => filter === 'all' || e.type === filter);
+            if (filtered.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'ev-empty';
+                empty.innerHTML = '此分类暂无事件';
+                list.appendChild(empty);
+                return;
+            }
+            filtered.forEach(e => {
+                const m = typeMap[e.type] || typeMap.info;
                 const el = document.createElement('div');
-                el.className = 'event-item';
-                el.innerHTML = '<div class="ev-time">' + esc(e.time) + '</div>' + esc(e.text);
+                el.className = 'event-item ev-type-' + e.type;
+                el.style.borderLeftColor = m.color;
+                el.innerHTML = '<div class="ev-time">' + esc(e.time) + '</div>' +
+                    '<span class="ev-icon">' + m.icon + '</span>' +
+                    '<span class="ev-text">' + esc(e.text) + '</span>';
                 list.appendChild(el);
             });
         }
@@ -1552,7 +1640,7 @@
             const d = document.createElement('div');
             d.className = 'modal-overlay';
             d.style.zIndex = '10005';
-            d.innerHTML = '<div class="modal-panel" style="max-width:400px;text-align:center;padding:30px 24px;">' +
+            d.innerHTML = '<div class="modal-panel" style="max-width:420px;text-align:center;padding:30px 24px;">' +
                 '<div style="font-size:2.5rem;margin-bottom:12px;">💀</div>' +
                 '<h3 style="color:var(--color-danger);margin-bottom:12px;">末日终结</h3>' +
                 '<p style="font-size:0.82rem;color:var(--ink-soft);line-height:1.6;margin-bottom:16px;">' +
@@ -1566,13 +1654,48 @@
                     '"在这片废墟中，你的故事画上了句号。但末日仍在继续..."' +
                 '</div>' +
                 '<div style="display:flex;flex-direction:column;gap:8px;justify-content:center;">' +
-                    '<button class="btn-header accent" id="deathNewChar" style="width:100%;">创建新角色</button>' +
-                    '<button class="btn-header" id="deathLoadSave" style="width:100%;">读取最近存档</button>' +
-                    '<button class="btn-header" id="deathViewStats" style="width:100%;font-size:0.7rem;">查看结局统计</button>' +
+                    '<button class="btn-header accent" id="deathRestartCur" style="width:100%;">🔁 用当前角色卡重新开局</button>' +
+                    '<button class="btn-header" id="deathNewChar" style="width:100%;">🆕 创建新角色</button>' +
+                    '<button class="btn-header" id="deathLoadSave" style="width:100%;">💾 读取最近存档</button>' +
+                    '<button class="btn-header" id="deathViewStats" style="width:100%;font-size:0.7rem;">📊 查看结局统计</button>' +
                 '</div>' +
             '</div>';
             document.body.appendChild(d);
             window._deathLock = false; // 弹窗已生成，解除防重入锁
+            // ===== 新增：用当前角色卡重新开局（保留 ch, 重置 st/clk/sbx/hist） =====
+            d.querySelector('#deathRestartCur').onclick = () => {
+                try {
+                    d.remove();
+                    // 保留当前角色卡，仅重置状态/时钟/历史/沙盒
+                    const keepChr = (typeof gch === 'function') ? gch() : null;
+                    if (keepChr) {
+                        // 在角色卡上追加 "前次死亡" 标记（彩蛋）
+                        try {
+                            const deathInfo = JSON.parse(localStorage.getItem('dz_death_info') || '{}');
+                            if (deathInfo.location) {
+                                keepChr._prevDeath = {
+                                    location: deathInfo.location,
+                                    day: deathInfo.day,
+                                    reason: deathInfo.reason,
+                                    at: Date.now()
+                                };
+                                if (typeof sch === 'function') sch(keepChr);
+                            }
+                        } catch(_) {}
+                    }
+                    ccb();
+                    sst(JSON.parse(JSON.stringify(DSTA)));
+                    svh([]);
+                    if (typeof stopIdle === 'function') stopIdle();
+                    if (typeof rbt === 'function') rbt();
+                    if (typeof upui === 'function') upui();
+                    // 清除死亡标记，允许新死亡
+                    const newSta = gst();
+                    if (newSta) { newSta.deathShown = false; newSta.deathProcessed = false; newSta.deathTriggered = false; sst(newSta); }
+                    tst('🔁 已用当前角色卡重新开局。前次死亡地点：' + deathLocation);
+                    snotify('info', '新局开始', '保留角色卡，世界已重置');
+                } catch (e) { tst('重新开局失败：' + (e && e.message ? e.message : e)); }
+            };
             // Create new character
             d.querySelector('#deathNewChar').onclick = () => {
               try {

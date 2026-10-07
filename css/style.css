@@ -6,6 +6,53 @@
             font-style: normal;
             font-display: swap;
         }
+        /* ===== AI 生成上锁：禁用关键按钮 + 视觉反馈 ===== */
+        body.ai-locked {
+            cursor: progress;
+        }
+        body.ai-locked::after {
+            content: '';
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                45deg,
+                transparent 0,
+                transparent 8px,
+                rgba(139, 69, 19, 0.04) 8px,
+                rgba(139, 69, 19, 0.04) 16px
+            );
+            z-index: 9990;
+            animation: ai-lock-pulse 1.6s ease-in-out infinite;
+        }
+        @keyframes ai-lock-pulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 0.9; }
+        }
+        body.ai-locked .btn-header[disabled],
+        body.ai-locked button[disabled] {
+            opacity: 0.55 !important;
+            cursor: not-allowed !important;
+        }
+        /* 输入栏 busy 状态：减弱视觉重点 */
+        .input-textarea.busy {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+        /* AI 锁定提示徽章 */
+        .ai-lock-badge {
+            position: fixed;
+            top: 8px; right: 8px;
+            background: var(--color-warn, #b58a3a);
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 12px 2px 12px 2px;
+            font-size: 0.7rem;
+            font-weight: bold;
+            z-index: 9995;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+            animation: ai-lock-pulse 1.6s ease-in-out infinite;
+        }
         :root {
             --bg: #f5f0e6;
             --bg-paper: #fdfaf2;
@@ -570,6 +617,147 @@
             font-size: 0.7rem;
             transition: transform 0.2s, box-shadow 0.2s;
             position: relative;
+        }
+        /* ===== 成就/事件 模态顶部条 ===== */
+        .ach-header-bar, .ev-filter-bar {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            margin-bottom: 8px;
+            padding: 8px 10px;
+            background: var(--bg-paper-alt);
+            border: 1px dashed var(--border-light);
+            border-radius: 6px;
+        }
+        .ach-progress {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 0.72rem;
+        }
+        .ach-prog-lbl {
+            min-width: 56px;
+            color: var(--ink);
+            font-weight: bold;
+            font-size: 0.7rem;
+        }
+        .ach-prog-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--grid-cell-bg, rgba(0,0,0,0.08));
+            border: 1px solid var(--divider);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .ach-prog-fg {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent) 0%, var(--notify-add, #4a9a6f) 100%);
+            border-radius: 3px;
+            transition: width 0.5s ease;
+        }
+        .ach-prog-val {
+            color: var(--accent);
+            font-weight: bold;
+            font-size: 0.7rem;
+            min-width: 70px;
+            text-align: right;
+        }
+        .ach-filters, .ev-filter-bar {
+            display: flex !important;
+            gap: 4px;
+            flex-wrap: wrap;
+        }
+        .btn-ach-filter, .btn-ev-filter {
+            padding: 3px 10px;
+            border: 1.4px solid var(--border-light);
+            border-radius: 4px 10px 4px 10px;
+            background: var(--button-bg);
+            color: var(--text);
+            font-size: 0.68rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+        .btn-ach-filter:hover, .btn-ev-filter:hover {
+            background: var(--button-hover);
+            transform: translateY(-1px);
+        }
+        .btn-ach-filter.active, .btn-ev-filter.active {
+            background: var(--accent);
+            color: #fff;
+            border-color: var(--accent);
+        }
+        .ach-empty, .ev-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 24px 10px;
+            font-style: italic;
+            font-size: 0.78rem;
+            line-height: 1.5;
+        }
+        .ev-empty-hint {
+            display: block;
+            font-size: 0.66rem;
+            margin-top: 4px;
+            opacity: 0.7;
+        }
+        /* ===== 事件项 ===== */
+        .event-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 8px;
+            margin: 3px 0;
+            background: var(--bg-paper);
+            border-left: 3px solid var(--accent);
+            border-radius: 4px;
+            font-size: 0.72rem;
+        }
+        .event-item .ev-time {
+            color: var(--text-muted);
+            font-size: 0.62rem;
+            min-width: 80px;
+            font-family: var(--font-mono, monospace);
+        }
+        .event-item .ev-icon {
+            font-size: 0.85rem;
+        }
+        .event-item .ev-text {
+            flex: 1;
+            color: var(--ink);
+        }
+        /* ===== 挂机配置：风险预览 ===== */
+        .ic-risk {
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            background: rgba(181, 138, 58, 0.08);
+            border: 1px dashed var(--color-warn, #b58a3a);
+            border-radius: 6px;
+            font-size: 0.7rem;
+            color: var(--color-warn);
+        }
+        .ic-risk.danger {
+            background: rgba(138, 58, 58, 0.08);
+            border-color: var(--color-danger, #8a3a3a);
+            color: var(--color-danger);
+            font-weight: bold;
+        }
+        .ic-risk.safe {
+            background: rgba(74, 154, 111, 0.08);
+            border-color: var(--notify-add, #4a9a6f);
+            color: var(--notify-add, #4a9a6f);
+        }
+        .ic-tips {
+            padding: 6px 10px;
+            margin-bottom: 8px;
+            background: var(--bg-paper-alt);
+            border: 1px dotted var(--divider);
+            border-radius: 6px;
+        }
+        .ic-tip-item {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+            line-height: 1.5;
         }
         .achievement-item:not(.locked):hover {
             transform: translateY(-1px) rotate(-0.3deg);
@@ -4157,4 +4345,285 @@
     border-left: 3px double #8a6b3a;
 }
 .vn-panel--letter .vn-panel-body { font-family: 'KaiTi', 'SimSun', serif; color: #3a2a1a; }
+
+/* ================================================================
+   移动端人性化适配（综合：触摸优化、可读性、安全区、按钮热区）
+   ================================================================ */
+
+/* 1. 触摸热区优化：所有可点击元素至少 44x44px（iOS HIG / Material Design） */
+@media (max-width: 840px) {
+    button,
+    .btn-header,
+    .btn-modal,
+    .preset-btn,
+    .map-item,
+    .bgm-cat,
+    .btn-ach-filter,
+    .btn-ev-filter,
+    .btn-codex-filter,
+    .nav-menu-row button {
+        min-height: 36px;
+        min-width: 36px;
+        touch-action: manipulation; /* 消除 300ms 点击延迟 */
+    }
+    /* 主操作按钮更大 */
+    .btn-modal.primary,
+    .btn-modal.accent,
+    .btn-header.accent {
+        min-height: 44px;
+        font-size: 0.85rem;
+    }
+}
+
+/* 2. 输入栏：移动端键盘弹出时不遮挡 */
+@media (max-width: 840px) {
+    /* viewport-fit=cover 下使用 safe-area-inset 避免被刘海/底部手势条遮挡 */
+    .input-bar,
+    #inputBar,
+    .chat-input-bar {
+        padding-bottom: env(safe-area-inset-bottom, 0);
+        padding-bottom: constant(safe-area-inset-bottom, 0); /* iOS < 11.2 */
+    }
+    /* 输入框 focus 时降低视口高度，避免键盘遮挡 */
+    .input-textarea {
+        max-height: 30vh;
+    }
+}
+
+/* 3. 模态框：移动端满屏 + 滚动优化 */
+@media (max-width: 600px) {
+    .modal-overlay {
+        padding: 0 !important;
+        align-items: stretch !important;
+    }
+    .modal-panel {
+        width: 100% !important;
+        max-width: 100% !important;
+        max-height: 100vh !important;
+        height: 100vh !important;
+        border-radius: 0 !important;
+        margin: 0 !important;
+        overflow-y: auto !important;
+        -webkit-overflow-scrolling: touch;
+    }
+    .modal-close {
+        top: 12px !important;
+        right: 12px !important;
+        font-size: 1.5rem !important;
+        min-width: 44px;
+        min-height: 44px;
+        z-index: 10;
+    }
+    /* 死亡弹窗、AI锁定徽章适配 */
+    .ai-lock-badge {
+        top: env(safe-area-inset-top, 8px);
+        right: 12px;
+    }
+}
+
+/* 4. 角色卡 / 背包 / 地图：小屏紧凑 */
+@media (max-width: 600px) {
+    .cc-header {
+        padding: 8px 10px !important;
+    }
+    .cc-avatar {
+        width: 40px;
+        height: 40px;
+        font-size: 1.4rem;
+    }
+    .cc-name {
+        font-size: 0.95rem;
+    }
+    .cc-vital-row {
+        font-size: 0.68rem;
+    }
+    .bp-stats-bar {
+        padding: 6px 8px;
+    }
+    .bp-stat-val {
+        font-size: 0.62rem;
+        min-width: 90px;
+    }
+    /* 地图：移动端列表更紧凑 */
+    .map-item {
+        font-size: 0.7rem;
+        padding: 6px 8px;
+    }
+    .map-legend {
+        font-size: 0.58rem;
+        gap: 3px 6px;
+    }
+    .map-danger-badge {
+        font-size: 0.55rem;
+    }
+    /* 势力卡：紧凑 */
+    .fac-card {
+        padding: 6px 8px;
+    }
+    .fac-name {
+        font-size: 0.74rem;
+    }
+}
+
+/* 5. 图鉴搜索栏：移动端占满 */
+@media (max-width: 600px) {
+    .codex-toolbar {
+        flex-direction: column;
+    }
+    .codex-search,
+    .codex-sort {
+        width: 100%;
+    }
+    .codex-sort {
+        max-width: 100%;
+    }
+}
+
+/* 6. 顶部导航：移动端简化 */
+@media (max-width: 600px) {
+    .nav-menu-section .nav-menu-title {
+        font-size: 0.65rem;
+    }
+    .nav-menu-row button {
+        font-size: 0.7rem !important;
+        padding: 4px 8px !important;
+    }
+}
+
+/* 7. 侧边栏：移动端折叠优化 */
+@media (max-width: 840px) {
+    .side-panel {
+        max-height: 50vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+    .sp-card {
+        padding: 6px 8px;
+    }
+    .sp-row {
+        font-size: 0.68rem;
+    }
+}
+
+/* 8. 触摸长按：区分单击与长按（防止误触） */
+@media (hover: none) and (pointer: coarse) {
+    .map-item:hover,
+    .btn-header:hover,
+    .btn-codex-filter:hover {
+        transform: none; /* 移动端取消 hover 上浮效果 */
+    }
+    /* 长按反馈：active 状态明显 */
+    .map-item:active,
+    .btn-header:active {
+        background: rgba(139, 69, 19, 0.12);
+        transform: scale(0.98);
+    }
+}
+
+/* 9. 字号：移动端可读性 */
+@media (max-width: 480px) {
+    body {
+        font-size: 14px;
+    }
+    .vn-text,
+    .vn-panel-body,
+    .chat-message {
+        font-size: 0.82rem;
+        line-height: 1.55;
+    }
+    /* 玩家气泡、AI 回复：避免字号过大导致一屏字数太少 */
+    .player-bubble,
+    .ai-bubble {
+        font-size: 0.78rem !important;
+    }
+}
+
+/* 10. 横屏适配：宽度足够时降低高度负担 */
+@media (max-width: 840px) and (orientation: landscape) {
+    .modal-panel {
+        max-height: 95vh !important;
+    }
+    .input-textarea {
+        max-height: 22vh;
+    }
+}
+
+/* 11. 选项气泡：移动端更易点击 */
+@media (max-width: 600px) {
+    .vn-choice-container .vn-choice,
+    .choice-bubble {
+        min-height: 44px;
+        padding: 10px 14px;
+        font-size: 0.78rem;
+    }
+}
+
+/* 12. 减少动效：尊重 prefers-reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+    }
+    .ai-lock-badge,
+    body.ai-locked::after {
+        animation: none !important;
+    }
+}
+
+/* 13. 焦点辅助：键盘/触摸焦点可见 */
+@media (max-width: 840px) {
+    button:focus-visible,
+    .btn-header:focus-visible,
+    input:focus-visible,
+    select:focus-visible,
+    textarea:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+    }
+}
+
+/* 14. 输入栏：移动端固定底部 + 安全区 + 键盘适配 */
+@media (max-width: 600px) {
+    .input-bar-fixed {
+        position: fixed;
+        left: 0; right: 0;
+        bottom: 0;
+        z-index: 50;
+        background: var(--bg-paper);
+        border-top: 1px solid var(--divider);
+        padding: 6px 10px;
+        padding-bottom: max(6px, env(safe-area-inset-bottom, 0));
+        padding-bottom: max(6px, constant(safe-area-inset-bottom, 0));
+    }
+}
+
+/* 15. 加载/演算指示器：移动端位置适配 */
+@media (max-width: 600px) {
+    .ai-lock-badge {
+        font-size: 0.62rem;
+        padding: 3px 8px;
+    }
+}
+
+/* 16. 工具提示：移动端不显示 hover tooltip，改为长按触发 */
+@media (hover: none) and (pointer: coarse) {
+    [data-title]:hover::after { display: none; }
+    [data-title]:active::after {
+        content: attr(data-title);
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--ink, #2a1d0a);
+        color: #fff;
+        padding: 4px 8px;
+        border-radius: 4px;
+        font-size: 0.6rem;
+        white-space: nowrap;
+        z-index: 100;
+    }
+}
 

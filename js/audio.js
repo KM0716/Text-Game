@@ -450,29 +450,68 @@ function initAutoBGM() {
 
 function bgmAutoSwitch(context) {
     if (!BGM.enabled) return;
+    // 自动切换开关：若用户手动关闭则不自动切
+    if (localStorage.getItem('vn_bgm_auto') === '0') return;
     const loc = (context && context.location) || '';
     const season = (context && context.season) || '';
     const weather = (context && context.weather) || '';
-    const _s = (typeof window.gst === 'function') ? window.gst() : { hp: 100, fatigue: 0 };
+    const _s = (typeof window.gst === 'function') ? window.gst() : { hp: 100, fatigue: 0, hunger: 70, thirst: 70, bodyTemp: 37 };
     const _c = (typeof window.gch === 'function') ? window.gch() : { mental: '稳定' };
     const mentality = _c.mental || '';
     const hp = (_s && _s.hp != null) ? _s.hp : 100;
     const fatigue = (_s && _s.fatigue != null) ? _s.fatigue : 0;
+    const hunger = (_s && _s.hunger != null) ? _s.hunger : 70;
+    const spirit = (_s && _s.spirit != null) ? _s.spirit : 85;
+    const bodyTemp = (_s && _s.bodyTemp != null) ? _s.bodyTemp : 37;
+    const dayPhase = (context && context.dayPhase) || ''; // 'morning'/'day'/'dusk'/'night'
 
+    // 优先级排序（从最特殊到最普通）
+
+    // 1. 战斗/Boss：context 显式标记
+    if (context && context.bgmForce) {
+        bgmPlayCategory(context.bgmForce);
+        return;
+    }
+    // 2. 死亡边缘：HP < 20 + 精神 < 30
+    if (hp < 20 || spirit < 25) { bgmPlayCategory('horror'); return; }
+    // 3. 危急状态：HP < 50
+    if (hp < 50) { bgmPlayCategory('danger'); return; }
+    // 4. 精神创伤/焦虑
+    if (mentality === '创伤' || mentality === '崩溃' || spirit < 40) { bgmPlayCategory('horror'); return; }
+    if (mentality === '焦虑' && fatigue > 50) { bgmPlayCategory('sad'); return; }
+    // 5. 极端体温
+    if (bodyTemp <= 33 || bodyTemp >= 41) { bgmPlayCategory('survival'); return; }
+    // 6. 极端饥饿/口渴
+    if (hunger < 15 || _s.thirst < 15) { bgmPlayCategory('danger'); return; }
+    // 7. 雨雪天气
+    if (/暴雨|大雨|雨/.test(weather)) { bgmPlayCategory('rain'); return; }
+    if (/雪|暴雪/.test(weather)) { bgmPlayCategory('survival'); return; }
+    // 8. 室内/营地：考虑昼夜和疲惫
     if (/公寓|营地|小屋|避难所|地下室|仓库|据点|屋|室|居|家|卧室/.test(loc)) {
-        if (fatigue > 60 || mentality === '焦虑' || mentality === '悲痛') bgmPlayCategory('sad');
+        if (dayPhase === 'night' && fatigue > 60) bgmPlayCategory('sad');
+        else if (fatigue > 70 || mentality === '悲痛') bgmPlayCategory('sad');
+        else if (dayPhase === 'night') bgmPlayCategory('camp');
         else bgmPlayCategory('camp');
         return;
     }
-    if (hp < 50) { bgmPlayCategory('danger'); return; }
-    if (mentality === '创伤' || mentality === '焦虑') { bgmPlayCategory('horror'); return; }
-    if (/雨/.test(weather)) { bgmPlayCategory('rain'); return; }
-    if (/雪/.test(weather)) { bgmPlayCategory('survival'); return; }
-    if (/医院|警局|学校|商场|超市|工厂|车站|地铁|隧道|下水道/.test(loc)) { bgmPlayCategory('explore'); return; }
-    if (/森林|树林|山|野外|公路|桥|街区|废墟|城市|街道|商业区/.test(loc)) { bgmPlayCategory('survival'); return; }
-    if (season === '春' || season === '夏') { bgmPlayCategory('hope'); return; }
-    if (season === '秋') { bgmPlayCategory('explore'); return; }
-    if (season === '冬') { bgmPlayCategory('horror'); return; }
+    // 9. 危险/恐怖地点
+    if (/医院|警局|学校|商场|超市|工厂|车站|地铁|隧道|下水道|停尸间|实验室|邪教/.test(loc)) {
+        if (dayPhase === 'night') bgmPlayCategory('horror');
+        else bgmPlayCategory('explore');
+        return;
+    }
+    // 10. 户外探索
+    if (/森林|树林|山|野外|公路|桥|街区|废墟|城市|街道|商业区/.test(loc)) {
+        if (dayPhase === 'night') bgmPlayCategory('danger');
+        else if (season === '冬') bgmPlayCategory('survival');
+        else bgmPlayCategory('survival');
+        return;
+    }
+    // 11. 季节兜底
+    if (season === '春') { bgmPlayCategory('hope'); return; }
+    if (season === '夏') { bgmPlayCategory('explore'); return; }
+    if (season === '秋') { bgmPlayCategory('sad'); return; }
+    if (season === '冬') { bgmPlayCategory('survival'); return; }
     bgmPlayCategory('explore');
 }
 
@@ -521,6 +560,11 @@ function bgmOpenPicker() {
             '#bgmPicker .bgm-cat.active{background:var(--accent,#9c4718);color:#fff;border-color:var(--accent,#9c4718);box-shadow:0 3px 0 rgba(60,40,12,.3);}',
             '#bgmPicker .bgm-cur{margin:2px 0 10px;padding:8px 10px;border-radius:6px;background:rgba(160,90,30,.08);border:1px dashed rgba(120,78,30,.35);font-size:.74rem;color:var(--text-muted,#5e4118);line-height:1.5;}',
             '#bgmPicker .bgm-cur b{color:var(--accent,#9c4718);}',
+            '#bgmPicker .bgm-theme-hint{margin-top:4px;font-size:.7rem;color:var(--text-muted,#5e4118);}',
+            '#bgmPicker .bgm-theme-hint b{color:var(--ink,#2a1d0a);}',
+            '#bgmPicker .bgm-auto-row{display:flex;align-items:center;margin-bottom:8px;padding:6px 10px;background:rgba(139,69,19,0.06);border-radius:6px;border:1px dashed var(--border-light,rgba(120,78,30,.3));}',
+            '#bgmPicker .bgm-auto-row label{display:flex;align-items:center;gap:6px;cursor:pointer;font-size:.74rem;color:var(--ink,#2a1d0a);}',
+            '#bgmPicker .bgm-auto-row input[type=checkbox]{accent-color:var(--accent,#9c4718);width:16px;height:16px;cursor:pointer;}',
             '#bgmPicker .bgm-vol{display:flex;align-items:center;gap:8px;margin-top:2px;padding-top:10px;border-top:1px dashed var(--border-light,rgba(120,78,30,.3));font-size:.76rem;color:var(--text-muted,#5e4118);}',
             '#bgmPicker input[type=range]{flex:1;accent-color:var(--accent,#9c4718);min-height:24px;}',
             '#bgmPickerClose{cursor:pointer;color:var(--text-muted,#6a4b22);font-size:1.4rem;line-height:1;padding:2px 8px;border-radius:6px;transition:all .15s ease;}',
@@ -541,15 +585,45 @@ function bgmOpenPicker() {
     const catsHtml = cats.map(c => '<div class="bgm-cat' + (BGM._currentCategory === c.key ? ' active' : '') + '" data-cat="' + c.key + '" title="' + c.name + '：点击切换到该分类的背景音乐">' + c.name + '</div>').join('');
     const marker = BGM.enabled ? '🎵' : '🔇';
     const curCat = cats.find(c => c.key === BGM._currentCategory);
-    const curLine = '<div class="bgm-cur">当前：<b>' + esc(BGM.enabled ? ((curCat ? curCat.name : BGM._currentCategory) + (BGM.current ? ' · ' + BGM.current : '')) : '已关闭') + '</b>' + (BGM.enabled ? ' · 点击下方分类切换，或拖动下方调节音量' : ' · 点击「音乐」按钮即可开启') + '</div>';
+    // 自动切换状态：从 localStorage 读取
+    const autoSwitchOn = localStorage.getItem('vn_bgm_auto') !== '0';
+    // 主题/情境指示：基于当前游戏状态推断应播放什么
+    let themeHint = '—';
+    try {
+        const _s = (typeof window.gst === 'function') ? window.gst() : null;
+        const _c = (typeof window.gch === 'function') ? window.gch() : null;
+        if (_s && _c) {
+            const hints = [];
+            if (_s.hp < 50) hints.push('HP低危');
+            if (_s.spirit < 30) hints.push('精神低');
+            if (_s.hunger < 20) hints.push('饥饿');
+            if (_s.bodyTemp <= 33 || _s.bodyTemp >= 41) hints.push('体温异常');
+            if (_c.mental === '创伤') hints.push('创伤');
+            else if (_c.mental === '焦虑') hints.push('焦虑');
+            else if (_c.mental === '崩溃') hints.push('精神崩溃');
+            if (_s.location) hints.push(_s.location);
+            themeHint = hints.length ? hints.join(' / ') : '正常探索';
+        }
+    } catch(_) {}
+    const curLine = '<div class="bgm-cur">当前：<b>' + esc(BGM.enabled ? ((curCat ? curCat.name : BGM._currentCategory) + (BGM.current ? ' · ' + BGM.current : '')) : '已关闭') + '</b>' + (BGM.enabled ? ' · 点击下方分类切换，或拖动下方调节音量' : ' · 点击「音乐」按钮即可开启') + '</div>' +
+        '<div class="bgm-theme-hint">🔊 当前主题：<b>' + esc(themeHint) + '</b></div>';
     el.innerHTML =
         '<h5><span>' + marker + ' 背景音乐选择</span><span id="bgmPickerClose" title="关闭（Esc）">×</span></h5>' +
         curLine +
+        '<div class="bgm-auto-row"><label><input type="checkbox" id="bgmAutoSwitch"' + (autoSwitchOn ? ' checked' : '') + '><span>自动切换（按状态/地点）</span></label></div>' +
         '<div class="bgm-grid">' + catsHtml + '</div>' +
         '<div class="bgm-vol"><span>音量</span><input type="range" id="bgmVolRange" min="0" max="1" step="0.02" value="' + BGM.volume + '"><span id="bgmVolLabel" style="min-width:42px;text-align:right;font-variant-numeric:tabular-nums;font-weight:700;">' + Math.round(BGM.volume * 100) + '%</span></div>' +
         '<div class="bgm-actions"><button type="button" class="bgm-stop" id="bgmStopBtn">停止所有音乐</button></div>';
     overlay.appendChild(el);
     document.body.appendChild(overlay);
+    // 自动切换开关：保存到 localStorage
+    const autoChk = $('bgmAutoSwitch');
+    if (autoChk) {
+        autoChk.addEventListener('change', () => {
+            localStorage.setItem('vn_bgm_auto', autoChk.checked ? '1' : '0');
+            _safeSnotify('info', 'BGM', autoChk.checked ? '已开启自动切换' : '已关闭自动切换');
+        });
+    }
     // 事件绑定：分类点击 → 立即切换并高亮；拖动音量 → 实时更新
     el.querySelectorAll('.bgm-cat').forEach(btn => {
         btn.addEventListener('click', () => {

@@ -226,6 +226,11 @@
         }
 
         panel.querySelector('#cheatApply').addEventListener('click', () => {
+            // AI 生成中禁止修改状态
+            if (document.body.classList.contains('ai-locked')) {
+                tst('⚠️ AI 演算进行中，无法修改状态，请稍候…');
+                return;
+            }
             const v = parseFloat(input.value);
             if (isNaN(v)) { tst('请输入有效数字'); return; }
             const clamped = Math.max(def.min, Math.min(def.max, v));
