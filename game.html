@@ -351,7 +351,10 @@
         <input type="url" id="welEndpoint" placeholder="端点地址（自动填充）">
         <label>模型</label>
         <p class="field-hint">选择或输入模型名称，如 gpt-4o、deepseek-chat</p>
-        <select id="welModelSelect"><option>gpt-4o</option></select>
+        <div class="model-fetch-row" style="display:flex;gap:4px;align-items:center;">
+            <select id="welModelSelect" style="flex:1;"><option>gpt-4o</option></select>
+            <button type="button" class="btn-modal" id="btnFetchModelsWel" style="white-space:nowrap;font-size:0.66rem;padding:4px 8px;">🔄 拉取</button>
+        </div>
         <input type="text" id="welModel" placeholder="模型名" style="display:none;">
         <label>API 密钥</label>
         <p class="field-hint">在服务商后台获取的 API Key，本地存储不会上传</p>
@@ -546,8 +549,11 @@
             <p class="field-hint">API 接口地址，通常以 /v1/chat/completions 结尾</p>
             <input id="apiEndpoint" placeholder="端点">
             <label>模型名称</label>
-            <p class="field-hint">使用的模型，如 gpt-4o、deepseek-chat、llama3 等</p>
-            <select id="apiModelSelect"><option>gpt-4o</option></select>
+            <p class="field-hint">点击「拉取模型」从API自动获取可用模型列表，或手动输入</p>
+            <div class="model-fetch-row" style="display:flex;gap:4px;align-items:center;">
+                <select id="apiModelSelect" style="flex:1;"><option>gpt-4o</option></select>
+                <button type="button" class="btn-modal" id="btnFetchModels" style="white-space:nowrap;font-size:0.66rem;padding:4px 8px;">🔄 拉取</button>
+            </div>
             <input id="apiModel" placeholder="模型" style="display:none;">
             <label>API 密钥</label>
             <p class="field-hint">在服务商后台获取的密钥，仅本地存储</p>

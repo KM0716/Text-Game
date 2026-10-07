@@ -862,6 +862,80 @@
                     signal: signal
                 });
             };
+            // ====== 拉取模型列表：从 /v1/models 端点获取可用模型，替代固定预设列表 ======
+            // 大多数 OpenAI 兼容 API 都支持 GET {base}/v1/models，返回 { data: [{id: "模型名"}, ...] }
+            window._fetchModels = async function(endpoint, apiKey) {
+                // 从 chat completions 端点推导 models 端点
+                let modelsUrl = (endpoint || '').trim();
+                if (!modelsUrl) throw new Error('端点为空');
+                // 去掉末尾斜杠
+                modelsUrl = modelsUrl.replace(/\/+$/, '');
+                // 替换 /chat/completions → /models
+                if (/\/chat\/completions$/i.test(modelsUrl)) {
+                    modelsUrl = modelsUrl.replace(/\/chat\/completions$/i, '/models');
+                } else if (/\/v1$/i.test(modelsUrl)) {
+                    modelsUrl = modelsUrl + '/models';
+                } else {
+                    // 通用兜底：尝试在末尾加 /models
+                    modelsUrl = modelsUrl + '/models';
+                }
+                const headers = { 'Authorization': 'Bearer ' + (apiKey || '') };
+                const ctrl = new AbortController();
+                const timer = setTimeout(() => { try { ctrl.abort(); } catch(_) {} }, 10000);
+                try {
+                    const resp = await fetch(modelsUrl, { method: 'GET', headers, signal: ctrl.signal });
+                    clearTimeout(timer);
+                    if (!resp.ok) {
+                        let msg = 'HTTP ' + resp.status;
+                        if (resp.status === 401) msg = '认证失败：API密钥无效';
+                        else if (resp.status === 403) msg = '访问被拒绝';
+                        else if (resp.status === 404) msg = '模型列表端点不存在（该服务商可能不支持拉取）';
+                        else if (resp.status === 429) msg = '请求过于频繁';
+                        throw new Error(msg);
+                    }
+                    const data = await resp.json();
+                    // 兼容多种返回格式：{ data: [...] } / { models: [...] } / [ ... ]
+                    let models = [];
+                    if (Array.isArray(data)) models = data;
+                    else if (data && Array.isArray(data.data)) models = data.data;
+                    else if (data && Array.isArray(data.models)) models = data.models;
+                    // 提取模型 ID（兼容 id / name / model 字段）
+                    const ids = models.map(m => {
+                        if (typeof m === 'string') return m;
+                        return m.id || m.name || m.model || '';
+                    }).filter(Boolean).sort();
+                    return ids;
+                } catch (e) {
+                    clearTimeout(timer);
+                    if (e && e.name === 'AbortError') throw new Error('拉取超时（>10s），请检查网络');
+                    throw e;
+                }
+            };
+            // 统一填充模型下拉框的辅助函数
+            window._populateModelSelect = function(selectEl, models, currentValue) {
+                if (!selectEl) return;
+                selectEl.innerHTML = '';
+                if (!models || !models.length) {
+                    // 无模型：显示一个占位
+                    selectEl.add(new Option('(拉取失败，请手动输入)', ''));
+                    selectEl.style.display = 'none';
+                    const inp = document.getElementById(selectEl.id === 'apiModelSelect' ? 'apiModel' : 'welModel');
+                    if (inp) inp.style.display = '';
+                    return;
+                }
+                models.forEach(m => selectEl.add(new Option(m, m)));
+                selectEl.style.display = '';
+                const inp = document.getElementById(selectEl.id === 'apiModelSelect' ? 'apiModel' : 'welModel');
+                if (inp) inp.style.display = 'none';
+                // 尝试保留之前选中的模型
+                if (currentValue && models.includes(currentValue)) {
+                    selectEl.value = currentValue;
+                } else if (selectEl.options.length > 0) {
+                    selectEl.selectedIndex = 0;
+                }
+                // 同步到 hidden input
+                if (inp) inp.value = selectEl.value;
+            };
             // ===== 背包操作统一封装（支持数量后缀x2/x3匹配）=====
             function parseItemQty(item) {
                 if (!item) return { base: '', qty: 0, raw: '' };
@@ -5979,7 +6053,78 @@
                     } catch {}
                 } catch {}
             })();
-            // ===== Export / Import full backup (handled by save modal buttons btnExportBackup/btnImportBackup) =====
+            // ========== 拉取模型按钮：点击后从 API /v1/models 端点获取模型列表 ==========
+            (function bindFetchModelButtons() {
+                async function doFetch(btnId, epId, keyId, selId) {
+                    const btn = document.getElementById(btnId);
+                    const epEl = document.getElementById(epId);
+                    const keyEl = document.getElementById(keyId);
+                    const selEl = document.getElementById(selId);
+                    if (!btn || !epEl || !selEl) return;
+                    const ep = epEl.value.trim();
+                    const key = keyEl ? (keyEl.value || cfg().key || '') : '';
+                    if (!ep) { tst('请先填写端点地址'); return; }
+                    const oldText = btn.textContent;
+                    btn.textContent = '⏳ 拉取中…';
+                    btn.disabled = true;
+                    try {
+                        const models = await window._fetchModels(ep, key);
+                        if (models && models.length) {
+                            // 保存到 localStorage 缓存（下次打开自动恢复）
+                            try {
+                                localStorage.setItem('vn_fetched_models', JSON.stringify({ ep: ep, models: models, ts: Date.now() }));
+                            } catch(_) {}
+                            const curVal = selEl.value || (document.getElementById('apiModel') ? document.getElementById('apiModel').value : '');
+                            window._populateModelSelect(selEl, models, curVal);
+                            tst('✅ 拉取成功：共 ' + models.length + ' 个模型');
+                            // 拉取成功后自动保存配置（内联实现，避免引用 IIFE 内部的 saveFromSettings）
+                            if (btnId === 'btnFetchModels') {
+                                try {
+                                    const mSel = document.getElementById('apiModelSelect');
+                                    const cur = cfg();
+                                    const finalModel = mSel ? (mSel.value || '') : cur.model;
+                                    scf({ ...cur, model: finalModel || cur.model || 'gpt-4o' });
+                                } catch(_) {}
+                            }
+                        } else {
+                            tst('⚠ 服务商未返回模型列表，请手动输入');
+                        }
+                    } catch (e) {
+                        const msg = (e && e.message) ? e.message : String(e);
+                        tst('❌ 拉取失败：' + msg);
+                        // 拉取失败时切换为手动输入模式
+                        selEl.style.display = 'none';
+                        const inpId = selId === 'apiModelSelect' ? 'apiModel' : 'welModel';
+                        const inp = document.getElementById(inpId);
+                        if (inp) { inp.style.display = ''; inp.focus(); }
+                    } finally {
+                        btn.textContent = oldText;
+                        btn.disabled = false;
+                    }
+                }
+                const btn1 = document.getElementById('btnFetchModels');
+                if (btn1) btn1.addEventListener('click', () => doFetch('btnFetchModels', 'apiEndpoint', 'apiKey', 'apiModelSelect'));
+                const btn2 = document.getElementById('btnFetchModelsWel');
+                if (btn2) btn2.addEventListener('click', () => doFetch('btnFetchModelsWel', 'welEndpoint', 'welKey', 'welModelSelect'));
+                // 页面加载时自动恢复缓存的模型列表
+                try {
+                    const cached = localStorage.getItem('vn_fetched_models');
+                    if (cached) {
+                        const obj = JSON.parse(cached);
+                        if (obj && Array.isArray(obj.models) && obj.models.length && obj.ep) {
+                            // 如果当前端点和缓存端点一致，自动填充
+                            const curEp = cfg().ep || '';
+                            if (curEp === obj.ep) {
+                                const sel1 = document.getElementById('apiModelSelect');
+                                if (sel1) {
+                                    const curModel = cfg().model || '';
+                                    window._populateModelSelect(sel1, obj.models, curModel);
+                                }
+                            }
+                        }
+                    }
+                } catch(_) {}
+            })();
             $('godModeToggle').addEventListener('change', () => {
                 const cur = cfg();
                 scf({ ...cur, debug: $('godModeToggle').checked });

@@ -49,6 +49,36 @@
                 if (effects.bodyTemp != null) { s.bodyTemp = clamp((s.bodyTemp ?? 36.8) + Number(effects.bodyTemp), 30, 45); mutated = true; }
                 if (effects.enc != null)      { s.enc = Math.max(0, (s.enc ?? 0) + Number(effects.enc)); mutated = true; }
                 if (effects.location)         { s.location = String(effects.location); mutated = true; }
+                // ===== 修复：injury / statusAdd / statusRem / traitsRem 之前未处理 =====
+                if (effects.injury)           { s.injury = String(effects.injury); mutated = true; }
+                if (effects.joy != null)      { s.joy = clamp((s.joy ?? 0) + Number(effects.joy), 0, 100); if (Number(effects.joy) > 0) s.pleasureUnlocked = true; mutated = true; }
+                if (effects.mentality)       { s.mentality = String(effects.mentality); mutated = true; }
+                // 状态增减（如「流血」「感染」「中毒」等 Buff/Debuff）
+                if (Array.isArray(effects.statusAdd) && effects.statusAdd.length) {
+                    if (!s.status) s.status = [];
+                    for (const st of effects.statusAdd) {
+                        if (typeof st === 'string' && !s.status.includes(st)) s.status.push(st);
+                    }
+                    mutated = true;
+                }
+                if (Array.isArray(effects.statusRem) && effects.statusRem.length) {
+                    if (s.status) {
+                        for (const st of effects.statusRem) {
+                            s.status = s.status.filter(x => x !== st);
+                        }
+                    }
+                    mutated = true;
+                }
+                // 单个状态增减（便捷写法）
+                if (typeof effects.statusAdd === 'string') {
+                    if (!s.status) s.status = [];
+                    if (!s.status.includes(effects.statusAdd)) s.status.push(effects.statusAdd);
+                    mutated = true;
+                }
+                if (typeof effects.statusRem === 'string') {
+                    if (s.status) s.status = s.status.filter(x => x !== effects.statusRem);
+                    mutated = true;
+                }
                 if (mutated && typeof window.sst === 'function') window.sst(s);
                 if (mutated && typeof window.upui === 'function') window.upui();
             }
@@ -94,6 +124,21 @@
                 if (typeof window.sst === 'function') window.sst(s);
             }
 
+            // ---- 地图新增（写入角色 ch.map 而非 s.mapUnlock）----
+            if (Array.isArray(effects.mapNew) && effects.mapNew.length) {
+                try {
+                    const ch = (typeof window.gch === 'function') ? window.gch() : null;
+                    if (ch) {
+                        const curMap = (ch.map || '').split(/[、，,;；\n]/).map(x => x.trim()).filter(Boolean);
+                        for (const area of effects.mapNew) {
+                            if (area && !curMap.includes(area)) curMap.push(area);
+                        }
+                        ch.map = curMap.join('、');
+                        if (typeof window.sch === 'function') window.sch(ch);
+                    }
+                } catch (_) {}
+            }
+
             // ---- 天气/气温 ----
             if ((effects.weather || effects.temp != null) && clk) {
                 if (effects.weather) clk.weather = String(effects.weather);
@@ -105,13 +150,33 @@
                 }
             }
 
-            // ---- 特质 ----
+            // ---- 特质增减 ----
             if (s && Array.isArray(effects.traitsAdd) && effects.traitsAdd.length) {
                 if (!s.traits) s.traits = [];
                 for (const t of effects.traitsAdd) {
                     if (!s.traits.includes(t)) s.traits.push(t);
                     if (snotify) snotify('trait_add', '', t);
                 }
+                if (typeof window.sst === 'function') window.sst(s);
+            }
+            if (s && Array.isArray(effects.traitsRem) && effects.traitsRem.length) {
+                if (s.traits) {
+                    for (const t of effects.traitsRem) {
+                        s.traits = s.traits.filter(x => x !== t);
+                        if (snotify) snotify('trait_rem', '', t);
+                    }
+                    if (typeof window.sst === 'function') window.sst(s);
+                }
+            }
+
+            // ---- 创伤 ----
+            if (effects.trauma && s) {
+                if (!s.traumas) s.traumas = [];
+                if (!s.traumas.includes(effects.trauma)) s.traumas.push(effects.trauma);
+                if (s.spirit != null) s.spirit = Math.max(0, s.spirit - 10);
+                s.injury = (s.injury === '无' || !s.injury) ? '心理创伤' : (s.injury + '（心理创伤）');
+                if (addLogEntry) addLogEntry('trauma', '创伤事件：' + effects.trauma);
+                if (playSfx) playSfx('danger');
                 if (typeof window.sst === 'function') window.sst(s);
             }
 
