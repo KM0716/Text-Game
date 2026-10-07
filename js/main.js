@@ -534,7 +534,7 @@
                 const el = $('inputText');
                 if (!el) return;
                 if (el.tagName === 'TEXTAREA') { el.value = html; return; }
-                el.innerHTML = '';
+                el.innerHTML = html || '';
             }
             // 构造输入栏物品引用 chip 节点（insertItemChip 与 {{}} 实时转换共用）
             function makeItemChipNode(itemName) {
@@ -547,8 +547,8 @@
             }
             function insertItemChip(itemName) {
                 const el = $('inputText');
-                // 关键修复：只允许插入到输入栏，避免被误插入到导出按钮、角色名输入框等其他可编辑元素
                 if (!el) return;
+                // 关键修复：只允许插入到输入栏，避免被误插入到导出按钮、角色名输入框等其他可编辑元素
                 const isInputArea = (el.id === 'inputText') ||
                     (el.classList && (el.classList.contains('contenteditable-input') || el.classList.contains('chat-input')));
                 if (!isInputArea) return;
@@ -558,30 +558,55 @@
                     el.value = el.value.slice(0, start) + '{{' + itemName + '}}' + el.value.slice(end);
                     return;
                 }
+                // ===== 关键修复：先聚焦输入栏，清除外部选区，再插入 =====
+                // 之前选区可能残留于已移除的上下文菜单/背包弹窗，导致 insertNode 指向错误目标
+                el.focus();
+                // 清除当前可能残留在外部元素的选区
+                const sel = window.getSelection();
+                if (sel && sel.rangeCount > 0) {
+                    // 检查选区是否在 inputText 内；不在则全部清除
+                    const r = sel.getRangeAt(0);
+                    if (!el.contains(r.commonAncestorContainer) && !el.contains(r.startContainer)) {
+                        sel.removeAllRanges();
+                    }
+                }
                 const chip = makeItemChipNode(itemName);
-                const selection = window.getSelection();
-                let usedSelection = false;
-                if (selection && selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    // 关键修复：确认 selection 的范围确实在输入栏内，避免把 chip 插到导出按钮等外部 DOM
+                let inserted = false;
+                // 尝试在光标位置插入（仅当光标确实在 inputText 内部时）
+                if (sel && sel.rangeCount > 0) {
+                    const range = sel.getRangeAt(0);
                     if (el.contains(range.commonAncestorContainer) || el.contains(range.startContainer)) {
                         range.deleteContents();
                         range.insertNode(chip);
-                        const spaceAfter = document.createTextNode(' ');
+                        // 在 chip 后插入一个空格，方便继续输入
+                        const spaceAfter = document.createTextNode('\u00a0');
                         chip.parentNode.insertBefore(spaceAfter, chip.nextSibling);
-                        selection.removeAllRanges();
+                        sel.removeAllRanges();
                         const newRange = document.createRange();
                         newRange.setStartAfter(spaceAfter);
                         newRange.collapse(true);
-                        selection.addRange(newRange);
-                        usedSelection = true;
+                        sel.addRange(newRange);
+                        inserted = true;
                     }
                 }
-                if (!usedSelection) {
+                // 兜底：直接追加到 inputText 末尾
+                if (!inserted) {
+                    // 如果 inputText 为空，直接 appendChild
+                    // 如果有内容，在末尾追加
                     el.appendChild(chip);
-                    el.appendChild(document.createTextNode(' '));
+                    el.appendChild(document.createTextNode('\u00a0'));
+                    // 将光标移到 chip 之后
+                    if (sel) {
+                        sel.removeAllRanges();
+                        const newRange = document.createRange();
+                        newRange.selectNodeContents(el);
+                        newRange.collapse(false); // collapse to end
+                        sel.addRange(newRange);
+                    }
                 }
                 el.focus();
+                // 触发 input 事件以更新高度等
+                try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch(_) {}
             }
             // 输入栏 {{物品名}} 实时转 chip（contentEditable 模式）：
             // 修复"导出角色设定文本贴回输入栏后物品引用显示为纯文本"——粘贴/输入含 {{物品名}} 时自动转为可交互 chip 胶囊
@@ -5467,9 +5492,13 @@
                         } else if (act === 'refinput') {
                             $('backpackModal').style.display = 'none';
                             const baseName = getItemBaseName(item);
-                            insertItemChip(baseName);
-                            tst('已引用「' + baseName + '」到输入框');
-                            playSfx('pickup');
+                            // 延迟一帧再插入 chip：等待上下文菜单移除 + 弹窗隐藏 + 选区重置完成
+                            // 避免 Selection 残留在已移除的 DOM 节点上导致 insertNode 指向错误目标
+                            requestAnimationFrame(() => {
+                                insertItemChip(baseName);
+                                tst('已引用「' + baseName + '」到输入框');
+                                playSfx('pickup');
+                            });
                         } else if (act === 'bookmark') {
                             const baseName = getItemBaseName(item);
                             toggleItemStarred(baseName);
