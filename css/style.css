@@ -384,6 +384,28 @@
             scrollbar-width: thin;
             scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
         }
+        /* 防止图片/表格/代码块等固有宽度元素导致横向溢出 */
+        img, svg, video, canvas {
+            max-width: 100%;
+            height: auto;
+        }
+        table {
+            max-width: 100%;
+            display: block;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+        }
+        pre {
+            max-width: 100%;
+            overflow-x: auto;
+            -webkit-overflow-scrolling: touch;
+            word-break: break-all;
+            overflow-wrap: break-word;
+        }
+        code {
+            word-break: break-all;
+            overflow-wrap: break-word;
+        }
         *::-webkit-scrollbar {
             width: 9px;
             height: 9px;
@@ -412,6 +434,7 @@
             font-size: clamp(14px, 2.5vw, 16px);
             -webkit-tap-highlight-color: transparent;
             -webkit-text-size-adjust: 100%;
+            overflow-x: hidden;
         }
         body {
             height: 100%;
@@ -424,8 +447,11 @@
             justify-content: center;
             margin: 0;
             overflow: hidden;
+            overflow-x: hidden;
             overscroll-behavior: none;
             position: relative;
+            word-break: break-word;
+            overflow-wrap: break-word;
             background-image: radial-gradient(ellipse at 20% 18%, rgba(160, 130, 100, 0.03) 0%, transparent 70%);
             transition: background 0.4s;
             font-weight: 500;
@@ -801,10 +827,11 @@
         .header-actions {
             display: flex;
             gap: 6px;
-            flex-wrap: nowrap;
+            flex-wrap: wrap;
             align-items: center;
             margin-left: auto;
             overflow: visible;
+            max-width: 100%;
         }
         .nav-group {
             display: flex;
@@ -860,6 +887,7 @@
             top: calc(100% + 2px);
             right: 0;
             min-width: 220px;
+            max-width: calc(100vw - 16px);
             background: var(--modal-bg);
             border: 2px solid var(--border);
             border-radius: 8px 2px 10px 4px / 4px 12px 3px 10px;
@@ -1021,6 +1049,11 @@
             display: flex;
             flex-wrap: wrap;
             gap: 3px;
+            max-width: 100%;
+        }
+        .quick-actions > div {
+            min-width: 0;
+            max-width: 100%;
         }
         .btn-quick {
             padding: 4px 8px;
@@ -1048,9 +1081,11 @@
             display: flex;
             gap: 6px;
             align-items: flex-end;
+            max-width: 100%;
         }
         .input-text {
             flex: 1;
+            min-width: 0;
             padding: 12px 14px;
             font-size: 16px;
             font-family: var(--font-main);
@@ -1063,6 +1098,8 @@
             min-height: 52px;
             max-height: 140px;
             line-height: 1.6;
+            overflow-wrap: break-word;
+            word-break: break-word;
             transition: border-color 0.2s, box-shadow 0.2s;
         }
         @media (max-width: 840px) {
