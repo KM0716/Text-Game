@@ -385,9 +385,12 @@
             scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track);
         }
         /* 防止图片/表格/代码块等固有宽度元素导致横向溢出 */
-        img, svg, video, canvas {
+        img, video, canvas {
             max-width: 100%;
             height: auto;
+        }
+        svg {
+            max-width: 100%;
         }
         table {
             max-width: 100%;
@@ -477,6 +480,7 @@
             flex-direction: column;
             position: relative;
             z-index: 1;
+            min-width: 0;
             background: var(--bg-paper);
             box-shadow: 0 0 0 1px var(--border-light), 5px 7px 0 var(--shadow-dark);
             border-radius: 7px 3px 9px 4px / 9px 7px 4px 11px;
@@ -537,6 +541,8 @@
         .app-header {
             flex-shrink: 0;
             padding: 5px 10px;
+            padding-left: calc(10px + env(safe-area-inset-left, 0px));
+            padding-right: calc(10px + env(safe-area-inset-right, 0px));
             display: flex;
             align-items: center;
             justify-content: space-between;
@@ -1036,6 +1042,8 @@
         .input-area {
             flex-shrink: 0;
             padding: 8px 10px;
+            padding-left: calc(10px + env(safe-area-inset-left, 0px));
+            padding-right: calc(10px + env(safe-area-inset-right, 0px));
             padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
             border-top: 1.5px dashed var(--divider);
             background: var(--bg-paper-alt);
@@ -1043,6 +1051,7 @@
             flex-direction: column;
             gap: 5px;
             z-index: 10;
+            max-width: 100%;
             position: relative;
         }
         .quick-actions {
@@ -3466,9 +3475,8 @@
             .side-panel .btn-header { width: 100%; margin-top: 6px; min-height: 42px; }
             .input-text { font-size: 0.85rem; min-height: 44px; padding: 10px 12px; }
             .chat-area { padding: 8px 10px; gap: 6px; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-            .input-area { padding: 6px 10px; padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); gap: 4px; }
-            .app-header { padding-top: env(safe-area-inset-top, 5px); padding-left: 6px; padding-right: 6px; }
-            body { padding-top: env(safe-area-inset-top, 0); }
+            .input-area { padding: 6px 10px; padding-left: calc(10px + env(safe-area-inset-left, 0px)); padding-right: calc(10px + env(safe-area-inset-right, 0px)); padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); gap: 4px; }
+            .app-header { padding-top: env(safe-area-inset-top, 5px); padding-left: calc(6px + env(safe-area-inset-left, 0px)); padding-right: calc(6px + env(safe-area-inset-right, 0px)); }
             .backpack-modal { max-width: 95vw !important; max-height: 92vh; }
             .bp-cat-bar { overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
             .bp-cat-btn { white-space: nowrap; }
@@ -3537,8 +3545,8 @@
             }
             /* ===== 移动端导航栏按钮排版优化 ===== */
             .app-header {
-                padding-left: 8px;
-                padding-right: 8px;
+                padding-left: calc(8px + env(safe-area-inset-left, 0px));
+                padding-right: calc(8px + env(safe-area-inset-right, 0px));
                 padding-bottom: 4px;
             }
             .nav-group {
@@ -4464,15 +4472,21 @@
         width: 100% !important;
         max-width: 100% !important;
         max-height: 100vh !important;
+        max-height: 100dvh !important;
         height: 100vh !important;
+        height: 100dvh !important;
         border-radius: 0 !important;
         margin: 0 !important;
         overflow-y: auto !important;
+        overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
+        /* 刘海/底部手势条安全区，避免内容被遮挡 */
+        padding-top: calc(16px + env(safe-area-inset-top, 0px)) !important;
+        padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px)) !important;
     }
     .modal-close {
-        top: 12px !important;
-        right: 12px !important;
+        top: calc(12px + env(safe-area-inset-top, 0px)) !important;
+        right: calc(12px + env(safe-area-inset-right, 0px)) !important;
         font-size: 1.5rem !important;
         min-width: 44px;
         min-height: 44px;
@@ -4480,8 +4494,8 @@
     }
     /* 死亡弹窗、AI锁定徽章适配 */
     .ai-lock-badge {
-        top: env(safe-area-inset-top, 8px);
-        right: 12px;
+        top: calc(8px + env(safe-area-inset-top, 0px));
+        right: calc(12px + env(safe-area-inset-right, 0px));
     }
 }
 
@@ -4690,4 +4704,77 @@
         z-index: 100;
     }
 }
+
+/* ================================================================
+   17. 移动端横向溢出兜底：防止任何内容撑破视口产生横向滚动条
+   ================================================================ */
+@media (max-width: 840px) {
+    /* flex 子项默认 min-width:auto，会被长内容撑开，统一置 0 允许收缩 */
+    .app-container > *,
+    .app-header > *,
+    .input-area > *,
+    .input-row > *,
+    .header-actions > *,
+    .chat-area > * {
+        min-width: 0;
+    }
+    /* 文本容器强制换行，避免长英文/URL/数字撑宽 */
+    .chat-area,
+    .vn-text,
+    .vn-panel-body,
+    .chat-message,
+    .notify-bubble,
+    .codex-item,
+    .map-item,
+    .fac-card,
+    .cc-name,
+    .sp-row,
+    .ev-item,
+    .ach-item {
+        overflow-wrap: anywhere;
+        word-break: break-word;
+    }
+    /* 状态栏：允许横向滚动而不撑破头部 */
+    .status-bar {
+        max-width: 100%;
+        min-width: 0;
+    }
+    /* 快捷操作行：横向滚动而不撑破容器 */
+    .quick-actions > div {
+        overflow-x: auto;
+        overflow-y: hidden;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        flex-wrap: nowrap;
+    }
+    .quick-actions > div::-webkit-scrollbar {
+        display: none;
+    }
+    .input-area {
+        max-width: 100%;
+    }
+    /* 固定/绝对定位浮层不超出视口 */
+    .nav-more-menu {
+        min-width: min(220px, calc(100vw - 20px)) !important;
+    }
+    /* 侧边抽屉不超出容器 */
+    .side-panel {
+        max-width: min(340px, 88vw);
+    }
+}
+
+/* 超小屏（≤360px）进一步收缩 */
+@media (max-width: 360px) {
+    .nav-more-menu {
+        min-width: calc(100vw - 16px) !important;
+        right: -4px !important;
+    }
+    .header-actions {
+        gap: 2px;
+    }
+    .status-bar {
+        font-size: 0.56rem;
+    }
+}
+
 
