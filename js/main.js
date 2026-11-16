@@ -6531,6 +6531,11 @@
                 }
                 // ===== DZ 第四步：AI 与功能 —— 打开角色面板时同步配置 =====
                 try { if (window.DZ && window.DZ.charStep4) window.DZ.charStep4.fill(); } catch(e) {}
+                // ===== DZ 创建向导态标记：无已有角色 = 首次创建（独立全屏界面，无返回路径） =====
+                try {
+                    const _cm = $('charModal');
+                    if (_cm) { if (hasCustomCharacter()) _cm.classList.remove('is-first'); else _cm.classList.add('is-first'); }
+                } catch(e) {}
             }
 
             $('btnNewGame').addEventListener('click', async () => {
@@ -8633,7 +8638,13 @@ ${sumContent}
             });
             document.querySelectorAll('.modal-close').forEach(b => b.addEventListener('click', () => {
                 const overlay = b.closest('.modal-overlay');
-                if (overlay && (overlay.id === 'welcomeModal' || overlay.id === 'charModal')) {
+                if (overlay && overlay.id === 'charModal') {
+                    // DZ：首次创建（向导态）必须完成；游戏内编辑态可关闭返回游戏
+                    if (overlay.classList.contains('is-first')) { tst('请完成角色创建后再继续'); return; }
+                    overlay.style.display = 'none';
+                    return;
+                }
+                if (overlay && overlay.id === 'welcomeModal') {
                     tst('请完成配置后再关闭');
                     return;
                 }
@@ -8759,7 +8770,11 @@ ${sumContent}
             }));
             document.addEventListener('keydown', e => {
                 if (e.key === 'Escape') {
-                    document.querySelectorAll('.modal-overlay').forEach(m => { if (m.style.display === 'flex') m.style.display = 'none'; });
+                    document.querySelectorAll('.modal-overlay').forEach(m => {
+                        // DZ：首次创建向导态不可用 Esc 退出（无返回路径）
+                        if (m.id === 'charModal' && m.classList.contains('is-first')) return;
+                        if (m.style.display === 'flex') m.style.display = 'none';
+                    });
                     if ($('sidePanel').classList.contains('open')) { $('sidePanel').classList.remove('open'); $('sideOverlay').classList.remove('show'); }
                 }
             });

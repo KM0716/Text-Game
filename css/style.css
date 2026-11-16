@@ -5139,3 +5139,205 @@ body[data-theme="dark"].dz-hl-dialogue .dlg { color: #7db8e8; }
 
 
 
+
+/* ============================================================
+   ===== DZ 扩展样式 v2（PC 全宽布局 + 创建向导独立界面） =====
+   ============================================================ */
+
+/* ---------- 0. 新增布局变量 ---------- */
+:root {
+    --dz-read-w: 760px;   /* PC 阅读列宽度（正文/输入区） */
+    --dz-wizard-w: 920px; /* 向导表单内容宽度 */
+}
+
+/* ---------- 1. PC 全宽：摆脱 840px 固定纸张容器 ---------- */
+@media (min-width: 841px) {
+    body {
+        padding: 0 !important;
+        align-items: stretch !important;
+    }
+    .app-container {
+        max-width: none !important;
+        max-height: none !important;
+        width: 100%;
+        height: 100vh;
+        height: 100dvh;
+        border-radius: 0 !important;
+        box-shadow: none !important;
+        border: none;
+    }
+    /* header 全宽后稍微舒展 */
+    .app-header {
+        padding: 6px 16px;
+        gap: 12px;
+    }
+    .status-bar { font-size: 0.62rem; gap: 4px; }
+    .status-item { font-size: 0.6rem; padding: 2px 7px; }
+    .app-title { font-size: 1rem; }
+    /* 阅读列限宽居中：正文行宽保持可读性 */
+    #chatArea > * {
+        max-width: var(--dz-read-w);
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+    }
+    #chatArea .chat-empty { max-width: var(--dz-read-w); }
+    /* 输入区与快捷栏同样限宽，视觉与正文对齐 */
+    .input-area .quick-actions,
+    .input-area .input-row {
+        max-width: var(--dz-read-w);
+        margin-left: auto;
+        margin-right: auto;
+        width: 100%;
+    }
+}
+/* 侧栏打开时 header 与阅读列左侧避让（≥1024px 由 body padding-left 处理，此处补 841-1023 过渡档） */
+@media (min-width: 841px) and (max-width: 1023px) {
+    body.dz-sidebar-open .app-header { padding-left: calc(16px + var(--dz-side-w)); }
+}
+
+/* ---------- 2. 创建向导独立全屏界面 ---------- */
+.modal-overlay.dz-wizard {
+    z-index: 1300;               /* 盖过侧栏(1200)与导航遮罩(1150) */
+    padding: 0;
+    background: var(--bg-paper);
+    align-items: stretch;
+    justify-content: stretch;
+}
+/* 末日纸张颗粒质感（复用全局噪点思路，保持独立界面氛围） */
+.modal-overlay.dz-wizard::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+        repeating-linear-gradient(0deg, transparent, transparent 28px, rgba(180,160,130,.035) 28px, rgba(180,160,130,.035) 29px);
+}
+.dz-wizard-panel {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    max-width: none;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    transform: none;
+    overflow: hidden;
+}
+/* 头部横幅 */
+.dz-wizard-head {
+    position: relative;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 24px 14px;
+    border-bottom: 2px solid var(--divider);
+    background: var(--bg-paper-alt);
+}
+.dz-wizard-head-inner { min-width: 0; }
+.dz-wizard-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: clamp(1.1rem, 2.4vw, 1.5rem);
+    font-weight: 800;
+    letter-spacing: 2px;
+    color: var(--ink);
+}
+.dz-wizard-title .logo-mark {
+    width: 20px;
+    height: 20px;
+    border-width: 3px;
+    transform: rotate(-5deg);
+}
+.dz-wizard-sub {
+    margin-top: 4px;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+    letter-spacing: 0.6px;
+}
+/* 步骤条 */
+.dz-wizard-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    flex-shrink: 0;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    border-bottom: 1.5px dashed var(--divider);
+    background: var(--bg-paper);
+    overflow-x: auto;
+}
+.dz-wizard-tabs .tab-btn {
+    flex-shrink: 0;
+    min-width: 150px;
+    text-align: center;
+    padding: 8px 18px;
+    font-size: 0.82rem;
+}
+/* 表单滚动主体：内容限宽居中，长表单不摊满超宽屏 */
+.dz-wizard-body {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 20px 20px 28px;
+    display: block;
+}
+.dz-wizard-body .tab-content.active {
+    max-width: var(--dz-wizard-w);
+    margin: 0 auto;
+}
+/* 底部操作条：常驻 sticky，创建动作始终可见 */
+.dz-wizard-foot {
+    position: sticky;
+    bottom: 0;
+    flex-shrink: 0;
+    border-top: 2px solid var(--divider);
+    background: var(--bg-paper-alt);
+    padding: 12px 20px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+}
+.dz-wizard-foot .btn-row {
+    max-width: var(--dz-wizard-w);
+    margin: 0 auto;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+.dz-wizard-foot .btn-modal { font-size: 0.78rem; padding: 9px 18px; }
+/* 首次创建（向导态）：没有可返回的游戏，隐藏关闭按钮 */
+#charModal.is-first .modal-close { display: none !important; }
+/* 编辑态（游戏内重开向导）：显示关闭按钮 */
+#charModal:not(.is-first) .modal-close {
+    position: relative;
+    z-index: 6;
+    flex-shrink: 0;
+}
+
+/* ---------- 3. 向导移动端适配 ---------- */
+@media (max-width: 840px) {
+    .dz-wizard-head { padding: 12px 14px 10px; }
+    .dz-wizard-title { font-size: 1.05rem; letter-spacing: 1px; }
+    .dz-wizard-sub { font-size: 0.62rem; }
+    .dz-wizard-tabs {
+        justify-content: flex-start;
+        gap: 4px;
+        padding: 8px 10px;
+    }
+    .dz-wizard-tabs .tab-btn {
+        min-width: 0;
+        padding: 7px 12px;
+        font-size: 0.72rem;
+    }
+    .dz-wizard-body { padding: 14px 12px 20px; }
+    .dz-wizard-foot { padding: 10px 12px; }
+    .dz-wizard-foot .btn-modal { font-size: 0.72rem; padding: 8px 14px; }
+}

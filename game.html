@@ -413,15 +413,23 @@
         <div class="btn-row"><button class="btn-modal" id="btnTestWel">测试连接</button><button class="btn-modal primary" id="btnWelcomeNext">确认</button></div>
     </div></div>
 
-    <!-- Character & World Modal -->
-    <div class="modal-overlay" id="charModal" style="display:none;"><div class="modal-panel" style="max-width:540px;">
-        <button class="modal-close" id="modalCloseChar">x</button><h3>创建角色与世界</h3>
-        <div class="tab-row">
+    <!-- Character & World Creation Wizard（独立全屏界面：默认载入，创建后进入游戏） -->
+    <div class="modal-overlay dz-wizard" id="charModal" style="display:none;">
+    <div class="dz-wizard-panel">
+        <div class="dz-wizard-head">
+            <div class="dz-wizard-head-inner">
+                <div class="dz-wizard-title"><span class="logo-mark"></span> 创建你的角色与世界</div>
+                <div class="dz-wizard-sub">依次完成四个步骤 · 所有配置自动保存在本地 · 随时可在开局界面重新调整</div>
+            </div>
+            <button class="modal-close" id="modalCloseChar" title="返回游戏">x</button>
+        </div>
+        <div class="tab-row dz-wizard-tabs">
             <button class="tab-btn active" data-tab="tab-world">① 世界设定</button>
             <button class="tab-btn" data-tab="tab-char">② 角色设定</button>
             <button class="tab-btn" data-tab="tab-sandbox">③ 沙盒细节</button>
             <button class="tab-btn" data-tab="tab-ai">④ AI 与功能</button>
         </div>
+        <div class="dz-wizard-body">
         <div class="tab-content active" id="tab-world">
             <h4>预设模板</h4>
             <div id="presetBtns"><span class="preset-btn" data-preset="zombie">传统丧尸</span><span class="preset-btn" data-preset="fungal">真菌灾变</span><span class="preset-btn" data-preset="climate">气候末日</span><span class="preset-btn" data-preset="bandits">掠夺者</span><span class="preset-btn" data-preset="collapse">秩序崩塌</span><span class="preset-btn" data-preset="nuke">核战废土</span><span class="preset-btn" data-preset="ai">AI叛乱</span><span class="preset-btn" data-preset="tsunami">海啸水淹</span><span class="preset-btn" data-preset="iceage">寒冬冰封</span><span class="preset-btn" data-preset="mutant">变异生物</span><span class="preset-btn" data-preset="depression">大萧条</span><span class="preset-btn" data-preset="custom">完全自定义</span></div>
@@ -628,12 +636,15 @@
                 <input type="text" id="charModelMem" placeholder="逐轮总结使用的轻量模型，留空=沿用主模型">
             </div>
         </div>
+        </div><!-- /dz-wizard-body -->
+        <div class="dz-wizard-foot">
         <div class="btn-row">
             <input type="file" id="importCharacterFile" accept=".json,application/json" style="display:none;">
             <button class="btn-modal" id="btnImportCharacter">📥 导入角色设定</button>
             <button class="btn-modal" id="btnCharSkip">使用默认设定</button>
             <button class="btn-modal primary" id="btnCharConfirm">开始游戏</button>
             <button class="btn-modal accent" id="btnCharApplyOnly" style="display:none;" title="仅修改角色卡与世界设定，不重置进度/状态/历史">✎ 应用设定（不重开）</button>
+        </div>
         </div>
     </div></div>
 
