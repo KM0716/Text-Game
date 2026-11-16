@@ -179,7 +179,18 @@
                 maxT: 2048, temp: 0.7, ctx: 24, tspd: 20, strm: true, fsz: '15px',
                 prompt: DPROMPT, idleInt: 60, idleOn: false, idleDir: '休养', idleCustom: '',
                 worldLock: false, lastSlot: null, debug: false,
-                targetWordCount: 0  // 正文目标字数：0=不限，>0=每轮正文约N字
+                targetWordCount: 0,  // 正文目标字数：0=不限，>0=每轮正文约N字
+                // ===== DZ 扩展配置（静默保存，localStorage 持久化）=====
+                aiEnabled: true,     // AI 功能总开关（false=本地模式，不调用任何 API）
+                expertMode: false,   // 专家模式（解锁双模型/变量官/记忆模型）
+                dualModel: false,    // 双模型正文：第一模型推演，第二模型重组表达
+                model2: '',          // 第二模型名（文笔·重组表达）
+                varJudge: false,     // 变量官：数值状态每轮单独结算
+                memMode: 'summary',  // 记忆模式：'summary'=总结记忆，'off'=关闭
+                modelMem: '',        // 记忆模型（逐轮总结用，留空=主模型）
+                hlDialogue: true,    // 人物台词高亮
+                fszPanel: 15,        // 正文内面板/字条字号
+                fszUI: 14            // 界面与背包字号
             };
             const DSTA = { hunger: 70, thirst: 70, fatigue: 20, bodyTemp: 36.8, injury: '无', enc: 5, hp: 100, maxHp: 100, inv: ['破损背包', '半瓶水', '手电筒', '压缩饼干x2', '绷带x2'], clues: [], status: [], vehicle: '无', mapUnlock: [], visited: [], mentality: '稳定', spirit: 85, joy: 0, pleasureUnlocked: false, actionBar: [], location: '废弃公寓', traits: ['生存本能', '警觉'],
                 equip: { head: '', body: '', legs: '', feet: '', weapon: '', offhand: '', backpack: '破损背包', accessory: '' },
@@ -1304,7 +1315,19 @@
                 localStorage.setItem(K.THM, t);
                 playSfx('tab');
             }
-            function afs(sz) { document.documentElement.style.setProperty('--font-size-base', sz); document.documentElement.style.setProperty('--font-size-sm', (parseInt(sz) - 3) + 'px'); document.documentElement.style.setProperty('--font-size-lg', (parseInt(sz) + 2) + 'px'); }
+            function afs(sz) {
+                document.documentElement.style.setProperty('--font-size-base', sz);
+                document.documentElement.style.setProperty('--font-size-sm', (parseInt(sz) - 3) + 'px');
+                document.documentElement.style.setProperty('--font-size-lg', (parseInt(sz) + 2) + 'px');
+                // ===== DZ 阅读字号：正文/面板/界面三档 + 台词高亮 =====
+                try {
+                    const c = cfg();
+                    document.documentElement.style.setProperty('--font-narr', (parseInt(String(c.fsz || sz)) || 15) + 'px');
+                    document.documentElement.style.setProperty('--font-panel', (parseInt(c.fszPanel) || 15) + 'px');
+                    document.documentElement.style.setProperty('--font-ui', (parseInt(c.fszUI) || 14) + 'px');
+                    document.body.classList.toggle('dz-hl-dialogue', c.hlDialogue !== false);
+                } catch (e) {}
+            }
 
 
             // ===== Game Clock =====
@@ -1782,6 +1805,14 @@
                     // tagAttr 已经是完整的 "strong class=..." 或 "span class=... data-item-info=..."
                     return '<' + p.tagAttr + '>' + p.inner + '</' + p.tagName + '>';
                 });
+                // ===== DZ 人物台词高亮：引号内对话着色（可开关）=====
+                try {
+                    if (cfg().hlDialogue !== false) {
+                        html = html.replace(/「([^<」\n]{1,120}?)」|“([^<”\n]{1,160}?)”/g, function (m) {
+                            return '<span class="dlg">' + m + '</span>';
+                        });
+                    }
+                } catch (e) {}
                 return html;
             }
 
@@ -2758,6 +2789,20 @@
                 } catch(e) {}
                 const s = gst();
                 const c = gch();
+                // ===== DZ 自定义变量合并：[变量:名=值] 标签 → s.customVars =====
+                if (ch && ch.customVars && typeof ch.customVars === 'object') {
+                    try {
+                        const prevVars = s.customVars || {};
+                        s.customVars = Object.assign({}, prevVars, ch.customVars);
+                        sst(s);
+                        // 通知（仅新增变量时提示一次）
+                        Object.keys(ch.customVars).forEach(function (k) {
+                            if (!(k in prevVars)) {
+                                try { tst('🧮 新变量：' + k + ' = ' + String(ch.customVars[k]).slice(0, 40)); } catch (e) {}
+                            }
+                        });
+                    } catch (e) {}
+                }
                 // ===== 状态验证闸门：AI 标签只是建议，程序验证后才执行 =====
                 // 1. 取旧值快照
                 let _oldSnap = {};
@@ -3072,9 +3117,60 @@
                 const ch = {};
                 const notes = [];
                 const firedSet = new Set();
+                // ===== DZ 变量官：开启时正文的数值状态标签由变量官单独结算（跳过解析）=====
+                const _vjOn = !!(cfg().varJudge && cfg().expertMode && !window._vjApplying);
                 tx = tx.replace(/\[([^\]]+)\]/g, (m, rawTg) => {
                     // 标签归一化：兼容中文冒号「：」与冒号后空格等 AI 输出变体（如 [物品：+罐头] / [物品: +罐头]）
                     const tg = rawTg.replace(/：/g, ':').replace(/:\s+/g, ':');
+                    if (_vjOn && /^(饱腹|口渴|疲劳|体温|伤势|负重|血量|精神|欢愉):/.test(tg)) return '';
+                    // ===== DZ [变量官:名=值]：历史中变量官结算结果的复现（不受 vjOn 跳过限制）=====
+                    if (tg.startsWith('变量官:')) {
+                        const eqv = tg.indexOf('=');
+                        if (eqv > 3) {
+                            const vk = tg.slice(4, eqv).trim();
+                            const vv = tg.slice(eqv + 1).trim();
+                            const num = parseFloat(vv);
+                            if (vk === '饱腹') ch.hunger = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
+                            else if (vk === '口渴') ch.thirst = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
+                            else if (vk === '疲劳') ch.fatigue = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
+                            else if (vk === '血量') ch.hp = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
+                            else if (vk === '精神') ch.spirit = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
+                            else if (vk === '体温') ch.bt = Math.max(30, Math.min(45, isNaN(num) ? 37 : num));
+                            else if (vk === '负重') ch.wei = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
+                            else if (vk === '伤势') ch.wd = vv.slice(0, 30);
+                            else if (vk === '心态') ch.mood = vv.slice(0, 30);
+                            const key = 'vj:' + vk; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '⚖ 变量官', val: vk + (isNaN(num) ? '' : '=' + Math.round(num)) }); }
+                        }
+                        return '';
+                    }
+                    // ===== DZ [变量:名=值]：AI 创建/修改自定义变量 =====
+                    if (tg.startsWith('变量:')) {
+                        const body = tg.slice(3);
+                        const eq = body.indexOf('=');
+                        if (eq > 0) {
+                            const k = body.slice(0, eq).trim().slice(0, 30);
+                            const v = body.slice(eq + 1).trim().slice(0, 200);
+                            if (k) {
+                                if (!ch.customVars) ch.customVars = {};
+                                ch.customVars[k] = v;
+                                const key = 'var:' + k; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'memory', label: '变量', val: k + ' = ' + v.slice(0, 24) }); }
+                            }
+                        }
+                        return '';
+                    }
+                    // ===== DZ [设定:标题=内容] / [设定:新增-标题=内容]：AI 把新设定写入世界书 =====
+                    if (tg.startsWith('设定:')) {
+                        try {
+                            if (window.DZ && !_replayingHistory) {
+                                const mm = tg.slice(3).match(/^(?:新增-)?(.+?)=(.+)$/);
+                                if (mm && mm[1] && mm[2]) {
+                                    window.DZ.worldbook.addFromTag(mm[1].trim().slice(0, 40), mm[2].trim());
+                                    const key = 'wb:' + mm[1]; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'clue', label: '世界书', val: mm[1].trim() }); }
+                                }
+                            }
+                        } catch (e) {}
+                        return '';
+                    }
                     if (tg.startsWith('饱腹:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.hunger = v; const key = 'status:饱腹:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '饱腹', val: v + '%' }); } }
                     else if (tg.startsWith('口渴:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.thirst = v; const key = 'status:口渴:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '口渴', val: v + '%' }); } }
                     else if (tg.startsWith('疲劳:')) { const v = Math.max(0, Math.min(100, parseInt(tg.split(':')[1]) || 0)); ch.fatigue = v; const key = 'status:疲劳:' + v; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '疲劳', val: v + '%' }); } }
@@ -3305,7 +3401,8 @@
                             s.hp, s.hunger, s.thirst, s.fatigue, s.spirit, s.mentality, s.injury, s.location,
                             f.difficulty, f.genre, f.debug ? 1 : 0, (f.censorshipLevel || 0),
                             cl ? cl.day : 0, cl ? cl.weather : '', cl ? cl.season : '',
-                            Object.keys(gsbx()).map(k => gsbx()[k].title)
+                            Object.keys(gsbx()).map(k => gsbx()[k].title),
+                            (window.DZ && window.DZ.systemNoteHash) ? window.DZ.systemNoteHash() : 'dz'
                         ]);
                         if (curHash === _gspCache.hash) return _gspCache.prompt;
                     } catch(e) { _gspCache = null; }
@@ -3427,9 +3524,9 @@
                     const extCtx = window.__vnExtContext();
                     if (extCtx) _preContext += extCtx + '\n\n';
                 }
-                // 2. 记忆系统（长期记忆 + 压缩事实记录）
+                // 2. 记忆系统（长期记忆 + 压缩事实记录）—— DZ 记忆模式关闭时跳过注入
                 try {
-                    if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.getMemoryContext === 'function') {
+                    if (f.memMode !== 'off' && window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.getMemoryContext === 'function') {
                         const memCtx = window.MEMORY_SYSTEM.getMemoryContext(hist, f.ctx || 24);
                         if (memCtx) _preContext += memCtx + '\n\n';
                     }
@@ -3439,6 +3536,13 @@
                     if (window.WRITING_GUIDELINES && typeof window.WRITING_GUIDELINES.generatePromptInjection === 'function') {
                         const wgPrompt = window.WRITING_GUIDELINES.generatePromptInjection();
                         if (wgPrompt) _preContext += wgPrompt + '\n\n';
+                    }
+                } catch(e) {}
+                // 3.5 ===== DZ 扩展注入：世界书命中参考 / 词条索引 / 自定义变量 / 变量官·双模型规则 =====
+                try {
+                    if (window.DZ && typeof window.DZ.buildSystemNote === 'function') {
+                        const dzNote = window.DZ.buildSystemNote();
+                        if (dzNote) _preContext += dzNote + '\n\n';
                     }
                 } catch(e) {}
                 // 将前置上下文插入到提示词最前面（AI 先读到约束再读世界设定）
@@ -3474,7 +3578,8 @@
                         f.difficulty, f.genre, f.debug ? 1 : 0, (f.censorshipLevel || 0),
                         cl ? cl.day : 0, cl ? cl.weather : '', cl ? cl.season : '',
                         Object.keys(gsbx()).map(k => gsbx()[k].title),
-                        _wgHash, _memHash, f.targetWordCount || 0
+                        _wgHash, _memHash, f.targetWordCount || 0,
+                        (window.DZ && window.DZ.systemNoteHash) ? window.DZ.systemNoteHash() : 'dz'
                     ]);
                     _gspCache = { hash: curHash, prompt: p, ts: Date.now() };
                 } catch(e) { /* ignore */ }
@@ -3493,7 +3598,8 @@
                     if (window.AI_FRAMEWORK && window.AI_FRAMEWORK.VALIDATORS
                         && typeof window.AI_FRAMEWORK.VALIDATORS.validateOutput === 'function') {
                         const v = window.AI_FRAMEWORK.VALIDATORS.validateOutput(safeRaw);
-                        if (v && v.raw && typeof v.raw === 'string') safeRaw = v.raw;
+                        // DZ 修复：validateOutput 返回 { narrative, choices, tagsText, fullText }
+                        if (v && v.fullText && typeof v.fullText === 'string' && v.fullText.trim()) safeRaw = v.fullText;
                     }
                 } catch(e) {
                     // 框架出错也不影响剧情渲染：打 debug 日志
@@ -3544,6 +3650,24 @@
 
             function cbe(b) {
                 const el = document.createElement('div');
+                // ===== DZ 变量官结算块：独立样式的状态结算面板 =====
+                if (b.ty === 'varblock') {
+                    const hd = document.createElement('div');
+                    hd.className = 'dz-vj-head';
+                    const ic = document.createElement('span');
+                    ic.className = 'dz-vj-ico'; ic.textContent = '⚖';
+                    hd.appendChild(ic);
+                    hd.appendChild(document.createTextNode('变量官 · 本轮结算'));
+                    const bd = document.createElement('div');
+                    bd.className = 'dz-vj-body';
+                    bd.innerHTML = esc(b.tx || '').replace(/\n/g, '<br>');
+                    el.className = 'dz-varjudge';
+                    el.appendChild(hd);
+                    el.appendChild(bd);
+                    el._ft = b.tx || '';
+                    el._bolded = true; // 已完成渲染，无需 typing/abold
+                    return el;
+                }
                 let cls = 'vn-narration';
                 if (b.ty === 'player') cls = 'vn-bubble--player';
                 else if (b.ty === 'npc') cls = 'vn-bubble--npc';
@@ -3841,15 +3965,17 @@
                 if (!s) return '';
                 const tags = [];
                 const had = (re) => re.test(full);
-                if (!had(/\[饱腹:/)) {
+                // ===== DZ 变量官开启时：数值默认标签（饱腹/口渴/疲劳）由变量官补结算，不再自动补 =====
+                const _vjOn = !!(cfg().varJudge && cfg().expertMode);
+                if (!_vjOn && !had(/\[饱腹:/)) {
                     const cur = s.hunger != null ? s.hunger : 50;
                     tags.push('[饱腹:' + Math.max(0, Math.min(100, Math.round(cur - 2))) + ']');
                 }
-                if (!had(/\[口渴:/)) {
+                if (!_vjOn && !had(/\[口渴:/)) {
                     const cur = s.thirst != null ? s.thirst : 50;
                     tags.push('[口渴:' + Math.max(0, Math.min(100, Math.round(cur - 3))) + ']');
                 }
-                if (!had(/\[疲劳:/)) {
+                if (!_vjOn && !had(/\[疲劳:/)) {
                     const cur = s.fatigue != null ? s.fatigue : 20;
                     tags.push('[疲劳:' + Math.max(0, Math.min(100, Math.round(cur + 2))) + ']');
                 }
@@ -4049,6 +4175,13 @@
                 if (!Array.isArray(hist)) {
                     try { console.warn('[hin] hist was not array, reset'); } catch(_) {}
                     hist = []; try { svh([]); } catch(_) {}
+                }
+                // ===== DZ AI 功能总开关：关闭时进入本地模式，不调用任何 API =====
+                if (cfg().aiEnabled === false) {
+                    try { apb({ ty: 'system', tx: '【本地模式】AI 叙事已关闭（可在 设置 → AI 功能 或 开局·第四步 重新开启）。本轮输入不会发送给 AI，也不会写入剧情。' }, 0); } catch (_) {}
+                    try { apb({ ty: 'choice', opts: generateNeutralChoices() }, 0); } catch (_) {}
+                    try { tst('AI 功能已关闭：本地模式，已跳过生成'); } catch (_) {}
+                    return false;
                 }
                 let indicatorEl = null;
                 try {
@@ -4274,7 +4407,44 @@
                     const safeModel = f.model.trim();
                     // 不同服务商兼容修正：避免不必要字段导致 400（DeepSeek 不需要额外兼容；Ollama 对 max_tokens 有时更宽容）
                     let full = '';
-                    if (f.strm && f.key) {
+                    // ===== DZ 双模型正文：第一模型推演 → 第二模型重组表达（不改变事实/选项，不替玩家做决定）=====
+                    const useDual = !!(window.DZ && window.DZ.dual && window.DZ.dual.isEnabled());
+                    if (useDual) {
+                        // —— 阶段 1：第一模型（推演：剧情、事实标签、选项）——
+                        try { if (indicatorEl && indicatorEl._setStage) indicatorEl._setStage('🧠 第一模型 · 剧情推演中…'); } catch(_) {}
+                        const requestBodyD = { model: safeModel, messages: msgs, max_tokens: safeMaxTokens, temperature: safeTemp, stream: false };
+                        const rpD = await requestWithRetry(f.ep, requestBodyD, f.key, null, false, 2, 120000);
+                        const dD = await rpD.json();
+                        const draft = (dD && dD.choices && dD.choices[0] && dD.choices[0].message && dD.choices[0].message.content) || '';
+                        if (!draft || !draft.trim()) throw new Error('第一模型返回为空，请检查模型配置');
+                        // —— 拆分草稿：叙事 / 标签 / 选项 ——
+                        let dNarr = draft, dTags = '', dChoices = null;
+                        try {
+                            if (window.AI_FRAMEWORK && window.AI_FRAMEWORK.VALIDATORS && typeof window.AI_FRAMEWORK.VALIDATORS.validateOutput === 'function') {
+                                const v = window.AI_FRAMEWORK.VALIDATORS.validateOutput(draft);
+                                if (v && typeof v.narrative === 'string') {
+                                    dNarr = v.narrative;
+                                    dTags = v.tagsText || '';
+                                    dChoices = v.choices || null;
+                                }
+                            }
+                        } catch(_) {}
+                        // —— 阶段 2：第二模型（重组表达）——
+                        try { if (indicatorEl && indicatorEl._setStage) indicatorEl._setStage('✍️ 第二模型 · 重组表达中…'); } catch(_) {}
+                        let rewritten = '';
+                        try {
+                            rewritten = await window.DZ.dual.rewrite(dNarr);
+                        } catch (e2) {
+                            rewritten = '';
+                            try { tst('第二模型润色失败，已回退第一模型正文'); } catch (_) {}
+                        }
+                        // —— 重组：润色后的叙事 + 原事实标签 + 原选项（选项绝不改动）——
+                        full = (rewritten || dNarr).trim();
+                        if (dTags) full += '\n' + dTags;
+                        full += '\n[choice]' + (dChoices && dChoices.length ? dChoices.join('|') : generateNeutralChoices().join('|')) + '[/choice]';
+                        const bbD = pai(full, false);
+                        for (const b of bbD) apb(b, f.tspd);
+                    } else if (f.strm && f.key) {
                         const ct = new AbortController();
                         ctrl = ct;
                         const requestBody = { model: safeModel, messages: msgs, max_tokens: safeMaxTokens, temperature: safeTemp, stream: true };
@@ -4437,15 +4607,21 @@
                         }
                         hist.push({ role: 'assistant', content: full });
                         svh(hist);
-                        // ===== 记忆系统：异步压缩本轮对话（不阻塞 UI）=====
+                        // ===== 记忆系统：异步压缩本轮对话（不阻塞 UI）— DZ 记忆模式关闭时跳过 =====
                         try {
-                            if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.recordTurn === 'function') {
+                            if (cfg().memMode !== 'off' && window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.recordTurn === 'function') {
                                 const _userMsg = tx || '';
                                 const _aiResp = full || '';
                                 // 异步执行，不等待
                                 window.MEMORY_SYSTEM.recordTurn(_userMsg, _aiResp).catch(e => {
                                     if (cfg().debug) console.warn('[memory] compress failed:', e);
                                 });
+                            }
+                        } catch(e) {}
+                        // ===== DZ 变量官：本轮结算（专家模式 + 开启时；正文数值标签已被 ptg 跳过）=====
+                        try {
+                            if (window.DZ && window.DZ.varJudge && window.DZ.varJudge.isEnabled()) {
+                                window.DZ.varJudge.run(full || '').catch(() => {});
                             }
                         } catch(e) {}
                         // ===== 时间系统重构：玩家行动 → 推进游戏时间 =====
@@ -6353,6 +6529,8 @@
                         window._selectedJobPreset = '';
                     }
                 }
+                // ===== DZ 第四步：AI 与功能 —— 打开角色面板时同步配置 =====
+                try { if (window.DZ && window.DZ.charStep4) window.DZ.charStep4.fill(); } catch(e) {}
             }
 
             $('btnNewGame').addEventListener('click', async () => {
@@ -6435,7 +6613,8 @@
                 $('apiContextLen').value = c.ctx;
                 $('typingSpeed').value = c.tspd;
                 $('streamToggle').value = c.strm ? '1' : '0';
-                $('fontSizeSelect').value = c.fsz;
+                // ===== DZ：字号/功能开关同步（滑杆 + AI功能/专家模式/记忆/台词高亮）=====
+                try { if (window.DZ && window.DZ.settingsHooks) window.DZ.settingsHooks.syncAll(); } catch(e) {}
                 $('idleInterval').value = c.idleInt || 60;
                 $('idleDirection').value = c.idleDir || '休养';
                 $('idleCustom').value = c.idleCustom || '';
@@ -6474,6 +6653,8 @@
                 const mSel = $('apiModelSelect'), mInp = $('apiModel');
                 const useSel = mSel && mSel.style.display !== 'none';
                 const finalModel = (useSel ? mSel.value : (mInp ? mInp.value : '')) || 'gpt-4o';
+                // ===== DZ：字号改为滑杆读取 + 新增 AI 功能/专家模式/记忆开关 =====
+                const _narr = $('fontSizeNarr') ? (parseInt($('fontSizeNarr').value, 10) || 15) + 'px' : (cfg().fsz || '15px');
                 scf({
                     ...cfg(),
                     ep: $('apiEndpoint').value || DCFG.ep, key: finalKey,
@@ -6483,7 +6664,17 @@
                     ctx: parseInt($('apiContextLen').value) || 24,
                     tspd: parseInt($('typingSpeed').value) || 20,
                     strm: $('streamToggle').value === '1',
-                    fsz: $('fontSizeSelect').value || '15px',
+                    fsz: _narr,
+                    fszPanel: $('fontSizePanel') ? (parseInt($('fontSizePanel').value, 10) || 15) : (cfg().fszPanel || 15),
+                    fszUI: $('fontSizeUi') ? (parseInt($('fontSizeUi').value, 10) || 14) : (cfg().fszUI || 14),
+                    hlDialogue: $('setHlDialogue') ? $('setHlDialogue').checked : (cfg().hlDialogue !== false),
+                    aiEnabled: $('setAiEnabled') ? $('setAiEnabled').checked : (cfg().aiEnabled !== false),
+                    expertMode: $('setExpertMode') ? $('setExpertMode').checked : !!cfg().expertMode,
+                    dualModel: $('setDualModel') ? $('setDualModel').checked : !!cfg().dualModel,
+                    model2: $('setModel2') ? ($('setModel2').value || '').trim() : (cfg().model2 || ''),
+                    varJudge: $('setVarJudge') ? $('setVarJudge').checked : !!cfg().varJudge,
+                    modelMem: $('setModelMem') ? ($('setModelMem').value || '').trim() : (cfg().modelMem || ''),
+                    memMode: $('setMemMode') ? ($('setMemMode').checked ? 'summary' : 'off') : (cfg().memMode || 'summary'),
                     prompt: $('promptEditor').value || DPROMPT,
                     idleInt: parseInt($('idleInterval').value) || 60,
                     idleOn: oldIdle,
@@ -6576,19 +6767,7 @@
                             saveFromSettings();
                         });
                     }
-                    // 在设置标题下方加一个小提示
-                    try {
-                        const headerRow = document.getElementById('settingsModalTitle');
-                        if (headerRow && !document.getElementById('apiAutoSaveHint')) {
-                            const hint = document.createElement('div');
-                            hint.id = 'apiAutoSaveHint';
-                            hint.className = 'field-hint';
-                            hint.style.cssText = 'position:absolute;top:8px;right:32px;color:var(--notify-add);font-size:0.62rem;';
-                            hint.textContent = '✓ API配置自动保存到本地，刷新不丢失';
-                            headerRow.parentNode.style.position = 'relative';
-                            headerRow.parentNode.appendChild(hint);
-                        }
-                    } catch {}
+                    // ===== DZ：静默保存 —— 不再弹出"已保存到本地"提示 =====
                 } catch {}
             })();
             // ========== 拉取模型按钮：点击后从 API /v1/models 端点获取模型列表 ==========
@@ -8151,50 +8330,10 @@ ${sumContent}
                     } catch {}
                 }
                 const debouncedWelSave = debounce(saveFromWelcome, 250);
-                let _hintFn = saveFromWelcome;
                 const welIds = ['welKey','welEndpoint','welModel'];
                 welIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', debouncedWelSave); });
                 const sel = document.getElementById('welModelSelect'); if (sel) sel.addEventListener('change', saveFromWelcome);
-                // 提示用户已自动保存
-                try {
-                    const savedHint = document.createElement('div');
-                    savedHint.id = 'welSavedHint';
-                    savedHint.className = 'field-hint';
-                    savedHint.style.cssText = 'margin-top:8px;color:var(--notify-add);font-size:0.62rem;text-align:right;display:none;';
-                    savedHint.textContent = '✓ 已自动保存到本地（刷新不丢失）';
-                    const bn = document.getElementById('btnWelcomeNext');
-                    if (bn && bn.parentNode) bn.parentNode.insertBefore(savedHint, bn.nextSibling);
-                    const _showHintFn = function() {
-                        saveFromWelcome();
-                        if (savedHint) {
-                            savedHint.style.display = 'block';
-                            clearTimeout(_showHintFn._t);
-                            _showHintFn._t = setTimeout(function() { savedHint.style.display = 'none'; }, 1200);
-                        }
-                    };
-                    // 替换 debouncedWelSave，使其执行完调用原 save + 显示提示
-                    const debouncedWithHint = (function() {
-                        let _t2 = null;
-                        return function() {
-                            const ctx = this, args = arguments;
-                            if (_t2) clearTimeout(_t2);
-                            _t2 = setTimeout(function() { _t2 = null; _showHintFn.apply(ctx, args); }, 250);
-                        };
-                    })();
-                    // rebind（debouncedWelSave 改用带提示版）
-                    welIds.forEach(id => {
-                        const el = document.getElementById(id);
-                        if (el) {
-                            el.removeEventListener('input', debouncedWelSave);
-                            el.addEventListener('input', debouncedWithHint);
-                        }
-                    });
-                    if (sel) {
-                        sel.removeEventListener('change', saveFromWelcome);
-                        sel.addEventListener('change', _showHintFn);
-                    }
-                    _hintFn = _showHintFn;
-                } catch {}
+                // ===== DZ：静默保存 —— 不再显示"已自动保存到本地"提示 =====
             })();
             $('btnTestWel').addEventListener('click', async () => {
                 const k = $('welKey').value;
@@ -8274,6 +8413,8 @@ ${sumContent}
                 sch(c);
                 if (c.hiddenPresets && c.hiddenPresets.length) tst('已选择预设职业：' + c.hiddenPresets.map(h => JOB_PRESETS[h] ? JOB_PRESETS[h].name : h).join('、'));
                 $('charModal').style.display = 'none';
+                // ===== DZ 第四步落盘：AI 配置保存 + 用世界/角色设定种入世界书 =====
+                try { if (window.DZ && window.DZ.charStep4) window.DZ.charStep4.onConfirm(c); } catch(e) {}
                 stg();
             });
             // 新增：仅应用设定（不重开），用于游戏进行中修改角色卡/世界设定
@@ -8284,6 +8425,8 @@ ${sumContent}
                     const oldChr = gch() || {};
                     if (oldChr._prevDeath) c._prevDeath = oldChr._prevDeath;
                     sch(c);
+                    // ===== DZ 第四步落盘 + 世界书跟随设定更新 =====
+                    try { if (window.DZ && window.DZ.charStep4) window.DZ.charStep4.onConfirm(c); } catch(e) {}
                     // 应用后立刻自动存档
                     if (window.autoSaveAll && typeof window.autoSaveAll === 'function') {
                         window.autoSaveAll('charEdit');

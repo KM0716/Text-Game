@@ -66,7 +66,8 @@ AI回复：${(aiResponse || '').slice(0, 2000)}
 
         try {
             const body = {
-                model: f.model || 'gpt-4o-mini',
+                // ===== DZ：优先使用「记忆模型」（f.modelMem），留空沿用主模型 =====
+                model: (f.modelMem && f.modelMem.trim()) || f.model || 'gpt-4o-mini',
                 messages: [
                     { role: 'system', content: sysPrompt },
                     { role: 'user', content: userPrompt }
@@ -116,7 +117,8 @@ AI回复：${(aiResponse || '').slice(0, 2000)}
         const userPrompt = `请整合以下事实记录：\n\n${combined}\n\n---\n长期记忆：`;
         try {
             const body = {
-                model: f.model || 'gpt-4o-mini',
+                // ===== DZ：优先使用「记忆模型」（f.modelMem），留空沿用主模型 =====
+                model: (f.modelMem && f.modelMem.trim()) || f.model || 'gpt-4o-mini',
                 messages: [
                     { role: 'system', content: sysPrompt },
                     { role: 'user', content: userPrompt }
@@ -135,6 +137,11 @@ AI回复：${(aiResponse || '').slice(0, 2000)}
 
     // ===== 主入口：一轮结束后调用，记录压缩 =====
     async function recordTurn(userMsg, aiResponse) {
+        // ===== DZ 记忆模式关闭：跳过记录与压缩 =====
+        try {
+            const f = window.cfg();
+            if (f && f.memMode === 'off') return '';
+        } catch(e) {}
         const records = loadRecords();
         const turnNum = getCurrentTurn() + 1;
         // 更新轮次计数
