@@ -4262,6 +4262,8 @@
                             undo.memSnap = window.MEMORY_SYSTEM.snapshot();
                         }
                     } catch(e) {}
+                    // ===== DZ 回合快照：把「本轮开始前」的完整状态推入快照列表（供整轮撤回；同轮重生成自动覆盖）=====
+                    try { if (window.DZ && window.DZ.turnsnap) window.DZ.turnsnap.push(undo, tx); } catch(e) {}
                     snotifyStartBatch();
                     // 重置 pai 事件触发的 turn 标记（防止跨回合误触发）
                     if (typeof window._paiSetTurn === 'function') window._paiSetTurn(undo.turnId);
@@ -4837,6 +4839,9 @@
             // are defined in the second script block and exposed there via window.GameSystems
             // Additional functions needed by second script block
             window.rbt = rbt; window.upui = upui; window.stg = stg;
+            // DZ 整轮撤回支持：busy 查询 + 清空单步 undo 记录
+            window._isBusy = () => busy;
+            window._clearUndo = () => { undo = null; };
             window.ccb = ccb; window.svh = svh; window.apb = apb; window.cbe = cbe;
             window.migrateSta = migrateSta; window.migrateChr = migrateChr; window.migrateCfg = migrateCfg;
             window.mergeSbx = mergeSbx; window.ssbx = ssbx; window.gsbx = gsbx;
@@ -7662,6 +7667,8 @@ ${sumContent}
                         }
                     }
                 }
+                // ===== DZ 记忆回滚：撤掉旧回复的总结，防止重生成后同轮记忆双份（hin 重新完成时再记）=====
+                try { if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.rollbackTo === 'function') MEMORY_SYSTEM.rollbackTo((gst().turnCount || 0) + 1); } catch(_) {}
                 // Remove last user message AND all AI responses after it from hist
                 // (hin() will re-add the user message)
                 hist.splice(lastUserIdx, hist.length - lastUserIdx);
@@ -7812,6 +7819,8 @@ ${sumContent}
                             window._setUnlockedAchievements(undo.ach);
                         }
                     }
+                    // ===== DZ 记忆回滚：撤掉旧回复的总结，防止采用候选后同轮记忆双份（下面重新记录）=====
+                    try { if (window.MEMORY_SYSTEM && typeof window.MEMORY_SYSTEM.rollbackTo === 'function') MEMORY_SYSTEM.rollbackTo((gst().turnCount || 0) + 1); } catch(_) {}
                     // 2. 清除旧 AI 回复气泡（保留最后一条玩家气泡）
                     const ca = $('chatArea');
                     if (ca) {

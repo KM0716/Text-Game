@@ -5455,3 +5455,138 @@ body[data-theme="dark"].dz-hl-dialogue .dlg { color: #7db8e8; }
     overflow-y: auto;
 }
 .dz-export-box .btn-modal { display: block; width: 100%; margin-top: 4px; }
+
+/* ==================================================================
+ * DZ 第四轮新增：回合快照（整轮撤回）/ 记忆诊断与补录 / 变更日志
+ * ================================================================== */
+
+/* ---------- 1. 回合快照卡片 ---------- */
+.dz-snap-card {
+    padding: 10px 12px 9px;
+    margin-bottom: 8px;
+    background: var(--bg-paper);
+    border: 1.6px solid var(--border-light);
+    border-radius: 8px;
+}
+.dz-snap-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+}
+.dz-snap-turn {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+}
+.dz-snap-restore { font-size: 0.72rem; padding: 5px 12px; flex-shrink: 0; }
+.dz-snap-preview {
+    margin-top: 6px;
+    font-size: 0.76rem;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+.dz-snap-meta {
+    margin-top: 5px;
+    font-size: 0.66rem;
+    color: var(--text-muted);
+    letter-spacing: 0.05em;
+}
+
+/* ---------- 2. 进度条（记忆任务） ---------- */
+.dz-prog {
+    height: 12px;
+    background: var(--bg-paper-alt);
+    border: 1.4px solid var(--border-light);
+    border-radius: 6px;
+    overflow: hidden;
+    margin-top: 8px;
+}
+.dz-prog-fill {
+    height: 100%;
+    width: 0%;
+    background: var(--accent);
+    transition: width 300ms ease;
+}
+
+/* ---------- 3. 记忆档案弹窗 · 诊断与补录工具组 ---------- */
+.dz-mem-tools {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-top: 1.4px dashed var(--border-light);
+}
+
+/* ---------- 4. 诊断与补录弹窗表单 ---------- */
+.dz-bf-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+.dz-bf-row label {
+    flex-shrink: 0;
+    width: 118px;
+    font-size: 0.74rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    line-height: 1.5;
+}
+.dz-bf-sub { font-weight: normal; color: var(--text-muted); font-size: 0.68rem; }
+.dz-bf-inp {
+    flex: 1;
+    min-width: 0;
+    padding: 7px 10px;
+    font-size: 0.78rem;
+    font-family: inherit;
+    background: var(--bg-paper);
+    color: inherit;
+    border: 1.4px solid var(--border-light);
+    border-radius: 6px;
+}
+.dz-bf-diag {
+    padding: 9px 11px;
+    margin: 2px 0 10px;
+    font-size: 0.72rem;
+    line-height: 1.8;
+    color: var(--ink-soft);
+    background: var(--bg-paper-alt);
+    border: 1.4px dashed var(--border-light);
+    border-radius: 6px;
+}
+.dz-bf-status {
+    margin-top: 8px;
+    font-size: 0.74rem;
+    font-weight: 600;
+    color: var(--ink-soft);
+    letter-spacing: 0.02em;
+}
+
+/* ---------- 5. 变更日志行 ---------- */
+.dz-oplog-row {
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    padding: 7px 10px;
+    margin-bottom: 6px;
+    background: var(--bg-paper);
+    border: 1.4px solid var(--border-light);
+    border-radius: 6px;
+    font-size: 0.74rem;
+}
+.dz-oplog-src {
+    flex-shrink: 0;
+    font-size: 0.64rem;
+    font-weight: 700;
+    color: var(--accent);
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    padding: 2px 8px;
+    letter-spacing: 0.06em;
+}
+.dz-oplog-tx { flex: 1; min-width: 0; color: var(--ink-soft); line-height: 1.6; }
+.dz-oplog-ts { flex-shrink: 0; font-size: 0.64rem; color: var(--text-muted); }

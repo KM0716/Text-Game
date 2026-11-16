@@ -1468,7 +1468,425 @@
     };
 
     /* ================================================================
-     * 14. 移动端手势：屏幕左边缘右滑开侧栏；侧栏/面板内左滑关闭
+     * 14. 回合快照（整轮撤回）：每轮开始前的完整状态存档 + 变更日志
+     * ================================================================ */
+    const SNAP_KEY = 'dz_turn_snaps_v1';
+    const OPLOG_KEY = 'dz_oplog_v1';
+    const SNAP_MAX = 6;      // 最多保留最近 6 个回合快照
+    const SNAP_MIN = 3;      // 体积超预算时至少保留 3 个
+    const SNAP_BUDGET = 1200 * 1024; // 快照存储体积预算（字符数）
+
+    function snLoad() {
+        try {
+            const raw = localStorage.getItem(SNAP_KEY);
+            const d = raw ? JSON.parse(raw) : null;
+            if (d && Array.isArray(d.snaps)) return d;
+        } catch (e) {}
+        return { snaps: [] };
+    }
+    function snSave(d) {
+        try { localStorage.setItem(SNAP_KEY, JSON.stringify(d)); return true; }
+        catch (e) {
+            // 容量满：逐步删最旧重试
+            while (d.snaps.length > 1) {
+                d.snaps.shift();
+                try { localStorage.setItem(SNAP_KEY, JSON.stringify(d)); return true; } catch (_) {}
+            }
+            try { localStorage.setItem(SNAP_KEY, JSON.stringify(d)); } catch (_) {}
+            return false;
+        }
+    }
+    function opLoad() {
+        try {
+            const raw = localStorage.getItem(OPLOG_KEY);
+            const d = raw ? JSON.parse(raw) : null;
+            if (d && Array.isArray(d.items)) return d;
+        } catch (e) {}
+        return { items: [] };
+    }
+
+    const turnsnap = {
+        /* 每轮开始前推入快照（main.js hin 调用；同轮重生成自动覆盖） */
+        push: function (undo, preview) {
+            try {
+                if (!undo || !undo.hi) return;
+                const turnNum = undo.hi.filter(function (m) { return m && m.role === 'user'; }).length + 1;
+                const d = snLoad();
+                if (d.snaps.length && d.snaps[d.snaps.length - 1].turnNum === turnNum) d.snaps.pop();
+                d.snaps.push({
+                    id: 'sn' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
+                    turnNum: turnNum,
+                    preview: String(preview || '').slice(0, 80),
+                    ts: Date.now(),
+                    hi: undo.hi, st: undo.st, ch: undo.ch, clk: undo.clk, sbx: undo.sbx,
+                    ach: undo.ach || [], memSnap: undo.memSnap || null
+                });
+                // 体积自适应：超预算逐个删最旧（至少保 SNAP_MIN 个），再按数量上限裁剪
+                let json = JSON.stringify(d);
+                while (d.snaps.length > SNAP_MIN && json.length > SNAP_BUDGET) {
+                    d.snaps.shift();
+                    json = JSON.stringify(d);
+                }
+                while (d.snaps.length > SNAP_MAX) d.snaps.shift();
+                snSave(d);
+            } catch (e) {}
+        },
+        list: function () { return snLoad().snaps; },
+
+        /* 变更日志：记录撤回 / 清理 / 补录 / 重建等维护操作（最近 100 条） */
+        log: function (text, src) {
+            try {
+                const d = opLoad();
+                d.items.push({ ts: Date.now(), text: String(text).slice(0, 160), src: src || '系统' });
+                if (d.items.length > 100) d.items = d.items.slice(-100);
+                localStorage.setItem(OPLOG_KEY, JSON.stringify(d));
+            } catch (e) {}
+        },
+        logs: function () { return opLoad().items.slice().reverse(); },
+
+        /* 整轮撤回：完整恢复到所选回合开始前 */
+        restore: async function (id) {
+            const d = snLoad();
+            let target = null;
+            for (let i = 0; i < d.snaps.length; i++) { if (d.snaps[i].id === id) { target = d.snaps[i]; break; } }
+            if (!target) { if (window.tst) window.tst('快照不存在或已失效'); return; }
+            if (window._isBusy && window._isBusy()) { if (window.tst) window.tst('AI 正在演算，请稍后再撤回'); return; }
+            if (window.sketchConfirm && !(await window.sketchConfirm('整轮撤回到「第 ' + target.turnNum + ' 轮开始前」？\n\n所选回合及之后的对话、日期、钱、物品、人物状态、技能和记忆都会一起恢复；该回合及之后的操作全部撤回。此操作不可撤销。'))) return;
+            try {
+                window._setHist(JSON.parse(JSON.stringify(target.hi)));
+                window.svh(window._getHist());
+                window.sst(JSON.parse(JSON.stringify(target.st)));
+                if (target.ch) window.sch(JSON.parse(JSON.stringify(target.ch)));
+                if (target.clk) window.sclk(JSON.parse(JSON.stringify(target.clk)));
+                if (target.sbx) window._setSbx(window.mergeSbx(JSON.parse(JSON.stringify(target.sbx))));
+                if (window._setUnlockedAchievements) window._setUnlockedAchievements(target.ach || []);
+                if (target.memSnap && window.MEMORY_SYSTEM) window.MEMORY_SYSTEM.restore(target.memSnap);
+                // 整轮恢复后清空逐项撤回记录；更早的回合快照仍可使用
+                if (window._clearUndo) window._clearUndo();
+                d.snaps = d.snaps.filter(function (s) { return s.turnNum < target.turnNum; });
+                snSave(d);
+                window.rbt(); // 原始对话保留并重放渲染
+                try { if (window.autoSaveAll) window.autoSaveAll('turn'); } catch (e) {}
+                turnsnap.log('整轮撤回：恢复到第 ' + target.turnNum + ' 轮开始前', '撤回');
+                if (window.tst) window.tst('已恢复到第 ' + target.turnNum + ' 轮开始前');
+                turnsnap.render();
+            } catch (e) {
+                if (window.tst) window.tst('撤回失败：' + ((e && e.message) ? e.message : e));
+            }
+        },
+
+        /* 清理指定轮次之后的资料：只删对话与记忆，不恢复当时状态；操作前自动导出备份 */
+        clearAfterTurn: async function () {
+            if (window._isBusy && window._isBusy()) { if (window.tst) window.tst('AI 正在演算，请稍后再操作'); return; }
+            let curTurn = 0;
+            try { curTurn = (window.gst() || {}).turnCount || 0; } catch (e) {}
+            const input = window.sketchPrompt ? await window.sketchPrompt('清理第几轮开始的剧情？\n输入轮次号 N：第 N 轮及之后的对话与记忆会被删除（不恢复当时的钱、日期或装备）。\n当前轮次：' + (curTurn || '未知'), String(Math.max(1, curTurn))) : null;
+            const n = parseInt(String(input == null ? '' : input).trim(), 10);
+            if (!(n >= 1)) return;
+            if (curTurn && n > curTurn) { if (window.tst) window.tst('不能超过当前轮次（' + curTurn + '）'); return; }
+            if (window.sketchConfirm && !(await window.sketchConfirm('确定清理第 ' + n + ' 轮及之后的剧情？\n\n只删除对话与记忆，不会恢复当时的钱、日期或装备；操作前会自动导出当前存档备份。'))) return;
+            try {
+                // 1. 静默导出当前存档备份（含记忆）
+                try {
+                    const data = {
+                        cfg: cfg(), chr: window.gch(), sta: window.gst(), clk: window.gclk(),
+                        sbx: window.gsbx(), hist: window._getHist(),
+                        memory: window.MEMORY_SYSTEM ? window.MEMORY_SYSTEM.loadRecords() : null,
+                        exportTime: new Date().toISOString(), version: '2.0-cleanbackup'
+                    };
+                    const blob = new Blob([JSON.stringify(data)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'ZDay清理前备份_' + new Date().toISOString().slice(0, 10) + '.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(function () { try { document.body.removeChild(a); } catch (_) {} URL.revokeObjectURL(url); }, 400);
+                } catch (e) {}
+                // 2. 截断 hist 到第 n 轮开始前
+                const hist = window._getHist();
+                let count = 0, cut = hist.length;
+                for (let i = 0; i < hist.length; i++) {
+                    const m = hist[i];
+                    if (m && m.role === 'user') { count++; if (count === n) { cut = i; break; } }
+                }
+                window._setHist(hist.slice(0, cut));
+                window.svh(window._getHist());
+                // 3. 记忆与轮次计数回滚
+                if (window.MEMORY_SYSTEM && window.MEMORY_SYSTEM.rollbackTo) window.MEMORY_SYSTEM.rollbackTo(n);
+                window.rbt();
+                try { if (window.autoSaveAll) window.autoSaveAll('turn'); } catch (e) {}
+                turnsnap.log('清理剧情：删除第 ' + n + ' 轮及之后的对话与记忆（已自动备份）', '清理');
+                if (window.tst) window.tst('已清理第 ' + n + ' 轮及之后的剧情（备份已导出）');
+                turnsnap.render();
+            } catch (e) {
+                if (window.tst) window.tst('清理失败：' + ((e && e.message) ? e.message : e));
+            }
+        },
+
+        /* 渲染「回合撤回」弹窗 */
+        render: function () {
+            const root = $('dzSnapshotContent');
+            if (!root) return;
+            root.innerHTML = '';
+            const desc = document.createElement('div');
+            desc.className = 'dz-archive-tip';
+            desc.textContent = '完整恢复到所选回合开始前：对话、日期、钱、物品、人物状态、技能和记忆一起恢复。所选回合及之后的操作都会撤回。';
+            root.appendChild(desc);
+            const snaps = turnsnap.list();
+            if (!snaps.length) {
+                const empty = document.createElement('div');
+                empty.className = 'dz-archive-tip';
+                empty.textContent = '暂无快照 · 每次发送行动时会自动保存最近几轮「开始前」的完整快照，到这里就能整轮撤回。';
+                root.appendChild(empty);
+            } else {
+                // 新快照在前
+                snaps.slice().reverse().forEach(function (s) {
+                    const card = document.createElement('div');
+                    card.className = 'dz-snap-card';
+                    const head = document.createElement('div');
+                    head.className = 'dz-snap-head';
+                    const t = document.createElement('span');
+                    t.className = 'dz-snap-turn';
+                    t.textContent = '第 ' + s.turnNum + ' 轮开始前';
+                    head.appendChild(t);
+                    const btn = document.createElement('button');
+                    btn.className = 'btn-modal dz-snap-restore';
+                    btn.textContent = '撤回这里';
+                    btn.addEventListener('click', function () { turnsnap.restore(s.id); });
+                    head.appendChild(btn);
+                    card.appendChild(head);
+                    const pv = document.createElement('div');
+                    pv.className = 'dz-snap-preview';
+                    pv.textContent = '「' + (s.preview || '…') + '」';
+                    card.appendChild(pv);
+                    const meta = document.createElement('div');
+                    meta.className = 'dz-snap-meta';
+                    meta.textContent = new Date(s.ts).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                    card.appendChild(meta);
+                    root.appendChild(card);
+                });
+            }
+            // 清理指定轮次
+            const sec = document.createElement('div');
+            sec.className = 'dz-archive-tip';
+            sec.textContent = '没有旧快照而只想清理某段剧情时，可使用「清理指定轮次之后的资料」。它不会恢复当时的钱、日期或装备，操作前会先导出当前存档备份。';
+            root.appendChild(sec);
+            const clean = document.createElement('button');
+            clean.className = 'btn-modal';
+            clean.style.margin = '4px 0 10px';
+            clean.textContent = '🧹 清理指定轮次之后的资料';
+            clean.addEventListener('click', turnsnap.clearAfterTurn);
+            root.appendChild(clean);
+            const foot = document.createElement('div');
+            foot.className = 'dz-archive-tip';
+            foot.style.marginBottom = '8px';
+            foot.textContent = '最多保留最近 ' + SNAP_MAX + ' 个回合快照；存档较大时会减少保留数量。整轮恢复后清空逐项撤回记录，更早的回合快照仍可使用；原始对话保留，也可在剧情档案·时间轴回看。';
+            root.appendChild(foot);
+            const lg = document.createElement('button');
+            lg.className = 'btn-modal';
+            lg.textContent = '📜 变更日志';
+            lg.addEventListener('click', function () {
+                turnsnap.renderLogs();
+                if ($('opLogModal')) openModal('opLogModal');
+            });
+            root.appendChild(lg);
+        },
+
+        /* 渲染变更日志弹窗 */
+        renderLogs: function () {
+            const root = $('dzOpLogContent');
+            if (!root) return;
+            root.innerHTML = '';
+            const items = turnsnap.logs();
+            if (!items.length) {
+                const e0 = document.createElement('div');
+                e0.className = 'dz-archive-tip';
+                e0.textContent = '暂无操作记录 · 撤回、清理、补录、重建等维护操作会记录在这里（最近 100 条）。';
+                root.appendChild(e0);
+                return;
+            }
+            items.forEach(function (it) {
+                const row = document.createElement('div');
+                row.className = 'dz-oplog-row';
+                const tag = document.createElement('span');
+                tag.className = 'dz-oplog-src';
+                tag.textContent = it.src;
+                row.appendChild(tag);
+                const tx = document.createElement('span');
+                tx.className = 'dz-oplog-tx';
+                tx.textContent = it.text;
+                row.appendChild(tx);
+                const tm = document.createElement('span');
+                tm.className = 'dz-oplog-ts';
+                tm.textContent = new Date(it.ts).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                row.appendChild(tm);
+                root.appendChild(row);
+            });
+        }
+    };
+
+    /* ================================================================
+     * 15. 记忆诊断与补录（补录记忆 / 安全重建 / 手动补录事实）
+     * ================================================================ */
+    const memrepair = {
+        _cancelRef: null,
+        _timer: null,
+        _t0: 0,
+
+        open: function (mode) {
+            const root = $('dzMemBfBody');
+            if (!root) return;
+            // 已有任务进行中：只把弹窗带回来，不重置 UI
+            if (memrepair._cancelRef && memrepair._cancelRef.running) { openModal('memBackfillModal'); return; }
+            let curTurn = 0;
+            try { curTurn = (window.gst() || {}).turnCount || 0; } catch (e) {}
+            root.innerHTML = ''
+                + '<div class="dz-bf-row"><label>开始轮次</label><input type="number" min="1" id="dzBfFrom" value="1" class="dz-bf-inp"></div>'
+                + '<div class="dz-bf-row"><label>结束轮次</label><input type="number" min="1" id="dzBfTo" value="' + Math.max(1, curTurn) + '" class="dz-bf-inp"></div>'
+                + '<div class="dz-bf-diag" id="dzBfDiag">—</div>'
+                + '<div class="dz-bf-row"><label>只补指定缺失轮次<br><span class="dz-bf-sub">（选填，逗号分隔）</span></label><input type="text" id="dzBfOnly" placeholder="例如 12, 25, 30" class="dz-bf-inp"></div>'
+                + '<div class="dz-bf-row"><label>处理方式</label><select id="dzBfMode" class="dz-bf-inp">'
+                + '<option value="backfill"' + (mode === 'rebuild' ? '' : ' selected') + '>只补缺失的普通总结（不处理已有总结）</option>'
+                + '<option value="rebuild"' + (mode === 'rebuild' ? ' selected' : '') + '>安全重建范围内的已有总结（重新生成，成功才替换）</option>'
+                + '</select></div>'
+                + '<div class="btn-row" style="margin:10px 0 4px;gap:8px;">'
+                + '<button class="btn-modal primary" id="dzBfStart">开始补录</button>'
+                + '<button class="btn-modal" id="dzBfFact">手动补录事实</button>'
+                + '</div>'
+                + '<div class="dz-bf-status" id="dzBfStatus">等待操作。总结会调用已配置的记忆接口；手动补录无需调用 AI。</div>'
+                + '<div class="dz-prog"><div class="dz-prog-fill" id="dzBfProg" style="width:0%"></div></div>'
+                + '<button class="btn-modal" id="dzBfCancel" style="margin-top:8px;width:100%;">取消后台记忆任务（保留已完成项）</button>';
+            openModal('memBackfillModal');
+            const from = $('dzBfFrom'), to = $('dzBfTo'), only = $('dzBfOnly'), sel = $('dzBfMode');
+            if (from) from.addEventListener('change', memrepair._diag);
+            if (to) to.addEventListener('change', memrepair._diag);
+            const st = $('dzBfStart');
+            if (st) st.addEventListener('click', memrepair._start);
+            const fc = $('dzBfFact');
+            if (fc) fc.addEventListener('click', memrepair._fact);
+            const cc = $('dzBfCancel');
+            if (cc) cc.addEventListener('click', memrepair._cancel);
+            memrepair._diag();
+        },
+
+        _diag: function () {
+            const el = $('dzBfDiag');
+            if (!el || !window.MEMORY_SYSTEM || !window.MEMORY_SYSTEM.diagnose) return;
+            let from = 1, to = 0;
+            try { from = parseInt(($('dzBfFrom') || {}).value, 10) || 1; to = parseInt(($('dzBfTo') || {}).value, 10) || 0; } catch (e) {}
+            const dg = window.MEMORY_SYSTEM.diagnose(from, to);
+            let txt = '诊断范围：第 ' + dg.from + ' ~ ' + dg.to + ' 轮（当前第 ' + dg.currentTurn + ' 轮）。';
+            if (dg.missing.length) {
+                txt += ' 缺失总结轮次：' + dg.missing.slice(0, 40).join('、') + (dg.missing.length > 40 ? '…' : '') + '。';
+            } else {
+                txt += ' 范围内没有缺失总结。';
+            }
+            if (dg.missingNoBody.length) txt += ' 没有正文（无法自动总结）的轮次：' + dg.missingNoBody.slice(0, 20).join('、') + '，可手动补录事实。';
+            if (dg.mergeable > 0) txt += ' 另有 ' + dg.mergeable + ' 条够条件做二次压缩。';
+            txt += ' 二次压缩覆盖的轮次不会算缺失。';
+            el.textContent = txt;
+        },
+
+        _setProg: function (done, total) {
+            const bar = $('dzBfProg');
+            if (bar) bar.style.width = (total > 0 ? Math.round(done / total * 100) : 0) + '%';
+        },
+        _setStatus: function (s) {
+            const el = $('dzBfStatus');
+            if (el) el.textContent = s;
+        },
+
+        _start: async function () {
+            if (!window.MEMORY_SYSTEM) return;
+            if (memrepair._cancelRef && memrepair._cancelRef.running) { if (window.tst) window.tst('已有任务在进行中'); return; }
+            const mode = (($('dzBfMode') || {}).value) || 'backfill';
+            let from = 1, to = 0;
+            try { from = parseInt(($('dzBfFrom') || {}).value, 10) || 1; to = parseInt(($('dzBfTo') || {}).value, 10) || 0; } catch (e) {}
+            const dg = window.MEMORY_SYSTEM.diagnose(from, to);
+            const ref = { stop: false, running: true };
+            memrepair._cancelRef = ref;
+            memrepair._t0 = Date.now();
+            const st = $('dzBfStart');
+            if (st) st.disabled = true;
+            if (memrepair._timer) clearInterval(memrepair._timer);
+            memrepair._timer = setInterval(function () {
+                const sec = Math.round((Date.now() - memrepair._t0) / 1000);
+                const el = $('dzBfStatus');
+                if (el && el.dataset.live) el.textContent = el.dataset.live.replace('%s', sec);
+            }, 500);
+            const upd = function (done, total, tn, ok, fail) {
+                memrepair._setProg(done, total);
+                const el = $('dzBfStatus');
+                if (el) {
+                    el.dataset.live = '任务进行中 · ' + done + ' / ' + total + ' · %s 秒' + (fail ? ' · 失败 ' + fail : '');
+                    el.textContent = '任务进行中 · ' + done + ' / ' + total + ' · 0 秒';
+                }
+            };
+            try {
+                let res;
+                if (mode === 'rebuild') {
+                    res = await window.MEMORY_SYSTEM.rebuildRange(from, to, upd, ref);
+                    turnsnap.log('安全重建：范围 ' + from + '~' + dg.currentTurn + '，成功 ' + res.ok + ' 轮，失败 ' + res.fail + ' 轮', '重建');
+                } else {
+                    // 补录列表：指定轮次 ∩ 缺失，或全部缺失
+                    let list = dg.missing;
+                    const onlyRaw = (($('dzBfOnly') || {}).value) || '';
+                    const only = onlyRaw.split(/[,，、\s]+/).map(function (s) { return parseInt(s, 10); }).filter(function (n) { return n >= 1; });
+                    if (only.length) list = only.filter(function (n) { return dg.missing.indexOf(n) !== -1; });
+                    if (!list.length) {
+                        memrepair._setStatus(only.length
+                            ? '指定轮次都不在缺失列表内，无需补录。'
+                            : '范围内没有缺失总结，无需补录。可改用「安全重建」。');
+                        if (window.tst) window.tst('没有需要补录的轮次');
+                        ref.running = false;
+                        if (st) st.disabled = false;
+                        clearInterval(memrepair._timer);
+                        return;
+                    }
+                    res = await window.MEMORY_SYSTEM.backfillTurns(list, upd, ref);
+                    turnsnap.log('补录记忆：补齐 ' + res.ok + ' 轮缺失总结' + (res.merged ? '，另完成 ' + res.merged + ' 批二次压缩' : '') + (ref.stop ? '（已取消，保留已完成项）' : ''), '补录');
+                }
+                const sec = Math.round((Date.now() - memrepair._t0) / 1000);
+                const cancelled = ref.stop ? '（已取消，保留已完成项）' : '';
+                memrepair._setStatus('任务结束 · ' + res.done + ' / ' + res.total + ' · ' + sec + ' 秒 · 成功 ' + res.ok + '，失败 ' + res.fail + cancelled);
+            } catch (e) {
+                memrepair._setStatus('任务出错：' + ((e && e.message) ? e.message : e));
+            } finally {
+                ref.running = false;
+                if (st) st.disabled = false;
+                clearInterval(memrepair._timer);
+                memrepair._timer = null;
+                memrepair._diag();
+            }
+        },
+
+        _cancel: function () {
+            if (memrepair._cancelRef && memrepair._cancelRef.running) {
+                memrepair._cancelRef.stop = true;
+                if (window.tst) window.tst('正在取消…已完成的项目会保留');
+            }
+        },
+
+        _fact: async function () {
+            if (!window.MEMORY_SYSTEM || !window.MEMORY_SYSTEM.backfillFact) return;
+            let curTurn = 0;
+            try { curTurn = (window.gst() || {}).turnCount || 0; } catch (e) {}
+            const t = window.sketchPrompt ? await window.sketchPrompt('手动补录事实：要补哪一轮的总结？\n（输入轮次号；当前第 ' + (curTurn || '?') + ' 轮）', String(Math.max(1, curTurn))) : null;
+            const n = parseInt(String(t == null ? '' : t).trim(), 10);
+            if (!(n >= 1)) return;
+            const f = window.sketchPrompt ? await window.sketchPrompt('输入第 ' + n + ' 轮的事实记录（不调用 AI，直接写入记忆）：', '') : null;
+            if (f == null || !String(f).trim()) return;
+            if (window.MEMORY_SYSTEM.backfillFact(n, f)) {
+                turnsnap.log('手动补录事实：写入第 ' + n + ' 轮总结', '补录');
+                if (window.tst) window.tst('已手动补录第 ' + n + ' 轮事实');
+                memrepair._diag();
+            }
+        }
+    };
+
+    /* ================================================================
+     * 16. 移动端手势：屏幕左边缘右滑开侧栏；侧栏/面板内左滑关闭
      * ================================================================ */
     function initGestures() {
         let sx = 0, sy = 0, st = 0, tracking = false;
@@ -1539,6 +1957,8 @@
         narrative: narrative,
         settingsHooks: settingsHooks,
         story: story,
+        turnsnap: turnsnap,
+        memrepair: memrepair,
         buildSystemNote: buildSystemNote,
         systemNoteHash: systemNoteHash,
         openModal: openModal
@@ -1557,9 +1977,19 @@
         bindModal('narrativeModal', 'modalCloseNarrative');
         bindModal('memoryModal', 'modalCloseMemory');
         bindModal('archiveModal', 'modalCloseArchive', story.render);
+        bindModal('snapshotModal', 'modalCloseSnapshot', turnsnap.render);
+        bindModal('opLogModal', 'modalCloseOpLog', turnsnap.renderLogs);
         // 剧情档案：侧栏入口 + 页签切换
         const ar = $('dzBtnArchive');
         if (ar) ar.addEventListener('click', function () { story.render(); openModal('archiveModal'); });
+        // 回合撤回：侧栏入口
+        const sn = $('dzBtnSnapshot');
+        if (sn) sn.addEventListener('click', function () { turnsnap.render(); openModal('snapshotModal'); });
+        // 记忆诊断与补录：记忆档案弹窗内入口
+        const bf = $('btnMemBackfill');
+        if (bf) bf.addEventListener('click', function () { memrepair.open('backfill'); });
+        const rb = $('btnMemRebuild');
+        if (rb) rb.addEventListener('click', function () { memrepair.open('rebuild'); });
         document.querySelectorAll('.dz-archive-tab').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 document.querySelectorAll('.dz-archive-tab').forEach(function (b) { b.classList.remove('active'); });

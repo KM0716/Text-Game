@@ -217,6 +217,7 @@
                     <button class="dz-side-btn" id="dzBtnNarrative" title="叙事与阅读设置">🖋️ 叙事阅读</button>
                     <button class="dz-side-btn" id="dzBtnMemory" title="查看记忆系统档案">🧠 记忆档案</button>
                     <button class="dz-side-btn" id="dzBtnArchive" title="剧情档案：时间轴回放 / 书签 / 剧本导出">📖 剧情档案</button>
+                    <button class="dz-side-btn" id="dzBtnSnapshot" title="回合撤回：回到所选回合开始前的完整状态">⏪ 回合撤回</button>
                 </div>
                 <div class="dz-nav-cap">系统</div>
                 <div class="dz-nav-group">
@@ -1015,6 +1016,14 @@
             <button class="btn-modal" id="btnMemoryClear">清空记忆</button>
             <button class="btn-modal" id="btnMemoryExport">导出记忆</button>
         </div>
+        <!-- ===== DZ：记忆诊断与补录 ===== -->
+        <div class="dz-mem-tools">
+            <div class="field-hint">「补录记忆」= 手动补齐：反复扫描，把还没总结的轮次补齐（并发），再把够条件的旧记录做二次压缩，直到再没有可做的活。「安全重建」先生成新总结，成功才替换，失败范围保留旧记忆；原文缺失可手动补录事实。进度在诊断与补录弹窗查看。</div>
+            <div class="btn-row" style="margin-top:6px;">
+                <button class="btn-modal" id="btnMemBackfill">补录记忆</button>
+                <button class="btn-modal" id="btnMemRebuild">安全重建</button>
+            </div>
+        </div>
     </div></div>
 
     <!-- ===== DZ：剧情档案（时间轴回放 / 书签 / 剧本导出） ===== -->
@@ -1026,6 +1035,24 @@
             <button class="btn-modal dz-archive-tab" data-atab="export">📄 导出剧本</button>
         </div>
         <div id="dzArchiveContent" style="max-height:480px;overflow-y:auto;"></div>
+    </div></div>
+
+    <!-- ===== DZ：回合撤回（整轮撤回 / 清理指定轮次 / 变更日志） ===== -->
+    <div class="modal-overlay" id="snapshotModal" style="display:none;"><div class="modal-panel" style="max-width:640px;">
+        <button class="modal-close" id="modalCloseSnapshot">x</button><h3>⏪ 回合撤回</h3>
+        <div id="dzSnapshotContent" style="max-height:520px;overflow-y:auto;"></div>
+    </div></div>
+
+    <!-- ===== DZ：记忆诊断与补录 ===== -->
+    <div class="modal-overlay" id="memBackfillModal" style="display:none;"><div class="modal-panel" style="max-width:560px;">
+        <button class="modal-close" id="modalCloseMemBackfill">x</button><h3>🧪 记忆诊断与补录</h3>
+        <div id="dzMemBfBody" style="max-height:520px;overflow-y:auto;"></div>
+    </div></div>
+
+    <!-- ===== DZ：变更日志（撤回/清理/补录/重建操作流水） ===== -->
+    <div class="modal-overlay" id="opLogModal" style="display:none;"><div class="modal-panel" style="max-width:560px;">
+        <button class="modal-close" id="modalCloseOpLog">x</button><h3>📜 变更日志</h3>
+        <div id="dzOpLogContent" style="max-height:440px;overflow-y:auto;"></div>
     </div></div>
 
     <!-- ===== 游戏脚本（按依赖顺序加载） ===== -->
