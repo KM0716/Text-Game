@@ -5590,3 +5590,71 @@ body[data-theme="dark"].dz-hl-dialogue .dlg { color: #7db8e8; }
 }
 .dz-oplog-tx { flex: 1; min-width: 0; color: var(--ink-soft); line-height: 1.6; }
 .dz-oplog-ts { flex-shrink: 0; font-size: 0.64rem; color: var(--text-muted); }
+
+/* ==================================================================
+ * DZ 第五轮新增：骰子检定（明骰/暗骰）/ 上下文体检
+ * ================================================================== */
+
+/* ---------- 1. 骰子检定面板 ---------- */
+.dz-dice-presets { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 10px; }
+.dz-dice-preset { font-size: 0.74rem; padding: 6px 13px; min-width: 46px; }
+.dz-dice-modes { display: flex; gap: 8px; margin-top: 10px; }
+.dz-dice-mode { flex: 1; font-size: 0.76rem; padding: 8px 10px; opacity: 0.7; }
+.dz-dice-mode.active {
+    opacity: 1;
+    font-weight: 700;
+    border-width: 2px;
+    color: var(--accent);
+}
+.dz-dice-result {
+    min-height: 30px;
+    padding: 8px 12px;
+    font-size: 0.86rem;
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--bg-paper-alt);
+    border: 1.4px dashed var(--border-light);
+    border-radius: 6px;
+    letter-spacing: 0.03em;
+}
+
+/* ---------- 2. 上下文体检行 ---------- */
+.dz-ctx-row {
+    padding: 8px 10px;
+    margin-bottom: 7px;
+    background: var(--bg-paper);
+    border: 1.4px solid var(--border-light);
+    border-radius: 6px;
+}
+.dz-ctx-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 5px; }
+.dz-ctx-role {
+    flex-shrink: 0;
+    font-size: 0.64rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    border: 1px solid var(--border-light);
+    border-radius: 999px;
+    padding: 2px 10px;
+    color: var(--accent);
+}
+.dz-ctx-role.user { color: var(--ink-soft); }
+.dz-ctx-role.assistant { color: var(--text-muted); }
+.dz-ctx-chars { font-size: 0.66rem; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.dz-ctx-bar {
+    height: 7px;
+    background: var(--bg-paper-alt);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 5px;
+}
+.dz-ctx-fill { height: 100%; border-radius: 4px; background: var(--accent); transition: width 240ms ease; }
+.dz-ctx-fill.user { background: var(--ink-soft); }
+.dz-ctx-fill.assistant { background: var(--border-light); }
+.dz-ctx-preview {
+    font-size: 0.7rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

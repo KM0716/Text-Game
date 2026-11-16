@@ -1780,6 +1780,17 @@
                     const normalized = i.replace(/\s*(x\d+|\d+\.?\d*\s*[kKmMgGlL升克千克]?)$/i, '').trim();
                     if (normalized.length >= 2 && normalized !== i) names.push(normalized);
                 });
+                // DZ 人名高亮：NPC 库 + 世界书「角色 · 名」词条 也参与加粗（参考同类产品的 playHlNames 设计）
+                try {
+                    const nd = window.NPC_DATA;
+                    if (nd && typeof nd === 'object') Object.keys(nd).forEach(n => { if (n && n.length >= 2 && n.length <= 12) names.push(n); });
+                    if (window.DZ && window.DZ.worldbook && window.DZ.worldbook.list) {
+                        window.DZ.worldbook.list().forEach(e => {
+                            const m = e && e.title ? String(e.title).match(/^角色\s*·\s*(.{2,12})$/) : null;
+                            if (m) names.push(m[1]);
+                        });
+                    }
+                } catch (_) {}
                 const unique = [...new Set(names)];
                 if (unique.length) {
                     // Sort by length descending to match longer names first
@@ -4279,7 +4290,10 @@
                     // 玩家气泡不渲染item-ref样式，将{{物品名}}转为纯文本【物品名】
                     const playerDisplayText = (isIdle ? '[自主] ' : '') + showText.replace(/\{\{([^}]+)\}\}/g, '【$1】');
                     try { apb({ ty: 'player', tx: playerDisplayText }, 0); } catch(_) {}
-                    hist.push({ role: 'user', content: tx });
+                    // ===== DZ 骰子注入：待定骰结果附加到本条消息（玩家气泡不显示，AI 依点数展开）=====
+                    let _diceTag = '';
+                    try { if (window.DZ && window.DZ.dice) _diceTag = window.DZ.dice.takePending(); } catch(_) {}
+                    hist.push({ role: 'user', content: tx + (_diceTag ? '\n' + _diceTag : '') });
 
                     // If player is asking about clues, sync the clue sidebar immediately
                     if (/线索|回顾|总结|整理/.test(tx)) {
@@ -4424,6 +4438,7 @@
                     const safeModel = f.model.trim();
                     // 不同服务商兼容修正：避免不必要字段导致 400（DeepSeek 不需要额外兼容；Ollama 对 max_tokens 有时更宽容）
                     let full = '';
+                    let _finishReason = ''; // DZ 反截断：官方截断标记（'length' = 被 max_tokens 截断）
                     // ===== DZ 双模型正文：第一模型推演 → 第二模型重组表达（不改变事实/选项，不替玩家做决定）=====
                     const useDual = !!(window.DZ && window.DZ.dual && window.DZ.dual.isEnabled());
                     if (useDual) {
@@ -4535,7 +4550,7 @@
                                         if (!l.startsWith('data: ')) continue;
                                         const d = l.slice(6).trim();
                                         if (d === '[DONE]') continue;
-                                        try { const j = JSON.parse(d); if (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) full += j.choices[0].delta.content; } catch {}
+                                        try { const j = JSON.parse(d); if (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) full += j.choices[0].delta.content; if (j.choices && j.choices[0] && j.choices[0].finish_reason) _finishReason = j.choices[0].finish_reason; } catch {}
                                     }
                                 }
                                 break;
@@ -4559,7 +4574,7 @@
                                 if (!l.startsWith('data: ')) continue;
                                 const d = l.slice(6).trim();
                                 if (d === '[DONE]') continue;
-                                try { const j = JSON.parse(d); if (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) full += j.choices[0].delta.content; } catch {}
+                                try { const j = JSON.parse(d); if (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) full += j.choices[0].delta.content; if (j.choices && j.choices[0] && j.choices[0].finish_reason) _finishReason = j.choices[0].finish_reason; } catch {}
                             }
                             const allBubbles = (window.pai || pai)(full, true);
                             while (bubblesInDOM.length < allBubbles.length) {
@@ -4613,6 +4628,7 @@
                         const rp = await requestWithRetry(f.ep, requestBody, f.key, null, false, 3, 30000);
                         const d = await rp.json();
                         full = d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content || '';
+                        try { _finishReason = (d.choices && d.choices[0] && d.choices[0].finish_reason) || ''; } catch(_) {}
                         if (full && full.length > 50000) { full = full.slice(0, 50000) + '\n\n[系统提示：回复过长已截断，建议分次行动获取更完整叙事。]'; try { snotify('warn', 'AI回复', '内容超长已截断'); } catch(_) {} }
                         // 非流式收到响应：切换阶段提示
                         if (indicatorEl && indicatorEl._setStage) {
@@ -4634,6 +4650,30 @@
                         indicatorEl = null;
                     }
                     if (full && full.length > 60000) { full = full.slice(0, 60000) + '\n\n[系统：回复超长严重截断]'; }
+                    // ===== DZ 反截断自动续写：无选项 + 官方 length 标记/长度近上限且结尾非自然终止 → 静默续写一次并增量渲染 =====
+                    try {
+                        const _atc = cfg();
+                        if (full && _atc.antiTrunc !== false && !isIdle && !/\[choice\]/i.test(full)
+                            && (_finishReason === 'length'
+                                || (full.length >= Math.max(400, safeMaxTokens * 1.2) && !/[。！？…；："'”』」\)\]\n]\s*$/.test(full.trim())))) {
+                            try { tst('✂️ 检测到正文疑似被截断，正在自动续写…'); } catch(_) {}
+                            const contMsgs = msgs.concat([
+                                { role: 'assistant', content: full.slice(-4000) },
+                                { role: 'user', content: '你刚才的输出在结尾处被截断了。请从中断的位置继续写下去：不要重复已有内容，不要任何说明，直接输出后续正文（含自然的段落收尾），保持原文的人称、格式与标签规范。' }
+                            ]);
+                            const rpc = await requestWithRetry(f.ep, { model: safeModel, messages: contMsgs, max_tokens: Math.min(2048, safeMaxTokens), temperature: safeTemp, stream: false }, f.key, null, false, 1, 60000);
+                            const dc2 = await rpc.json();
+                            const cont = (dc2.choices && dc2.choices[0] && dc2.choices[0].message && dc2.choices[0].message.content) || '';
+                            if (cont && cont.trim()) {
+                                const cTrim = cont.trim();
+                                full = full + '\n' + cTrim;
+                                try { apb({ ty: 'system', tx: '✂️ 已自动续写补全被截断的结尾。' }, 0); } catch(_) {}
+                                const bbC = (window.pai || pai)(cTrim, false);
+                                for (const b of bbC) apb(b, f.tspd);
+                                try { checkChatFold(); } catch(_) {}
+                            }
+                        }
+                    } catch (_) {} // 续写失败：保留原文继续正常收尾
                     if (full) {
                         // 补充缺失的属性/时间标签（挂机模式也补充）
                         const s0 = gst();
@@ -4842,6 +4882,8 @@
             // DZ 整轮撤回支持：busy 查询 + 清空单步 undo 记录
             window._isBusy = () => busy;
             window._clearUndo = () => { undo = null; };
+            // DZ 上下文体检：复用回合组装，逐条预览即将发送给 AI 的完整上下文
+            window._composeTurnMessages = composeTurnMessages;
             window.ccb = ccb; window.svh = svh; window.apb = apb; window.cbe = cbe;
             window.migrateSta = migrateSta; window.migrateChr = migrateChr; window.migrateCfg = migrateCfg;
             window.mergeSbx = mergeSbx; window.ssbx = ssbx; window.gsbx = gsbx;

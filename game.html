@@ -311,6 +311,7 @@
                     <button class="btn-quick" id="btnUndoTurn" title="回退到上一步">回退</button>
                     <button class="btn-quick" id="btnRegenTurn" title="重新生成AI上一次回复">重生成</button>
                     <button class="btn-quick" id="btnRegenMulti" title="一次生成3个候选版本供挑选">多候选</button>
+                    <button class="btn-quick" id="btnDice" title="骰子检定：明骰/暗骰，结果随下一次行动交给 AI 裁定">🎲 掷骰</button>
                 </div>
             </div>
             <div class="input-row">
@@ -1029,12 +1030,20 @@
     <!-- ===== DZ：剧情档案（时间轴回放 / 书签 / 剧本导出） ===== -->
     <div class="modal-overlay" id="archiveModal" style="display:none;"><div class="modal-panel" style="max-width:680px;">
         <button class="modal-close" id="modalCloseArchive">x</button><h3>📖 剧情档案</h3>
-        <div class="dz-archive-tabs" style="display:flex;gap:6px;margin:6px 0 10px;">
+        <div class="dz-archive-tabs" style="display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap;">
             <button class="btn-modal dz-archive-tab active" data-atab="timeline">🕰 时间轴</button>
             <button class="btn-modal dz-archive-tab" data-atab="bookmarks">🔖 书签</button>
+            <button class="btn-modal dz-archive-tab" data-atab="varlog">⚖ 变量流水</button>
+            <button class="btn-modal dz-archive-tab" data-atab="ctxcheck">🔍 上下文体检</button>
             <button class="btn-modal dz-archive-tab" data-atab="export">📄 导出剧本</button>
         </div>
         <div id="dzArchiveContent" style="max-height:480px;overflow-y:auto;"></div>
+    </div></div>
+
+    <!-- ===== DZ：骰子检定（明骰 / 暗骰） ===== -->
+    <div class="modal-overlay" id="diceModal" style="display:none;"><div class="modal-panel" style="max-width:520px;">
+        <button class="modal-close" id="modalCloseDice">x</button><h3>🎲 骰子检定</h3>
+        <div id="dzDiceContent" style="max-height:500px;overflow-y:auto;"></div>
     </div></div>
 
     <!-- ===== DZ：回合撤回（整轮撤回 / 清理指定轮次 / 变更日志） ===== -->

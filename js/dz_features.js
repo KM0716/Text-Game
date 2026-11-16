@@ -380,6 +380,8 @@
             } catch (e) {}
             // 结算差异展示
             const after = vjSnapshot();
+            // DZ 变量流水：把本轮数值变化写入可搜索的变更流水（最近 300 条）
+            try { if (window.DZ && window.DZ.varlog) window.DZ.varlog.record(before, after, reasons); } catch (e) {}
             const lines = [];
             VJ_NUM_KEYS.forEach(function (p) {
                 const a = before[p[0]], b = after[p[0]];
@@ -1031,6 +1033,12 @@
             if (dual.isEnabled()) {
                 parts.push('【双模型写作模式】你的正文将由第二模型重组润色。请优先保证：推演逻辑清晰、事实与状态标签完整、事件结果明确；文笔从简，不必雕琢词藻。');
             }
+            // DZ 骰子检定规则：用过骰或有待定骰时注入（让模型知道如何处理 [骰:]/[暗骰:] 标记）
+            try {
+                if (dice.active()) {
+                    parts.push('【骰子检定】玩家消息末尾可能附带 [骰:表达式=点数]（明骰）或 [暗骰:表达式=点数]（暗骰）。必须严格依据点数与当前情境裁定该行动的成败并推进剧情；明骰结果玩家已知，可直接引用点数；暗骰结果玩家不知道——绝对禁止报出点数，只能通过正文的描写与后果自然呈现成败。');
+                }
+            } catch (e) {}
             if (c.aiEnabled === false) {
                 parts.push('【AI 已关闭】当前为本地模式，任何 AI 请求都不会发送。');
             }
@@ -1358,6 +1366,8 @@
             if (!root) return;
             if (story._tab === 'bookmarks') return story._renderBookmarks(root);
             if (story._tab === 'export') return story._renderExport(root);
+            if (story._tab === 'varlog') return varlog.render(root);
+            if (story._tab === 'ctxcheck') return ctxcheck.render(root);
             story._renderTimeline(root);
         },
         _renderTimeline: function (root) {
@@ -1886,7 +1896,367 @@
     };
 
     /* ================================================================
-     * 16. 移动端手势：屏幕左边缘右滑开侧栏；侧栏/面板内左滑关闭
+     * 16. 骰子检定（明骰 / 暗骰）：掷骰 → 结果随下一次行动注入 AI 上下文
+     * ================================================================ */
+    const DICE_KEY = 'dz_dice_v1';
+    function diceLoad() {
+        try {
+            const raw = localStorage.getItem(DICE_KEY);
+            const d = raw ? JSON.parse(raw) : null;
+            if (d && Array.isArray(d.items)) return d;
+        } catch (e) {}
+        return { items: [], pending: '', used: false };
+    }
+    function diceSave(d) { try { localStorage.setItem(DICE_KEY, JSON.stringify(d)); } catch (e) {} }
+
+    const dice = {
+        _mode: 'open', // open=明骰 / blind=暗骰
+        /* 解析骰型表达式：NdM[+K]，如 2d6+1 */
+        parse: function (expr) {
+            const m = String(expr || '').trim().toLowerCase().match(/^(\d{1,2})d(\d{1,4})(?:\+(\d{1,3}))?$/);
+            if (!m) return null;
+            const n = parseInt(m[1], 10), k = parseInt(m[2], 10), add = m[3] ? parseInt(m[3], 10) : 0;
+            if (!(n >= 1 && n <= 20 && k >= 2 && k <= 1000)) return null;
+            return { n: n, m: k, add: add, label: n + 'd' + k + (add ? '+' + add : '') };
+        },
+        /* 掷骰：记录历史 + 设为待定标记（随玩家下一次行动注入） */
+        roll: function (expr) {
+            const p = dice.parse(expr);
+            if (!p) { if (window.tst) window.tst('骰型格式：如 2d6、d100、3d6+1'); return null; }
+            const rolls = [];
+            for (let i = 0; i < p.n; i++) rolls.push(1 + Math.floor(Math.random() * p.m));
+            const sum = rolls.reduce(function (a, b) { return a + b; }, 0) + p.add;
+            const blind = dice._mode === 'blind';
+            const d = diceLoad();
+            d.items.push({ ts: Date.now(), expr: p.label, rolls: rolls, sum: sum, blind: blind });
+            if (d.items.length > 20) d.items = d.items.slice(-20);
+            const ruleTxt = blind
+                ? '|你已知道结果但玩家不知道，请在正文中通过描写自然呈现成败，禁止报出点数]'
+                : '|请依据点数与情境裁定本行动成败并展开]';
+            d.pending = (blind ? '[暗骰:' : '[骰:') + p.label + '=' + sum + ruleTxt;
+            d.used = true;
+            diceSave(d);
+            if (blind) {
+                if (window.tst) window.tst('🎲 已暗中掷骰（' + p.label + '）· 结果将由 AI 在正文中暗中裁定');
+            } else {
+                try {
+                    window.apb({ ty: 'system', tx: '🎲 明骰 ' + p.label + ' → [' + rolls.join(' + ') + (p.add ? ' +' + p.add : '') + '] = ' + sum + '\n结果将随你的下一次行动一并交给 AI。' }, 0);
+                } catch (e) {}
+            }
+            return { expr: p.label, rolls: rolls, sum: sum, blind: blind };
+        },
+        /* 玩家发送行动时取走待定标记（main.js hin 调用） */
+        takePending: function () {
+            const d = diceLoad();
+            const p = d.pending || '';
+            if (p) { d.pending = ''; diceSave(d); }
+            return p;
+        },
+        /* 是否需要向系统提示注入骰子规则（用过骰或有待定骰） */
+        active: function () {
+            const d = diceLoad();
+            return !!(d.pending || d.used);
+        },
+        /* 骰子弹窗 UI */
+        render: function () {
+            const root = $('dzDiceContent');
+            if (!root) return;
+            root.innerHTML = '';
+            const tip = document.createElement('div');
+            tip.className = 'dz-archive-tip';
+            tip.textContent = '先掷骰，再输入你的行动发送：结果会附在下一条消息里交给 AI 裁定成败。明骰直接标出点数；暗骰连点数一起对玩家保密，AI 只在正文里自然呈现结果——适合感知、潜行、谈判等「不知道自己行不行」的判定。';
+            root.appendChild(tip);
+            // 骰型预设 + 自定义
+            const presetRow = document.createElement('div');
+            presetRow.className = 'dz-dice-presets';
+            ['d100', 'd20', '2d6', '3d6', 'd6', 'd4'].forEach(function (e0) {
+                const b = document.createElement('button');
+                b.className = 'btn-modal dz-dice-preset';
+                b.textContent = e0;
+                b.addEventListener('click', function () {
+                    const inp = $('dzDiceExpr');
+                    if (inp) inp.value = e0 === 'd100' || e0 === 'd20' || e0 === 'd6' || e0 === 'd4' ? '1' + e0 : e0;
+                    dice._reHighlight(root);
+                });
+                presetRow.appendChild(b);
+            });
+            root.appendChild(presetRow);
+            const row = document.createElement('div');
+            row.className = 'dz-bf-row';
+            const lab = document.createElement('label');
+            lab.textContent = '骰型';
+            row.appendChild(lab);
+            const inp = document.createElement('input');
+            inp.type = 'text';
+            inp.id = 'dzDiceExpr';
+            inp.className = 'dz-bf-inp';
+            inp.value = '2d6';
+            inp.placeholder = '如 2d6 / 1d20 / 3d6+1';
+            row.appendChild(inp);
+            root.appendChild(row);
+            // 明骰 / 暗骰 切换
+            const modeRow = document.createElement('div');
+            modeRow.className = 'dz-dice-modes';
+            [['open', '☀ 明骰（点数公开）'], ['blind', '🌙 暗骰（点数保密）']].forEach(function (pair) {
+                const b = document.createElement('button');
+                b.className = 'btn-modal dz-dice-mode' + (dice._mode === pair[0] ? ' active' : '');
+                b.setAttribute('data-m', pair[0]);
+                b.textContent = pair[1];
+                b.addEventListener('click', function () {
+                    dice._mode = pair[0];
+                    dice._reHighlight(root);
+                });
+                modeRow.appendChild(b);
+            });
+            root.appendChild(modeRow);
+            // 掷骰按钮 + 结果区
+            const go = document.createElement('button');
+            go.className = 'btn-modal primary';
+            go.style.cssText = 'display:block;width:100%;margin:10px 0;';
+            go.textContent = '🎲 掷骰';
+            const out = document.createElement('div');
+            out.className = 'dz-dice-result';
+            out.id = 'dzDiceResult';
+            out.textContent = dice._mode === 'blind' ? '（暗骰模式下不显示点数）' : '—';
+            go.addEventListener('click', function () {
+                const r = dice.roll(($('dzDiceExpr') || {}).value);
+                if (r && !r.blind) {
+                    out.textContent = '🎲 ' + r.expr + ' → [' + r.rolls.join(' + ') + '] = ' + r.sum;
+                }
+                dice._renderHist(root);
+            });
+            root.appendChild(go);
+            root.appendChild(out);
+            // 历史
+            const histHead = document.createElement('div');
+            histHead.className = 'dz-replay-head';
+            histHead.textContent = '最近掷骰';
+            root.appendChild(histHead);
+            const hist = document.createElement('div');
+            hist.id = 'dzDiceHist';
+            root.appendChild(hist);
+            dice._renderHist(root);
+        },
+        _reHighlight: function (root) {
+            try {
+                root.querySelectorAll('.dz-dice-mode').forEach(function (b) {
+                    b.classList.toggle('active', (b.getAttribute('data-m') || '') === dice._mode);
+                });
+            } catch (e) {}
+            const out = $('dzDiceResult');
+            if (out && dice._mode === 'blind') out.textContent = '（暗骰模式下不显示点数）';
+        },
+        _renderHist: function (root) {
+            const box = $('dzDiceHist');
+            if (!box) return;
+            box.innerHTML = '';
+            const items = diceLoad().items.slice().reverse();
+            if (!items.length) {
+                const e0 = document.createElement('div');
+                e0.className = 'dz-archive-tip';
+                e0.textContent = '暂无记录。';
+                box.appendChild(e0);
+                return;
+            }
+            items.slice(0, 10).forEach(function (it) {
+                const rowH = document.createElement('div');
+                rowH.className = 'dz-oplog-row';
+                const tag = document.createElement('span');
+                tag.className = 'dz-oplog-src';
+                tag.textContent = it.blind ? '暗骰' : '明骰';
+                rowH.appendChild(tag);
+                const tx = document.createElement('span');
+                tx.className = 'dz-oplog-tx';
+                tx.textContent = it.expr + (it.blind ? ' = ？' : ' = ' + it.sum) + (it.blind ? '' : '（[' + it.rolls.join('+') + ']）');
+                rowH.appendChild(tx);
+                const tm = document.createElement('span');
+                tm.className = 'dz-oplog-ts';
+                tm.textContent = new Date(it.ts).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+                rowH.appendChild(tm);
+                box.appendChild(rowH);
+            });
+        }
+    };
+
+    /* ================================================================
+     * 17. 变量变更流水：变量官每轮结算的数值变化记录（最近 300 条，可搜索）
+     * ================================================================ */
+    const VL_KEY = 'dz_varlog_v1';
+    function vlLoad() {
+        try {
+            const raw = localStorage.getItem(VL_KEY);
+            const d = raw ? JSON.parse(raw) : null;
+            if (d && Array.isArray(d.items)) return d;
+        } catch (e) {}
+        return { items: [] };
+    }
+    const varlog = {
+        /* 由 varJudge.run 在结算 diff 后调用 */
+        record: function (before, after, reasons) {
+            try {
+                const d = vlLoad();
+                let turn = 0;
+                try { turn = (window.gst() || {}).turnCount || 0; } catch (e) {}
+                const push = function (key, a, b) {
+                    d.items.push({ ts: Date.now(), turn: turn, key: key, old: a, new: b, reason: reasons[key] || '' });
+                };
+                VJ_NUM_KEYS.forEach(function (p) {
+                    const a = before[p[0]], b = after[p[0]];
+                    if (typeof a === 'number' && typeof b === 'number' && a !== b) push(p[0], a, b);
+                });
+                if (before['伤势'] !== after['伤势']) push('伤势', before['伤势'], after['伤势']);
+                if (before['心态'] !== after['心态']) push('心态', before['心态'], after['心态']);
+                if (d.items.length > 300) d.items = d.items.slice(-300); // 最多保留最近 300 次变更
+                localStorage.setItem(VL_KEY, JSON.stringify(d));
+            } catch (e) {}
+        },
+        /* 剧情档案页签渲染：搜索 + 流水列表 */
+        render: function (root) {
+            root.innerHTML = '';
+            const tip = document.createElement('div');
+            tip.className = 'dz-archive-tip';
+            tip.textContent = '变量官每轮结算的数值变化流水（最多保留最近 300 次变更），与「回合撤回」里的操作日志互补：这里记数据怎么变，那里记操作做过什么。';
+            root.appendChild(tip);
+            const search = document.createElement('input');
+            search.type = 'text';
+            search.id = 'dzVlSearch';
+            search.className = 'dz-bf-inp';
+            search.placeholder = '搜索：变量名 / 依据关键词，如「饱腹」「受伤」';
+            search.style.cssText = 'display:block;width:100%;margin-bottom:10px;';
+            search.addEventListener('input', debounce(function () { varlog._renderList(root, search.value); }, 200));
+            root.appendChild(search);
+            const list = document.createElement('div');
+            list.id = 'dzVlList';
+            root.appendChild(list);
+            varlog._renderList(root, '');
+        },
+        _renderList: function (root, q) {
+            const box = $('dzVlList');
+            if (!box) return;
+            box.innerHTML = '';
+            const kw = String(q || '').trim().toLowerCase();
+            const items = vlLoad().items.slice().reverse().filter(function (it) {
+                if (!kw) return true;
+                return (it.key + ' ' + it.old + '→' + it.new + ' ' + (it.reason || '')).toLowerCase().indexOf(kw) !== -1;
+            });
+            if (!items.length) {
+                const e0 = document.createElement('div');
+                e0.className = 'dz-archive-tip';
+                e0.textContent = kw ? '没有匹配的流水记录。' : '暂无变更记录 · 开启专家模式的变量官后，每轮数值变化会记录在这里。';
+                box.appendChild(e0);
+                return;
+            }
+            items.slice(0, 120).forEach(function (it) {
+                const row = document.createElement('div');
+                row.className = 'dz-oplog-row';
+                const tag = document.createElement('span');
+                tag.className = 'dz-oplog-src';
+                tag.textContent = '第' + (it.turn || '?') + '轮';
+                row.appendChild(tag);
+                const tx = document.createElement('span');
+                tx.className = 'dz-oplog-tx';
+                tx.textContent = it.key + '：' + it.old + ' → ' + it.new + (it.reason ? '（' + it.reason + '）' : '');
+                row.appendChild(tx);
+                const tm = document.createElement('span');
+                tm.className = 'dz-oplog-ts';
+                tm.textContent = new Date(it.ts).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+                row.appendChild(tm);
+                box.appendChild(row);
+            });
+            if (items.length > 120) {
+                const more = document.createElement('div');
+                more.className = 'dz-archive-tip';
+                more.textContent = '（仅显示前 120 条，共 ' + items.length + ' 条，可用搜索缩小范围）';
+                box.appendChild(more);
+            }
+        }
+    };
+
+    /* ================================================================
+     * 18. 上下文体检：逐条预览即将发送给 AI 的完整上下文 + 体积分解
+     * ================================================================ */
+    const ctxcheck = {
+        scan: function () {
+            const msgs = window._composeTurnMessages ? window._composeTurnMessages(false, null) : [];
+            let total = 0;
+            const rows = msgs.map(function (m) {
+                const len = String((m && m.content) || '').length;
+                total += len;
+                return {
+                    role: (m && m.role) || '?',
+                    chars: len,
+                    preview: String((m && m.content) || '').replace(/\s+/g, ' ').slice(0, 90)
+                };
+            });
+            return { rows: rows, total: total, estTokens: Math.round(total / 1.7), count: msgs.length };
+        },
+        render: function (root) {
+            root.innerHTML = '';
+            const tip = document.createElement('div');
+            tip.className = 'dz-archive-tip';
+            tip.textContent = '按正常回合实时组装一份完整上下文，逐条查看即将发送给 AI 的内容与体积分布（token 为按中文粗略估算，实际以服务商计费为准）。可导出 JSON 留档或对比不同设置下的差异。';
+            root.appendChild(tip);
+            let ctxWin = 0;
+            try { ctxWin = cfg().ctx || 0; } catch (e) {}
+            const r = ctxcheck.scan();
+            const sum = document.createElement('div');
+            sum.className = 'dz-bf-diag';
+            sum.textContent = '共 ' + r.count + ' 条消息 · ' + r.total.toLocaleString() + ' 字符 · ≈' + r.estTokens.toLocaleString() + ' tokens'
+                + (ctxWin ? ' · 上下文窗口 ' + ctxWin + ' 条' : '') + '。占比条按单条字符数着色，最长的一条占满。';
+            root.appendChild(sum);
+            const rows = r.rows.slice().sort(function (a, b) { return b.chars - a.chars; });
+            const maxChars = rows.length ? rows[0].chars : 1;
+            rows.forEach(function (row, i) {
+                const line = document.createElement('div');
+                line.className = 'dz-ctx-row';
+                const head = document.createElement('div');
+                head.className = 'dz-ctx-head';
+                const tag = document.createElement('span');
+                tag.className = 'dz-ctx-role ' + row.role;
+                tag.textContent = row.role === 'system' ? '系统' : (row.role === 'user' ? '玩家' : 'AI');
+                head.appendChild(tag);
+                const num = document.createElement('span');
+                num.className = 'dz-ctx-chars';
+                num.textContent = row.chars.toLocaleString() + ' 字 ≈' + Math.round(row.chars / 1.7).toLocaleString() + ' tok';
+                head.appendChild(num);
+                line.appendChild(head);
+                const bar = document.createElement('div');
+                bar.className = 'dz-ctx-bar';
+                const fill = document.createElement('div');
+                fill.className = 'dz-ctx-fill ' + row.role;
+                fill.style.width = Math.max(3, Math.round(row.chars / maxChars * 100)) + '%';
+                bar.appendChild(fill);
+                line.appendChild(bar);
+                const pv = document.createElement('div');
+                pv.className = 'dz-ctx-preview';
+                pv.textContent = row.preview + (row.chars > 90 ? '…' : '');
+                line.appendChild(pv);
+                root.appendChild(line);
+            });
+            const ex = document.createElement('button');
+            ex.className = 'btn-modal';
+            ex.style.cssText = 'display:block;width:100%;margin-top:8px;';
+            ex.textContent = '📄 导出本次上下文 JSON';
+            ex.addEventListener('click', function () {
+                try {
+                    const msgs = window._composeTurnMessages ? window._composeTurnMessages(false, null) : [];
+                    const blob = new Blob([JSON.stringify(msgs, null, 2)], { type: 'application/json' });
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = 'zday-上下文快照-' + new Date().toISOString().slice(0, 16).replace(/[:T]/g, '') + '.json';
+                    document.body.appendChild(a);
+                    a.click();
+                    setTimeout(function () { try { document.body.removeChild(a); } catch (_) {} URL.revokeObjectURL(url); }, 400);
+                    if (window.tst) window.tst('上下文 JSON 已导出');
+                } catch (e) { if (window.tst) window.tst('导出失败：' + (e && e.message ? e.message : e)); }
+            });
+            root.appendChild(ex);
+        }
+    };
+
+    /* ================================================================
+     * 19. 移动端手势：屏幕左边缘右滑开侧栏；侧栏/面板内左滑关闭
      * ================================================================ */
     function initGestures() {
         let sx = 0, sy = 0, st = 0, tracking = false;
@@ -1959,6 +2329,9 @@
         story: story,
         turnsnap: turnsnap,
         memrepair: memrepair,
+        dice: dice,
+        varlog: varlog,
+        ctxcheck: ctxcheck,
         buildSystemNote: buildSystemNote,
         systemNoteHash: systemNoteHash,
         openModal: openModal
@@ -1979,6 +2352,7 @@
         bindModal('archiveModal', 'modalCloseArchive', story.render);
         bindModal('snapshotModal', 'modalCloseSnapshot', turnsnap.render);
         bindModal('opLogModal', 'modalCloseOpLog', turnsnap.renderLogs);
+        bindModal('diceModal', 'modalCloseDice', dice.render);
         // 剧情档案：侧栏入口 + 页签切换
         const ar = $('dzBtnArchive');
         if (ar) ar.addEventListener('click', function () { story.render(); openModal('archiveModal'); });
@@ -1990,6 +2364,9 @@
         if (bf) bf.addEventListener('click', function () { memrepair.open('backfill'); });
         const rb = $('btnMemRebuild');
         if (rb) rb.addEventListener('click', function () { memrepair.open('rebuild'); });
+        // 骰子检定：输入栏入口
+        const db = $('btnDice');
+        if (db) db.addEventListener('click', function () { dice.render(); openModal('diceModal'); });
         document.querySelectorAll('.dz-archive-tab').forEach(function (btn) {
             btn.addEventListener('click', function () {
                 document.querySelectorAll('.dz-archive-tab').forEach(function (b) { b.classList.remove('active'); });
