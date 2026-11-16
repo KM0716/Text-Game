@@ -26,6 +26,14 @@
   [饱腹:70][口渴:65][疲劳:25][时间:+1h]
   [物品:+罐头][物品:-绷带][线索:密码是1234]
   [地图:解锁-医院][地点:医院大厅][天气:晴]
+
+■ 进阶标签（剧情需要时使用，同样置于末尾）：
+  [心态:坚定][状态:轻伤][血量:85][精神:60][欢愉:0]
+  [战斗:胜][武器:耐久-5][武器:弹药-2][合成:绷带]
+  [记忆:遭遇变异犬群][事件:广播预警][创伤:目睹同伴死亡]
+  [关系:李医生+10][收藏:军区地图][特质:+冷静][技能:+射击]
+  [变量:声望=20]（自定义变量，名=值）
+  [设定:新增-避难所=位于地铁站深处，储备充足]（沉淀为世界书设定）
 `.trim(),
 
         COMPACT: `
@@ -51,12 +59,15 @@
         ['血量',       { type: 'number', range: [0, 100], key: 'hp' }],
         ['精神',       { type: 'number', range: [0, 100], key: 'spirit' }],
         ['感染',       { type: 'number', range: [0, 100], key: 'infection' }],
+        ['欢愉',       { type: 'number', range: [0, 100], key: 'joy' }],
+        ['心态',       { type: 'string', key: 'mentality' }],
+        ['状态',       { type: 'string', key: 'statusEffect' }],
         // 物品
         ['物品:+',     { type: 'item_add',  alias: ['获得物品:+', '物品获得:+'] }],
         ['物品:-',     { type: 'item_rem',  alias: ['丢弃物品:-', '物品丢失:-'] }],
-        // 线索
-        ['线索',       { type: 'clue_add', alias: ['新增线索', 'clue'] }],
+        // 线索（"线索删除" 必须排在 "线索" 之前，避免被短前缀截获）
         ['线索删除',   { type: 'clue_rem' }],
+        ['线索',       { type: 'clue_add', alias: ['新增线索', 'clue'] }],
         // 地图/地点
         ['地图:解锁-', { type: 'map_unlock', alias: ['地图:解锁'] }],
         ['地图:新增-', { type: 'map_newarea' }],
@@ -66,12 +77,36 @@
         ['天气',       { type: 'weather', alias: ['weather'] }],
         ['气温',       { type: 'temp' }],
         ['时间:+',     { type: 'adv_time', alias: ['时间推进', '推进时间'] }],
-        // 特质/技能/装备
-        ['特质+',      { type: 'trait_add' }],
-        ['特质-',      { type: 'trait_rem' }],
-        ['技能+',      { type: 'skill_add' }],
-        ['技能-',      { type: 'skill_rem' }],
+        // 特质/技能/装备（ptg 实际匹配 "特质:+" / "技能:+"，同时兼容无冒号旧写法）
+        ['特质:+',     { type: 'trait_add' }],
+        ['特质:-',     { type: 'trait_rem' }],
+        ['特质+',      { type: 'trait_add_legacy' }],
+        ['特质-',      { type: 'trait_rem_legacy' }],
+        ['技能:+',     { type: 'skill_add' }],
+        ['技能:-',     { type: 'skill_rem' }],
+        ['技能+',      { type: 'skill_add_legacy' }],
+        ['技能-',      { type: 'skill_rem_legacy' }],
         ['装备',       { type: 'equip' }],
+        // 战斗/武器
+        ['战斗',       { type: 'battle' }],
+        ['武器:耐久-', { type: 'weapon_durability' }],
+        ['武器:弹药-', { type: 'weapon_ammo' }],
+        // 叙事记录类
+        ['记忆',       { type: 'key_memory' }],
+        ['创伤',       { type: 'trauma' }],
+        ['事件',       { type: 'event' }],
+        ['关系',       { type: 'relation' }],
+        ['收藏',       { type: 'bookmark' }],
+        ['合成',       { type: 'craft' }],
+        // DZ 扩展：世界书 / 自定义变量 / 变量官
+        ['设定:',      { type: 'worldbook_set' }],
+        ['设定:新增-', { type: 'worldbook_new' }],
+        ['变量:',      { type: 'custom_var' }],
+        ['变量官:',    { type: 'var_judge' }],
+        // 沙盒/角色扩展（专家沙盒模式下允许直写数据）
+        ['沙盒:',      { type: 'sandbox', alias: ['sandbox:', 'sbx:'] }],
+        ['角色:',      { type: 'character', alias: ['chr:', 'character:'] }],
+        ['背包:',      { type: 'inventory', alias: ['inv:'] }],
         // 载具/异能
         ['载具',       { type: 'vehicle' }],
         ['异能:升级',  { type: 'ability_up' }],
@@ -155,8 +190,11 @@
     AF.VALIDATORS.validateTags = function (text) {
         if (!text) return { cleanedText: '', tagTokens: [] };
         const tokens = [];
-        const cleaned = String(text).replace(/\[([^\]]+)\]/g, (m, raw) => {
-            const norm = raw.replace(/：/g, ':').replace(/:\s+/g, ':');
+        // DZ：先归一化全角括号/冒号（AI 常输出 ［饱腹:70］ 或 [饱腹：70]）
+        const normalized = String(text).replace(/［/g, '[').replace(/］/g, ']');
+        const cleaned = normalized.replace(/\[([^\]]+)\]/g, (m, raw) => {
+            const norm = raw.replace(/：/g, ':').replace(/:\s+/g, ':').trim();
+            if (!norm) return m;
             const hit = _findTagDef(norm);
             if (hit) {
                 tokens.push('[' + norm + ']');

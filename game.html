@@ -188,7 +188,52 @@
     </div>
 
     <div class="app-container">
+        <!-- ===== DZ 侧边导航：PC 常驻侧边栏 / 移动端抽屉（镜像按钮，委托触发原按钮） ===== -->
+        <nav class="dz-sidebar" id="dzSidebar" aria-label="主导航">
+            <div class="dz-sidebar-head">
+                <span class="dz-sidebar-brand"><span class="logo-mark"></span>ZDay</span>
+                <button class="dz-sidebar-collapse" id="dzSidebarClose" aria-label="收起导航">‹</button>
+            </div>
+            <div class="dz-sidebar-scroll">
+                <div class="dz-nav-cap">快捷面板</div>
+                <div class="dz-nav-group">
+                    <button class="dz-side-btn" data-mirror="btnProfile">👤 个人</button>
+                    <button class="dz-side-btn" data-mirror="btnBackpack">🎒 背包</button>
+                    <button class="dz-side-btn" data-mirror="btnEquipment">🛡️ 装备</button>
+                    <button class="dz-side-btn" data-mirror="btnSidePanel">📊 面板</button>
+                </div>
+                <div class="dz-nav-cap">进度与记录</div>
+                <div class="dz-nav-group">
+                    <button class="dz-side-btn" data-mirror="btnSave">💾 存档</button>
+                    <button class="dz-side-btn" data-mirror="btnCodex">📖 图鉴</button>
+                    <button class="dz-side-btn" data-mirror="btnAchievements">🏆 成就</button>
+                    <button class="dz-side-btn" data-mirror="btnEvents">⚡ 事件</button>
+                    <button class="dz-side-btn" data-mirror="btnActionLog">📝 日志</button>
+                    <button class="dz-side-btn" data-mirror="btnIdle">⏳ 挂机</button>
+                </div>
+                <div class="dz-nav-cap">设定与 AI</div>
+                <div class="dz-nav-group">
+                    <button class="dz-side-btn" id="dzBtnWorldbook" title="世界书 · 设定与参考词条">📚 世界书</button>
+                    <button class="dz-side-btn" id="dzBtnNarrative" title="叙事与阅读设置">🖋️ 叙事阅读</button>
+                    <button class="dz-side-btn" id="dzBtnMemory" title="查看记忆系统档案">🧠 记忆档案</button>
+                    <button class="dz-side-btn" id="dzBtnArchive" title="剧情档案：时间轴回放 / 书签 / 剧本导出">📖 剧情档案</button>
+                    <button class="dz-side-btn" id="dzBtnSnapshot" title="回合撤回：回到所选回合开始前的完整状态">⏪ 回合撤回</button>
+                </div>
+                <div class="dz-nav-cap">系统</div>
+                <div class="dz-nav-group">
+                    <button class="dz-side-btn" data-mirror="btnSettings">⚙️ 设置</button>
+                    <button class="dz-side-btn" data-mirror="btnTheme">🌓 主题</button>
+                    <button class="dz-side-btn" data-mirror="btnSfx">🔔 音效</button>
+                    <button class="dz-side-btn" data-mirror="btnBgm">🎵 音乐</button>
+                </div>
+            </div>
+            <div class="dz-sidebar-foot">
+                <button class="dz-side-btn dz-side-btn--accent" data-mirror="btnNewGame">🎬 开局</button>
+            </div>
+        </nav>
+        <div class="dz-nav-overlay" id="dzNavOverlay"></div>
         <header class="app-header">
+            <button class="btn-header dz-nav-toggle" id="btnNavMenu" aria-label="打开导航菜单" title="导航菜单">☰</button>
             <div class="app-title"><span class="logo-mark"></span> 代号：ZDay</div>
             <div class="status-bar">
                 <span class="status-item"><span class="st-label">饱腹</span><span id="stHunger">50</span>%</span>
@@ -245,6 +290,8 @@
                 </div>
             </div>
         </header>
+        <div class="dz-main" id="dzMain">
+        <div class="dz-chat-col">
         <div class="chat-area" id="chatArea">
             <div class="chat-empty" id="chatEmpty">
                 <div class="empty-mark"></div>
@@ -263,6 +310,8 @@
                 <div class="bottom-actions-bar">
                     <button class="btn-quick" id="btnUndoTurn" title="回退到上一步">回退</button>
                     <button class="btn-quick" id="btnRegenTurn" title="重新生成AI上一次回复">重生成</button>
+                    <button class="btn-quick" id="btnRegenMulti" title="一次生成3个候选版本供挑选">多候选</button>
+                    <button class="btn-quick" id="btnDice" title="骰子检定：明骰/暗骰，结果随下一次行动交给 AI 裁定">🎲 掷骰</button>
                 </div>
             </div>
             <div class="input-row">
@@ -270,19 +319,10 @@
                 <button class="btn-send" id="btnSend">发送</button>
             </div>
         </div>
-        <div class="side-overlay" id="sideOverlay"></div>
-        <!-- Floating clue sidebar (hand-drawn note style) -->
-        <div class="clue-sidebar" id="clueSidebar">
-            <div class="clue-sidebar-header">
-                <span class="clue-header-title"><span class="clue-head-icon" aria-hidden="true">📋</span><span class="clue-head-text">线索便签</span></span>
-                <span class="clue-head-close" id="btnCloseClueSidebar" aria-label="关闭线索便签">×</span>
-            </div>
-            <div class="clue-note" id="clueNoteContent"></div>
-        </div>
-        <button class="clue-sidebar-toggle" id="btnToggleClueSidebar" title="展开线索便签" aria-label="展开线索便签">
-            <span class="clue-btn-icon" aria-hidden="true">📋</span>
-        </button>
-        <div class="side-panel" id="sidePanel">
+        </div><!-- /dz-chat-col -->
+        <div class="dz-dragbar" id="dzDragbar" title="按住拖动调整面板宽度（双击收起）" aria-hidden="true"><span class="dz-dragbar-grip">⋮</span></div>
+        <aside class="side-panel" id="sidePanel">
+            <div class="side-panel-close" id="btnCloseSidePanel" aria-label="关闭面板">✕</div>
             <!-- Profile view content -->
             <div id="sideProfileView">
                 <h4>个人信息</h4><div id="sideProfile"></div>
@@ -302,7 +342,20 @@
                     <button class="btn-modal" id="btnSideSandbox" style="width:100%;font-size:0.66rem;">沙盒细节配置</button>
                 </div>
             </div>
+        </aside>
+        </div><!-- /dz-main -->
+        <div class="side-overlay" id="sideOverlay"></div>
+        <!-- Floating clue sidebar (hand-drawn note style) -->
+        <div class="clue-sidebar" id="clueSidebar">
+            <div class="clue-sidebar-header">
+                <span class="clue-header-title"><span class="clue-head-icon" aria-hidden="true">📋</span><span class="clue-head-text">线索便签</span></span>
+                <span class="clue-head-close" id="btnCloseClueSidebar" aria-label="关闭线索便签">×</span>
+            </div>
+            <div class="clue-note" id="clueNoteContent"></div>
         </div>
+        <button class="clue-sidebar-toggle" id="btnToggleClueSidebar" title="展开线索便签" aria-label="展开线索便签">
+            <span class="clue-btn-icon" aria-hidden="true">📋</span>
+        </button>
     </div>
 
     <div class="notify-container" id="notifyContainer"></div>
@@ -341,37 +394,25 @@
     <div class="idle-badge" id="idleBadge">挂机中</div>
     <div class="god-badge" id="godBadge" style="display:none;">上帝模式</div>
 
-    <!-- Welcome Modal -->
-    <div class="modal-overlay" id="welcomeModal"><div class="modal-panel" style="max-width:380px;">
-        <button class="modal-close" id="modalCloseWelcome">x</button><h3>API 配置</h3>
-        <p class="field-hint" style="text-align:center;margin-bottom:6px;">选择服务商后粘贴密钥即可快速开始</p>
-        <label>服务商预设</label>
-        <p class="field-hint">选择你使用的AI服务商，会自动填充端点和常用模型</p>
-        <select id="welEndpointPreset"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="moonshot">月之暗面 Kimi</option><option value="zhipu">智谱 AI GLM</option><option value="qwen">通义千问</option><option value="siliconflow">硅基流动</option><option value="groq">Groq</option><option value="ernie">文心一言</option><option value="minimax">MiniMax 海螺</option><option value="doubao">豆包（火山方舟）</option><option value="ollama">Ollama 本地</option></select>
-        <label>端点地址</label>
-        <p class="field-hint">API 接口地址，通常以 /v1/chat/completions 结尾</p>
-        <input type="url" id="welEndpoint" placeholder="端点地址（自动填充）">
-        <label>模型</label>
-        <p class="field-hint">选择或输入模型名称，如 gpt-4o、deepseek-chat</p>
-        <div class="model-fetch-row" style="display:flex;gap:4px;align-items:center;">
-            <select id="welModelSelect" style="flex:1;"><option>gpt-4o</option></select>
-            <button type="button" class="btn-modal" id="btnFetchModelsWel" style="white-space:nowrap;font-size:0.66rem;padding:4px 8px;">🔄 拉取</button>
-        </div>
-        <input type="text" id="welModel" placeholder="模型名" style="display:none;">
-        <label>API 密钥</label>
-        <p class="field-hint">在服务商后台获取的 API Key，本地存储不会上传</p>
-        <input type="password" id="welKey" placeholder="API 密钥">
-        <div class="btn-row"><button class="btn-modal" id="btnTestWel">测试连接</button><button class="btn-modal primary" id="btnWelcomeNext">确认</button></div>
-    </div></div>
+    <!-- DZ：welcomeModal 已移除 —— API 配置整合进创建向导第④步「AI 与功能」（charModal · tab-ai） -->
 
-    <!-- Character & World Modal -->
-    <div class="modal-overlay" id="charModal" style="display:none;"><div class="modal-panel" style="max-width:540px;">
-        <button class="modal-close" id="modalCloseChar">x</button><h3>创建角色与世界</h3>
-        <div class="tab-row">
-            <button class="tab-btn active" data-tab="tab-world">世界设定</button>
-            <button class="tab-btn" data-tab="tab-char">角色设定</button>
-            <button class="tab-btn" data-tab="tab-sandbox">沙盒细节</button>
+    <!-- Character & World Creation Wizard（独立全屏界面：默认载入，创建后进入游戏） -->
+    <div class="modal-overlay dz-wizard" id="charModal" style="display:none;">
+    <div class="dz-wizard-panel">
+        <div class="dz-wizard-head">
+            <div class="dz-wizard-head-inner">
+                <div class="dz-wizard-title"><span class="logo-mark"></span> 创建你的角色与世界</div>
+                <div class="dz-wizard-sub">依次完成四个步骤 · 所有配置自动保存在本地 · 随时可在开局界面重新调整</div>
+            </div>
+            <button class="modal-close" id="modalCloseChar" title="返回游戏">x</button>
         </div>
+        <div class="tab-row dz-wizard-tabs">
+            <button class="tab-btn active" data-tab="tab-world">① 世界设定</button>
+            <button class="tab-btn" data-tab="tab-char">② 角色设定</button>
+            <button class="tab-btn" data-tab="tab-sandbox">③ 沙盒细节</button>
+            <button class="tab-btn" data-tab="tab-ai">④ AI 与功能</button>
+        </div>
+        <div class="dz-wizard-body">
         <div class="tab-content active" id="tab-world">
             <h4>预设模板</h4>
             <div id="presetBtns"><span class="preset-btn" data-preset="zombie">传统丧尸</span><span class="preset-btn" data-preset="fungal">真菌灾变</span><span class="preset-btn" data-preset="climate">气候末日</span><span class="preset-btn" data-preset="bandits">掠夺者</span><span class="preset-btn" data-preset="collapse">秩序崩塌</span><span class="preset-btn" data-preset="nuke">核战废土</span><span class="preset-btn" data-preset="ai">AI叛乱</span><span class="preset-btn" data-preset="tsunami">海啸水淹</span><span class="preset-btn" data-preset="iceage">寒冬冰封</span><span class="preset-btn" data-preset="mutant">变异生物</span><span class="preset-btn" data-preset="depression">大萧条</span><span class="preset-btn" data-preset="custom">完全自定义</span></div>
@@ -532,12 +573,61 @@
             </ul>
             <p class="field-hint" style="margin-top:10px;">预设职业：在"角色设定"标签页的"职业与技能"部分可选择以下预设职业：行商、特别行动部队、流浪医生、工程师、黑客、狙击手、心理学家、炼金术士、退伍军人、前警官、街头混混、野外生存专家、科学家、神父/祭司、贵族/继承人。选择后将自动填充对应技能和初始物品。</p>
         </div>
+        <!-- ===== 第四步：AI 与功能 ===== -->
+        <div class="tab-content" id="tab-ai">
+            <p class="field-hint" style="margin-bottom:8px;">配置 AI 服务与功能开关。所有改动<strong>自动静默保存</strong>到本地，无需手动确认。</p>
+
+            <h4>AI 功能总开关</h4>
+            <label class="dz-switch-row"><input type="checkbox" id="charAiEnabled" checked><span class="dz-switch-body"><strong>启用 AI 叙事</strong><small>关闭后进入本地模式：不再调用任何 API，仅保留界面与已有剧情（适合纯整理存档）。</small></span></label>
+
+            <h4>专家模式</h4>
+            <label class="dz-switch-row"><input type="checkbox" id="charExpertMode"><span class="dz-switch-body"><strong>开启专家模式</strong><small>解锁双模型正文、变量官、记忆模型等高级功能。</small></span></label>
+
+            <h4>API 配置</h4>
+            <label>服务商预设</label>
+            <select id="charApiPreset">
+                <option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="moonshot">月之暗面 Kimi</option><option value="zhipu">智谱 AI GLM</option><option value="qwen">通义千问</option><option value="siliconflow">硅基流动</option><option value="groq">Groq</option><option value="ernie">文心一言</option><option value="minimax">MiniMax 海螺</option><option value="doubao">豆包（火山方舟）</option><option value="ollama">Ollama 本地</option>
+            </select>
+            <label>端点地址</label>
+            <input type="url" id="charEndpoint" placeholder="https://api.openai.com/v1/chat/completions">
+            <label>模型</label>
+            <div class="model-fetch-row" style="display:flex;gap:4px;align-items:center;">
+                <select id="charModelSelect" style="flex:1;"><option>gpt-4o</option></select>
+                <button type="button" class="btn-modal" id="btnCharFetchModels" style="white-space:nowrap;font-size:0.66rem;padding:4px 8px;">🔄 拉取</button>
+            </div>
+            <input type="text" id="charModel" placeholder="模型名" style="display:none;">
+            <label>API 密钥</label>
+            <input type="password" id="charKey" placeholder="API 密钥（仅保存在本地浏览器）">
+            <div class="btn-row" style="margin-top:6px;"><button type="button" class="btn-modal" id="btnCharTestApi">测试连接</button></div>
+            <p class="field-hint" id="charTestHint" style="min-height:1em;margin:4px 0 0;">&nbsp;</p>
+
+            <div class="dz-expert-only" id="charExpertBlock" style="display:none;">
+                <h4>双模型正文（推演 + 重组表达）</h4>
+                <p class="field-hint">第一模型负责剧情推演与状态结算；第二模型只重组第一遍正文的文笔表达，<strong>不改变事实、不替玩家做决定</strong>。留空或失败时自动回退单模型。</p>
+                <label class="dz-switch-row"><input type="checkbox" id="charDualModel"><span class="dz-switch-body"><strong>启用双模型正文</strong><small>每轮先推演后润色，速度约慢一倍，文笔更稳定。</small></span></label>
+                <label>第二模型（文笔 · 重组表达）</label>
+                <input type="text" id="charModel2" placeholder="例如 deepseek-chat / gpt-4o-mini，留空=不启用">
+
+                <h4>变量官（状态结算器）</h4>
+                <p class="field-hint">开启后，饱腹/口渴/疲劳/血量/精神等数值改由「变量官」在每轮结束后根据正文单独结算，并经过状态闸门验证，叙事模型只管讲故事。</p>
+                <label class="dz-switch-row"><input type="checkbox" id="charVarJudge"><span class="dz-switch-body"><strong>启用变量官结算</strong><small>每轮追加一次轻量请求，数值更公正、抗AI虚报。</small></span></label>
+
+                <h4>记忆模式</h4>
+                <p class="field-hint">开启后 AI 自动逐轮总结并保留长期记忆；关闭可省 Token，但跨轮细节会变模糊。</p>
+                <label class="dz-switch-row"><input type="checkbox" id="charMemMode" checked><span class="dz-switch-body"><strong>启用记忆系统</strong><small>总结式长期记忆 + 关键记忆。</small></span></label>
+                <label>记忆模型（可选）</label>
+                <input type="text" id="charModelMem" placeholder="逐轮总结使用的轻量模型，留空=沿用主模型">
+            </div>
+        </div>
+        </div><!-- /dz-wizard-body -->
+        <div class="dz-wizard-foot">
         <div class="btn-row">
             <input type="file" id="importCharacterFile" accept=".json,application/json" style="display:none;">
             <button class="btn-modal" id="btnImportCharacter">📥 导入角色设定</button>
             <button class="btn-modal" id="btnCharSkip">使用默认设定</button>
             <button class="btn-modal primary" id="btnCharConfirm">开始游戏</button>
             <button class="btn-modal accent" id="btnCharApplyOnly" style="display:none;" title="仅修改角色卡与世界设定，不重置进度/状态/历史">✎ 应用设定（不重开）</button>
+        </div>
         </div>
     </div></div>
 
@@ -582,9 +672,46 @@
             <label>流式输出</label>
             <p class="field-hint">开启后AI回复逐字流式显示</p>
             <select id="streamToggle"><option value="1" selected>开启流式</option><option value="0">关闭流式</option></select>
-            <label>字体大小</label>
-            <p class="field-hint">对话正文的字号大小</p>
-            <select id="fontSizeSelect"><option value="14px">小</option><option value="15px" selected>中</option><option value="17px">大</option></select>
+        </div>
+        <div class="setting-group">
+            <h4>AI 功能</h4>
+            <label class="dz-switch-row"><input type="checkbox" id="setAiEnabled" checked><span class="dz-switch-body"><strong>AI 功能总开关</strong><small>关闭后进入本地模式，不再调用任何 API。</small></span></label>
+            <label class="dz-switch-row"><input type="checkbox" id="setExpertMode"><span class="dz-switch-body"><strong>专家模式</strong><small>解锁双模型正文、变量官、记忆模型等高级功能（也可在「开局 → 第四步」配置）。</small></span></label>
+            <div class="dz-expert-only" id="setExpertBlock" style="display:none;">
+                <label class="dz-switch-row"><input type="checkbox" id="setDualModel"><span class="dz-switch-body"><strong>双模型正文</strong><small>第一模型推演剧情，第二模型重组表达（不替玩家做决定）。</small></span></label>
+                <label>第二模型（文笔 · 重组表达）</label>
+                <input type="text" id="setModel2" placeholder="留空=不启用，如 gpt-4o-mini">
+                <label class="dz-switch-row"><input type="checkbox" id="setVarJudge"><span class="dz-switch-body"><strong>变量官结算</strong><small>数值状态由变量官每轮单独裁定，经状态闸门验证。</small></span></label>
+                <label>记忆模型（可选）</label>
+                <input type="text" id="setModelMem" placeholder="逐轮总结的轻量模型，留空=沿用主模型">
+            </div>
+        </div>
+        <div class="setting-group">
+            <h4>记忆模式</h4>
+            <label class="dz-switch-row"><input type="checkbox" id="setMemMode" checked><span class="dz-switch-body"><strong>启用记忆系统</strong><small>自动逐轮总结、保留长期记忆与关键记忆；关闭可显著节省 Token。</small></span></label>
+            <div id="dzMemStats" class="field-hint" style="margin:4px 0 6px;">—</div>
+            <div class="btn-row"><button type="button" class="btn-modal" id="btnOpenMemoryViewer">🧠 查看完整记忆</button></div>
+        </div>
+        <div class="setting-group">
+            <h4>叙事与阅读</h4>
+            <div class="dz-slider-row">
+                <label>正文字号 <output id="fontSizeNarrVal">15</output>px</label>
+                <input type="range" class="dz-range" id="fontSizeNarr" min="12" max="24" step="1" value="15">
+            </div>
+            <div class="dz-slider-row">
+                <label>正文内面板/字条字号 <output id="fontSizePanelVal">15</output>px</label>
+                <input type="range" class="dz-range" id="fontSizePanel" min="12" max="24" step="1" value="15">
+            </div>
+            <div class="dz-slider-row">
+                <label>界面与背包字号 <output id="fontSizeUiVal">14</output>px</label>
+                <input type="range" class="dz-range" id="fontSizeUi" min="12" max="20" step="1" value="14">
+            </div>
+            <label class="dz-switch-row"><input type="checkbox" id="setHlDialogue" checked><span class="dz-switch-body"><strong>人物台词高亮</strong><small>引号内的对话以浅蓝强调色显示。</small></span></label>
+            <div class="dz-font-preview" id="dzFontPreview">
+                <div class="dz-fp-narr">雨点砸在铁皮屋顶上，你屏住呼吸贴紧墙壁。「有人吗？」你压低声音问。</div>
+                <div class="dz-fp-panel">📋 线索便签：门锁是旧的，钥匙也许还插在里面。</div>
+                <div class="dz-fp-ui">饱腹 70% · 口渴 55% · 状态：警觉</div>
+            </div>
         </div>
         <div class="setting-group">
             <h4>挂机配置</h4>
@@ -824,6 +951,119 @@
         </div>
     </div>
 
+    <!-- ===== DZ：世界书（设定·参考词条） ===== -->
+    <div class="modal-overlay" id="worldbookModal" style="display:none;"><div class="modal-panel" style="max-width:620px;">
+        <button class="modal-close" id="modalCloseWorldbook">x</button><h3>📚 世界书 · 设定与参考</h3>
+        <p class="field-hint" style="margin-bottom:8px;">词条按<strong>触发关键词</strong>扫描最近对话：命中时自动作为「世界书 · 参考」注入 AI 上下文，未命中不占 Token。创建角色时的世界/角色设定会自动生成词条，可自由增删改。</p>
+        <div id="worldbookContainer" style="max-height:430px;overflow-y:auto;"></div>
+        <hr style="border:none;border-top:1px dashed var(--divider);margin:8px 0;">
+        <h4 style="font-size:0.8rem;">新增词条</h4>
+        <input type="text" id="wbNewTitle" placeholder="标题（如：北郊幸存者营地）" style="margin-bottom:4px;">
+        <input type="text" id="wbNewKeys" placeholder="触发关键词，逗号分隔（如：营地,北郊,幸存者）" style="margin-bottom:4px;">
+        <textarea id="wbNewContent" rows="3" placeholder="词条内容：AI 在关键词命中时读到的参考设定"></textarea>
+        <div class="btn-row" style="margin-top:6px;">
+            <button class="btn-modal" id="btnWbSeedFromChar">🔄 从当前设定导入</button>
+            <button class="btn-modal primary" id="btnWbAdd">＋ 添加词条</button>
+        </div>
+    </div></div>
+
+    <!-- ===== DZ：叙事与阅读设置 ===== -->
+    <div class="modal-overlay" id="narrativeModal" style="display:none;"><div class="modal-panel" style="max-width:520px;">
+        <button class="modal-close" id="modalCloseNarrative">x</button><h3>🖋️ 叙事与阅读</h3>
+        <div class="setting-group">
+            <h4>字号</h4>
+            <div class="dz-slider-row">
+                <label>正文字号 <output id="fontSizeNarrVal2">15</output>px</label>
+                <input type="range" class="dz-range" id="fontSizeNarr2" min="12" max="24" step="1" value="15">
+            </div>
+            <div class="dz-slider-row">
+                <label>正文内面板/字条字号 <output id="fontSizePanelVal2">15</output>px</label>
+                <input type="range" class="dz-range" id="fontSizePanel2" min="12" max="24" step="1" value="15">
+            </div>
+            <div class="dz-slider-row">
+                <label>界面与背包字号 <output id="fontSizeUiVal2">14</output>px</label>
+                <input type="range" class="dz-range" id="fontSizeUi2" min="12" max="20" step="1" value="14">
+            </div>
+            <label class="dz-switch-row"><input type="checkbox" id="setHlDialogue2" checked><span class="dz-switch-body"><strong>人物台词高亮</strong><small>引号内的对话以浅蓝强调色显示。</small></span></label>
+            <div class="dz-font-preview" id="dzFontPreview2">
+                <div class="dz-fp-narr">雨点砸在铁皮屋顶上，你屏住呼吸贴紧墙壁。「有人吗？」你压低声音问。</div>
+                <div class="dz-fp-panel">📋 线索便签：门锁是旧的，钥匙也许还插在里面。</div>
+                <div class="dz-fp-ui">饱腹 70% · 口渴 55% · 状态：警觉</div>
+            </div>
+        </div>
+        <div class="setting-group">
+            <h4>叙事与阅读设置</h4>
+            <div id="writingGuidelinesContainer2" style="max-height:280px;overflow-y:auto;padding:4px;"></div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:8px;">
+                <label style="font-size:0.72rem;white-space:nowrap;">正文目标字数</label>
+                <select id="targetWordCountSelect2" style="flex:1;font-size:0.7rem;">
+                    <option value="0">不限（自由发挥）</option>
+                    <option value="300">约 300 字（紧凑）</option>
+                    <option value="500">约 500 字（标准）</option>
+                    <option value="800">约 800 字（丰富）</option>
+                    <option value="1200">约 1200 字（长篇）</option>
+                </select>
+            </div>
+        </div>
+        <div class="btn-row"><button class="btn-modal primary" id="btnNarrativeOk">应用</button></div>
+    </div></div>
+
+    <!-- ===== DZ：记忆档案查看器 ===== -->
+    <div class="modal-overlay" id="memoryModal" style="display:none;"><div class="modal-panel" style="max-width:620px;">
+        <button class="modal-close" id="modalCloseMemory">x</button><h3>🧠 记忆档案</h3>
+        <div id="dzMemoryStatsBar" class="field-hint" style="margin-bottom:6px;">—</div>
+        <div id="dzMemoryContent" style="max-height:460px;overflow-y:auto;"></div>
+        <div class="btn-row" style="margin-top:8px;">
+            <button class="btn-modal" id="btnMemoryClear">清空记忆</button>
+            <button class="btn-modal" id="btnMemoryExport">导出记忆</button>
+        </div>
+        <!-- ===== DZ：记忆诊断与补录 ===== -->
+        <div class="dz-mem-tools">
+            <div class="field-hint">「补录记忆」= 手动补齐：反复扫描，把还没总结的轮次补齐（并发），再把够条件的旧记录做二次压缩，直到再没有可做的活。「安全重建」先生成新总结，成功才替换，失败范围保留旧记忆；原文缺失可手动补录事实。进度在诊断与补录弹窗查看。</div>
+            <div class="btn-row" style="margin-top:6px;">
+                <button class="btn-modal" id="btnMemBackfill">补录记忆</button>
+                <button class="btn-modal" id="btnMemRebuild">安全重建</button>
+            </div>
+        </div>
+    </div></div>
+
+    <!-- ===== DZ：剧情档案（时间轴回放 / 书签 / 剧本导出） ===== -->
+    <div class="modal-overlay" id="archiveModal" style="display:none;"><div class="modal-panel" style="max-width:680px;">
+        <button class="modal-close" id="modalCloseArchive">x</button><h3>📖 剧情档案</h3>
+        <div class="dz-archive-tabs" style="display:flex;gap:6px;margin:6px 0 10px;flex-wrap:wrap;">
+            <button class="btn-modal dz-archive-tab active" data-atab="timeline">🕰 时间轴</button>
+            <button class="btn-modal dz-archive-tab" data-atab="bookmarks">🔖 书签</button>
+            <button class="btn-modal dz-archive-tab" data-atab="varlog">⚖ 变量流水</button>
+            <button class="btn-modal dz-archive-tab" data-atab="ctxcheck">🔍 上下文体检</button>
+            <button class="btn-modal dz-archive-tab" data-atab="export">📄 导出剧本</button>
+        </div>
+        <div id="dzArchiveContent" style="max-height:480px;overflow-y:auto;"></div>
+    </div></div>
+
+    <!-- ===== DZ：骰子检定（明骰 / 暗骰） ===== -->
+    <div class="modal-overlay" id="diceModal" style="display:none;"><div class="modal-panel" style="max-width:520px;">
+        <button class="modal-close" id="modalCloseDice">x</button><h3>🎲 骰子检定</h3>
+        <div id="dzDiceContent" style="max-height:500px;overflow-y:auto;"></div>
+    </div></div>
+
+    <!-- ===== DZ：回合撤回（整轮撤回 / 清理指定轮次 / 变更日志） ===== -->
+    <div class="modal-overlay" id="snapshotModal" style="display:none;"><div class="modal-panel" style="max-width:640px;">
+        <button class="modal-close" id="modalCloseSnapshot">x</button><h3>⏪ 回合撤回</h3>
+        <div id="dzSnapshotContent" style="max-height:520px;overflow-y:auto;"></div>
+    </div></div>
+
+    <!-- ===== DZ：记忆诊断与补录 ===== -->
+    <div class="modal-overlay" id="memBackfillModal" style="display:none;"><div class="modal-panel" style="max-width:560px;">
+        <button class="modal-close" id="modalCloseMemBackfill">x</button><h3>🧪 记忆诊断与补录</h3>
+        <div id="dzMemBfBody" style="max-height:520px;overflow-y:auto;"></div>
+    </div></div>
+
+    <!-- ===== DZ：变更日志（撤回/清理/补录/重建操作流水） ===== -->
+    <div class="modal-overlay" id="opLogModal" style="display:none;"><div class="modal-panel" style="max-width:560px;">
+        <button class="modal-close" id="modalCloseOpLog">x</button><h3>📜 变更日志</h3>
+        <div id="dzOpLogContent" style="max-height:440px;overflow-y:auto;"></div>
+    </div></div>
+
     <!-- ===== 游戏脚本（按依赖顺序加载） ===== -->
     <!-- 0. 独立数据模块（物品/NPC/成就/事件常量，零依赖，window全局暴露供main.js启动时读取） -->
     <script src="js/items_data.js"></script>
@@ -850,5 +1090,7 @@
     <!-- 4. main.js：核心IIFE（沙盒配置/存档读写/状态渲染/核心hin()AI对话循环/Init初始化）
          暴露gst/gch/gsbx/ld/sv/hin/upui等给其他文件使用；API配置自动 localStorage 持久化，刷新不丢失 -->
     <script src="js/main.js"></script>
+    <!-- 5. dz_features.js：DZ 扩展（世界书/变量官/双模型/记忆模式/阅读字号/侧边栏·分栏布局），依赖 main.js 暴露的全局 -->
+    <script src="js/dz_features.js"></script>
 </body>
 </html>
