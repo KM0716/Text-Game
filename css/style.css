@@ -5341,3 +5341,117 @@ body[data-theme="dark"].dz-hl-dialogue .dlg { color: #7db8e8; }
     .dz-wizard-foot { padding: 10px 12px; }
     .dz-wizard-foot .btn-modal { font-size: 0.72rem; padding: 8px 14px; }
 }
+
+/* ==================================================================
+ * DZ 第三轮新增：变量官判定依据 / 多候选重生成 / 剧情档案 / 手势支撑
+ * ================================================================== */
+
+/* ---------- 1. 变量官结算块 · 判定依据行（弱化缩进，让玩家理解数值为何变化） ---------- */
+.dz-varjudge .dz-vj-reason {
+    display: block;
+    margin-top: 2px;
+    padding-left: 1.2em;
+    font-size: 0.72rem;
+    font-weight: normal;
+    color: var(--text-muted);
+    opacity: 0.92;
+    letter-spacing: 0.02em;
+}
+
+/* ---------- 2. 多候选重生成选择器 ---------- */
+.dz-candidates {
+    margin: 14px 4px 10px;
+    padding: 12px;
+    background: var(--bg-paper-alt);
+    border: 1.6px solid var(--border-light);
+    border-radius: 8px;
+}
+.dz-candidates-head {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin-bottom: 10px;
+    letter-spacing: 0.03em;
+}
+.dz-candidate-card {
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    background: var(--bg-paper);
+    border: 1.4px solid var(--border-light);
+    border-radius: 6px;
+}
+.dz-candidate-preview {
+    font-size: 0.78rem;
+    line-height: 1.7;
+    color: var(--ink-soft);
+    margin-bottom: 8px;
+    word-break: break-all;
+}
+.dz-candidate-pick { display: block; width: 100%; }
+.dz-candidate-cancel { display: block; width: 100%; margin-top: 2px; }
+
+/* ---------- 3. 剧情档案（时间轴 / 书签 / 导出） ---------- */
+.dz-archive-tabs .dz-archive-tab { font-size: 0.74rem; padding: 7px 12px; opacity: 0.75; }
+.dz-archive-tabs .dz-archive-tab.active {
+    opacity: 1;
+    font-weight: 700;
+    border-width: 2px;
+    color: var(--accent);
+}
+.dz-archive-tip {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    line-height: 1.75;
+    margin: 4px 2px 12px;
+}
+/* 时间轴行 / 书签行 */
+.dz-tl-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    margin-bottom: 7px;
+    background: var(--bg-paper);
+    border: 1.4px solid var(--border-light);
+    border-radius: 6px;
+}
+.dz-tl-main { flex: 1; min-width: 0; display: flex; align-items: baseline; gap: 8px; }
+.dz-tl-turn {
+    flex-shrink: 0;
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.04em;
+    white-space: nowrap;
+}
+.dz-tl-tx {
+    flex: 1;
+    min-width: 0;
+    font-size: 0.78rem;
+    color: var(--ink-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+.dz-tl-acts { flex-shrink: 0; display: flex; gap: 6px; }
+.dz-tl-acts .btn-modal { font-size: 0.68rem; padding: 5px 10px; }
+.dz-bm-del { padding: 5px 8px; color: var(--text-muted); }
+.dz-bm-bar { margin-bottom: 10px; }
+/* 回放视图：复用 vn-* 气泡样式，仅提供纸面容器 */
+.dz-replay-back { font-size: 0.72rem; padding: 6px 12px; margin-bottom: 8px; }
+.dz-replay-head {
+    font-size: 0.78rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    margin: 0 2px 10px;
+    letter-spacing: 0.03em;
+}
+.dz-replay-box {
+    padding: 12px 10px 16px;
+    background: var(--bg-paper-alt);
+    border: 1.4px dashed var(--border-light);
+    border-radius: 8px;
+    max-height: 420px;
+    overflow-y: auto;
+}
+.dz-export-box .btn-modal { display: block; width: 100%; margin-top: 4px; }

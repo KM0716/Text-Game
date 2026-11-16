@@ -882,68 +882,9 @@ window.toggleSfx = function(){ const ret = _origToggleSfx(); window.sfxEnabled =
 //  BGM 增强：缓存前解除 loading 锁定 + 长按切换曲目 + 缓存进度条
 // ============================================================
 (function bgmEnhancements() {
-    // ===== ① 首曲"就绪前"阻塞 loading 层解除（防止加载页面先解除、音乐稍后突然冒出吓玩家一跳）=====
-    let _firstTrackReady = false;
-    let _waitingForBgmReady = true;
-    const _tryUnlockLoading = () => {
-        if (!_waitingForBgmReady || _firstTrackReady) return;
-        const loading = document.getElementById('initialLoading');
-        if (!loading) { // 没有 loading 层就视为解除
-            _waitingForBgmReady = false;
-            return;
-        }
-        // loading 层存在时，检查自定义 ready 标记：如果应用定义了 window._appReady = false，
-        // 则这里只负责置位 _firstTrackReady，交由应用方决定何时解除；
-        // 否则直接在首曲 canplaythrough 后 300ms 解除 loading
-        if (typeof window._appReadyGate === 'function') {
-            window._appReadyGate('_bgmReady', _firstTrackReady);
-        } else if (_firstTrackReady) {
-            try {
-                loading.style.transition = 'opacity .4s';
-                loading.style.opacity = '0';
-                setTimeout(() => { try { loading.remove(); } catch(_) {} }, 420);
-            } catch(_) {}
-            _waitingForBgmReady = false;
-        }
-    };
-    // 兜底：8 秒后无论 BGM 是否加载完成都放行，避免卡死 loading 层
-    setTimeout(() => {
-        if (_waitingForBgmReady) {
-            console.warn('[BGM] 首曲加载超时，兜底解除 loading');
-            _firstTrackReady = true;
-            _tryUnlockLoading();
-        }
-    }, 8000);
-    // 补丁 bgmInit 中的回调：标记首曲就绪
-    const _origInit = typeof bgmInit === 'function' ? bgmInit : null;
-    if (_origInit) {
-        const patchedInit = function() {
-            const ret = _origInit.apply(this, arguments);
-            if (BGM.audio && !BGM.audio._enhancePatched) {
-                BGM.audio._enhancePatched = true;
-                BGM.audio.addEventListener('canplaythrough', () => {
-                    if (!_firstTrackReady) {
-                        _firstTrackReady = true;
-                        _tryUnlockLoading();
-                    }
-                });
-                BGM.audio.addEventListener('error', () => {
-                    if (!_firstTrackReady) {
-                        console.warn('[BGM] 首曲加载失败，兜底解除 loading');
-                        _firstTrackReady = true;
-                        _tryUnlockLoading();
-                    }
-                });
-            }
-            return ret;
-        };
-        window.bgmInit = patchedInit;
-    }
-    // 如果 BGM 本身就被用户关闭了，立即解锁
-    if (!BGM.enabled) {
-        _firstTrackReady = true;
-        setTimeout(_tryUnlockLoading, 0);
-    }
+    // ===== ① 僵尸引用已清理：原"首曲就绪阻塞 loading 层"逻辑引用的 #initialLoading DOM 并不存在
+    //        （game.html 实际加载层为 #dzLoading，由其自身的 window.load + 最小展示时间控制淡出），
+    //        该块恒为空转，已整体移除。 =====
 
     // ===== ② 缓存进度条（不阻塞 UI 的右下角胶囊）=====
     let _progressEl = null;

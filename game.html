@@ -216,6 +216,7 @@
                     <button class="dz-side-btn" id="dzBtnWorldbook" title="世界书 · 设定与参考词条">📚 世界书</button>
                     <button class="dz-side-btn" id="dzBtnNarrative" title="叙事与阅读设置">🖋️ 叙事阅读</button>
                     <button class="dz-side-btn" id="dzBtnMemory" title="查看记忆系统档案">🧠 记忆档案</button>
+                    <button class="dz-side-btn" id="dzBtnArchive" title="剧情档案：时间轴回放 / 书签 / 剧本导出">📖 剧情档案</button>
                 </div>
                 <div class="dz-nav-cap">系统</div>
                 <div class="dz-nav-group">
@@ -308,6 +309,7 @@
                 <div class="bottom-actions-bar">
                     <button class="btn-quick" id="btnUndoTurn" title="回退到上一步">回退</button>
                     <button class="btn-quick" id="btnRegenTurn" title="重新生成AI上一次回复">重生成</button>
+                    <button class="btn-quick" id="btnRegenMulti" title="一次生成3个候选版本供挑选">多候选</button>
                 </div>
             </div>
             <div class="input-row">
@@ -390,28 +392,7 @@
     <div class="idle-badge" id="idleBadge">挂机中</div>
     <div class="god-badge" id="godBadge" style="display:none;">上帝模式</div>
 
-    <!-- Welcome Modal -->
-    <div class="modal-overlay" id="welcomeModal"><div class="modal-panel" style="max-width:380px;">
-        <button class="modal-close" id="modalCloseWelcome">x</button><h3>API 配置</h3>
-        <p class="field-hint" style="text-align:center;margin-bottom:6px;">选择服务商后粘贴密钥即可快速开始</p>
-        <label>服务商预设</label>
-        <p class="field-hint">选择你使用的AI服务商，会自动填充端点和常用模型</p>
-        <select id="welEndpointPreset"><option value="openai">OpenAI</option><option value="deepseek">DeepSeek</option><option value="moonshot">月之暗面 Kimi</option><option value="zhipu">智谱 AI GLM</option><option value="qwen">通义千问</option><option value="siliconflow">硅基流动</option><option value="groq">Groq</option><option value="ernie">文心一言</option><option value="minimax">MiniMax 海螺</option><option value="doubao">豆包（火山方舟）</option><option value="ollama">Ollama 本地</option></select>
-        <label>端点地址</label>
-        <p class="field-hint">API 接口地址，通常以 /v1/chat/completions 结尾</p>
-        <input type="url" id="welEndpoint" placeholder="端点地址（自动填充）">
-        <label>模型</label>
-        <p class="field-hint">选择或输入模型名称，如 gpt-4o、deepseek-chat</p>
-        <div class="model-fetch-row" style="display:flex;gap:4px;align-items:center;">
-            <select id="welModelSelect" style="flex:1;"><option>gpt-4o</option></select>
-            <button type="button" class="btn-modal" id="btnFetchModelsWel" style="white-space:nowrap;font-size:0.66rem;padding:4px 8px;">🔄 拉取</button>
-        </div>
-        <input type="text" id="welModel" placeholder="模型名" style="display:none;">
-        <label>API 密钥</label>
-        <p class="field-hint">在服务商后台获取的 API Key，本地存储不会上传</p>
-        <input type="password" id="welKey" placeholder="API 密钥">
-        <div class="btn-row"><button class="btn-modal" id="btnTestWel">测试连接</button><button class="btn-modal primary" id="btnWelcomeNext">确认</button></div>
-    </div></div>
+    <!-- DZ：welcomeModal 已移除 —— API 配置整合进创建向导第④步「AI 与功能」（charModal · tab-ai） -->
 
     <!-- Character & World Creation Wizard（独立全屏界面：默认载入，创建后进入游戏） -->
     <div class="modal-overlay dz-wizard" id="charModal" style="display:none;">
@@ -1034,6 +1015,17 @@
             <button class="btn-modal" id="btnMemoryClear">清空记忆</button>
             <button class="btn-modal" id="btnMemoryExport">导出记忆</button>
         </div>
+    </div></div>
+
+    <!-- ===== DZ：剧情档案（时间轴回放 / 书签 / 剧本导出） ===== -->
+    <div class="modal-overlay" id="archiveModal" style="display:none;"><div class="modal-panel" style="max-width:680px;">
+        <button class="modal-close" id="modalCloseArchive">x</button><h3>📖 剧情档案</h3>
+        <div class="dz-archive-tabs" style="display:flex;gap:6px;margin:6px 0 10px;">
+            <button class="btn-modal dz-archive-tab active" data-atab="timeline">🕰 时间轴</button>
+            <button class="btn-modal dz-archive-tab" data-atab="bookmarks">🔖 书签</button>
+            <button class="btn-modal dz-archive-tab" data-atab="export">📄 导出剧本</button>
+        </div>
+        <div id="dzArchiveContent" style="max-height:480px;overflow-y:auto;"></div>
     </div></div>
 
     <!-- ===== 游戏脚本（按依赖顺序加载） ===== -->

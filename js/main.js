@@ -956,13 +956,13 @@
                     // 无模型：显示一个占位
                     selectEl.add(new Option('(拉取失败，请手动输入)', ''));
                     selectEl.style.display = 'none';
-                    const inp = document.getElementById(selectEl.id === 'apiModelSelect' ? 'apiModel' : 'welModel');
+                    const inp = document.getElementById('apiModel');
                     if (inp) inp.style.display = '';
                     return;
                 }
                 models.forEach(m => selectEl.add(new Option(m, m)));
                 selectEl.style.display = '';
-                const inp = document.getElementById(selectEl.id === 'apiModelSelect' ? 'apiModel' : 'welModel');
+                const inp = document.getElementById('apiModel');
                 if (inp) inp.style.display = 'none';
                 // 尝试保留之前选中的模型
                 if (currentValue && models.includes(currentValue)) {
@@ -3128,7 +3128,11 @@
                         const eqv = tg.indexOf('=');
                         if (eqv > 3) {
                             const vk = tg.slice(4, eqv).trim();
-                            const vv = tg.slice(eqv + 1).trim();
+                            let vv = tg.slice(eqv + 1).trim();
+                            // DZ 判定依据：[变量官:名=值|依据:理由]（理由不影响数值解析）
+                            const _rIdx = vv.indexOf('|依据:');
+                            let _vjReason = '';
+                            if (_rIdx >= 0) { _vjReason = vv.slice(_rIdx + 4).trim().slice(0, 40); vv = vv.slice(0, _rIdx).trim(); }
                             const num = parseFloat(vv);
                             if (vk === '饱腹') ch.hunger = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
                             else if (vk === '口渴') ch.thirst = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
@@ -3139,7 +3143,7 @@
                             else if (vk === '负重') ch.wei = Math.max(0, Math.min(100, isNaN(num) ? 0 : Math.round(num)));
                             else if (vk === '伤势') ch.wd = vv.slice(0, 30);
                             else if (vk === '心态') ch.mood = vv.slice(0, 30);
-                            const key = 'vj:' + vk; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '⚖ 变量官', val: vk + (isNaN(num) ? '' : '=' + Math.round(num)) }); }
+                            const key = 'vj:' + vk; if (!firedSet.has(key)) { firedSet.add(key); notes.push({ ty: 'status', label: '⚖ 变量官', val: vk + (isNaN(num) ? '' : '=' + Math.round(num)) + (_vjReason ? '｜依据:' + _vjReason : '') }); }
                         }
                         return '';
                     }
@@ -3660,7 +3664,10 @@
                     hd.appendChild(document.createTextNode('变量官 · 本轮结算'));
                     const bd = document.createElement('div');
                     bd.className = 'dz-vj-body';
-                    bd.innerHTML = esc(b.tx || '').replace(/\n/g, '<br>');
+                    // DZ 判定依据：以「└ 依据：」开头的行渲染为弱化样式，让玩家理解数值为何变化
+                    bd.innerHTML = esc(b.tx || '').split('\n').map(function (ln) {
+                        return /^\s*└?\s*依据[:：]/.test(ln) ? '<span class="dz-vj-reason">' + ln + '</span>' : ln;
+                    }).join('<br>');
                     el.className = 'dz-varjudge';
                     el.appendChild(hd);
                     el.appendChild(bd);
@@ -4152,6 +4159,55 @@
             }
             window._setAILock = _setAILock;
 
+            /* ===== DZ 共享：回合上下文组装（hin 与多候选重生成共用）=====
+             * isIdle：挂机轮注入挂机提示；systemPromptExtra：附加系统上下文；
+             * histEndExclusive：可选的 hist 截止下标（多候选重生成时排除旧 AI 回复）。 */
+            function composeTurnMessages(isIdle, systemPromptExtra, histEndExclusive) {
+                let sysPrompt = gsp();
+                if (isIdle) {
+                    const _clkNow = gclk();
+                    const _isRealFlow = (_clkNow.dayLenSec === true || _clkNow.dayLenSec === 86400);
+                    sysPrompt += '\n\n【挂机模式】当前为自动挂机模式，日志将以[monologue]（内心独白/系统日志）形式输出。请以简洁的日志式叙述输出角色自主行动结果，结合角色设定、环境、当前状态和沙盒参数，尽量避开危险行动，以生存、探索、休息、收集资源为主。输出控制在200字以内。请将行动日志包裹在[monologue]标签中。\n\n【挂机流速适配 — 关键】当前' + (_isRealFlow ? '跟随现实（游戏时间=本地时钟）' : '行动驱动（每次挂机自动推进0.5小时）') + '。若为跟随现实：每次挂机仅描述数分钟内的短时动作（整理装备/观察环境/简短对话/小规模搜索/喝水吃干粮），状态变化幅度小，禁止描述跨越数小时的行动。若为行动驱动：每次挂机可描述约30分钟的行动，状态变化按实际耗时适度调整，无需手动附加[时间:+Xh]标签。\n\n【挂机自主决策优先级 — 必须按序决策】\n挂机不是随机游荡，角色应按以下优先级自主决策（高优先级需求未满足时不做低优先级事）：\n1. 生存急救（最高）：饱腹<30优先觅食；口渴<30优先找水；疲劳>70优先休息；受伤/感染优先治疗。状态危急时取消一切探索。\n2. 安全避险：夜间（22:00-6:00）优先寻找安全据点躲避；丧尸密集区优先撤离；天气极端（暴雪/暴雨）优先避难。\n3. 健康恢复：精神<30时安排休息或轻松活动（整理物资/回忆）；体温异常时调节环境（添衣/取暖/降温）。\n4. 资源储备：状态稳定时搜索附近物资，优先补充消耗品（水/食物/药品）。\n5. 探索发展：资源充足时谨慎探索新区域，标记线索，避免深入未知。\n6. 社交关系：遇到友好NPC时适度互动，不主动挑衅敌对势力。\n挂机风险评估：每轮行动前评估"失败最坏后果"，若可能致死或重伤则放弃该行动改选保守方案。挂机期间禁止主动挑起战斗（除非被攻击），禁止进入标注高危的区域。';
+                }
+                // Inject extra system prompt context (e.g., decision assistance)
+                if (systemPromptExtra) {
+                    sysPrompt += '\n\n' + systemPromptExtra;
+                }
+                // ============ Token 优化：发送前的"温和历史压缩" ============
+                // 单条过长截短 + 中间旧选项省略（保留头尾最新的上下文语义，不破坏后续对话逻辑）
+                const _f = cfg();
+                const ctxWindow = Math.max(1, (_f.ctx || 24) * 2);
+                let compressedHist = (typeof histEndExclusive === 'number' && histEndExclusive >= 0) ? hist.slice(0, histEndExclusive) : hist.slice();
+                if (compressedHist.length > ctxWindow) compressedHist = compressedHist.slice(-ctxWindow);
+                compressedHist = compressedHist.map((m, idx) => {
+                    try {
+                        // 距离末尾太近（最近 6 条）保留原始；否则进入压缩
+                        const tailDist = compressedHist.length - 1 - idx;
+                        const nm = { role: m.role, content: m.content || '' };
+                        if (tailDist <= 6) return nm;
+                        const raw = nm.content;
+                        if (!raw || typeof raw !== 'string') return nm;
+                        // 用户消息 >400 字 → 截短到 300 字
+                        if (nm.role === 'user' && raw.length > 400) {
+                            nm.content = raw.slice(0, 300) + '\n…(前文已省略)';
+                        }
+                        // Assistant 消息：距离末尾 >= 12 条的，[choice] 标签内容整体省略（保留标签语法不破坏 pai 解析框架）
+                        if (nm.role === 'assistant' && tailDist >= 12) {
+                            nm.content = raw.replace(/\[choice\][\s\S]*?\[\/choice\]/gi, '[choice](选项省略，以压缩上下文)[/choice]');
+                            // Assistant 超长剧情（>1200 字）也截到 700
+                            if (nm.content.length > 1200) {
+                                nm.content = nm.content.slice(0, 700) + '\n…(中景剧情已摘要省略)';
+                            }
+                        } else if (nm.role === 'assistant' && nm.content.length > 2000) {
+                            // 距离近但也过于超长的（>2000 字），截到 1100
+                            nm.content = nm.content.slice(0, 1100) + '\n…(超长部分已省略)';
+                        }
+                        return nm;
+                    } catch(_) { return m; }
+                });
+                return [{ role: 'system', content: sysPrompt }, ...compressedHist];
+            }
+
             async function hin(inp, isIdle, displayText, systemPromptExtra) {
                 if (busy) { tst('正在演算中，请稍候…'); return false; }
                 if (!isIdle && idleLocked) { tst('挂机中，行动已锁定。可打开背包或面板查看信息。'); return false; }
@@ -4351,48 +4407,7 @@
                         };
                     } catch(_) {}
                     try { scb(); } catch(_) {}
-                    let sysPrompt = gsp();
-                    if (isIdle) {
-                        const _clkNow = gclk();
-                        const _isRealFlow = (_clkNow.dayLenSec === true || _clkNow.dayLenSec === 86400);
-                        sysPrompt += '\n\n【挂机模式】当前为自动挂机模式，日志将以[monologue]（内心独白/系统日志）形式输出。请以简洁的日志式叙述输出角色自主行动结果，结合角色设定、环境、当前状态和沙盒参数，尽量避开危险行动，以生存、探索、休息、收集资源为主。输出控制在200字以内。请将行动日志包裹在[monologue]标签中。\n\n【挂机流速适配 — 关键】当前' + (_isRealFlow ? '跟随现实（游戏时间=本地时钟）' : '行动驱动（每次挂机自动推进0.5小时）') + '。若为跟随现实：每次挂机仅描述数分钟内的短时动作（整理装备/观察环境/简短对话/小规模搜索/喝水吃干粮），状态变化幅度小，禁止描述跨越数小时的行动。若为行动驱动：每次挂机可描述约30分钟的行动，状态变化按实际耗时适度调整，无需手动附加[时间:+Xh]标签。\n\n【挂机自主决策优先级 — 必须按序决策】\n挂机不是随机游荡，角色应按以下优先级自主决策（高优先级需求未满足时不做低优先级事）：\n1. 生存急救（最高）：饱腹<30优先觅食；口渴<30优先找水；疲劳>70优先休息；受伤/感染优先治疗。状态危急时取消一切探索。\n2. 安全避险：夜间（22:00-6:00）优先寻找安全据点躲避；丧尸密集区优先撤离；天气极端（暴雪/暴雨）优先避难。\n3. 健康恢复：精神<30时安排休息或轻松活动（整理物资/回忆）；体温异常时调节环境（添衣/取暖/降温）。\n4. 资源储备：状态稳定时搜索附近物资，优先补充消耗品（水/食物/药品）。\n5. 探索发展：资源充足时谨慎探索新区域，标记线索，避免深入未知。\n6. 社交关系：遇到友好NPC时适度互动，不主动挑衅敌对势力。\n挂机风险评估：每轮行动前评估"失败最坏后果"，若可能致死或重伤则放弃该行动改选保守方案。挂机期间禁止主动挑起战斗（除非被攻击），禁止进入标注高危的区域。';
-                    }
-                    // Inject extra system prompt context (e.g., decision assistance)
-                    if (systemPromptExtra) {
-                        sysPrompt += '\n\n' + systemPromptExtra;
-                    }
-                    // ============ Token 优化：发送前的"温和历史压缩" ============
-                    // 单条过长截短 + 中间旧选项省略（保留头尾最新的上下文语义，不破坏后续对话逻辑）
-                    const ctxWindow = Math.max(1, (f.ctx || 24) * 2);
-                    let compressedHist = hist.slice();
-                    if (compressedHist.length > ctxWindow) compressedHist = compressedHist.slice(-ctxWindow);
-                    compressedHist = compressedHist.map((m, idx) => {
-                        try {
-                            // 距离末尾太近（最近 6 条）保留原始；否则进入压缩
-                            const tailDist = compressedHist.length - 1 - idx;
-                            const nm = { role: m.role, content: m.content || '' };
-                            if (tailDist <= 6) return nm;
-                            const raw = nm.content;
-                            if (!raw || typeof raw !== 'string') return nm;
-                            // 用户消息 >400 字 → 截短到 300 字
-                            if (nm.role === 'user' && raw.length > 400) {
-                                nm.content = raw.slice(0, 300) + '\n…(前文已省略)';
-                            }
-                            // Assistant 消息：距离末尾 >= 12 条的，[choice] 标签内容整体省略（保留标签语法不破坏 pai 解析框架）
-                            if (nm.role === 'assistant' && tailDist >= 12) {
-                                nm.content = raw.replace(/\[choice\][\s\S]*?\[\/choice\]/gi, '[choice](选项省略，以压缩上下文)[/choice]');
-                                // Assistant 超长剧情（>1200 字）也截到 700
-                                if (nm.content.length > 1200) {
-                                    nm.content = nm.content.slice(0, 700) + '\n…(中景剧情已摘要省略)';
-                                }
-                            } else if (nm.role === 'assistant' && nm.content.length > 2000) {
-                                // 距离近但也过于超长的（>2000 字），截到 1100
-                                nm.content = nm.content.slice(0, 1100) + '\n…(超长部分已省略)';
-                            }
-                            return nm;
-                        } catch(_) { return m; }
-                    });
-                    const msgs = [{ role: 'system', content: sysPrompt }, ...compressedHist];
+                    const msgs = composeTurnMessages(isIdle, systemPromptExtra);
                     // 关键：必填字段完整性校验（部分服务商 400 可能是 max_tokens/ctx/model 无效，或 messages 为空）
                     if (!msgs.length) {
                         throw new Error('上下文为空，请重新生成角色或从存档载入');
@@ -4429,21 +4444,74 @@
                                 }
                             }
                         } catch(_) {}
-                        // —— 阶段 2：第二模型（重组表达）——
+                        // —— 阶段 2：第二模型（重组表达）：流式输出开启时边生成边显示 ——
                         try { if (indicatorEl && indicatorEl._setStage) indicatorEl._setStage('✍️ 第二模型 · 重组表达中…'); } catch(_) {}
                         let rewritten = '';
+                        let _dualStreamed = false;
+                        const _dualBubbles = [];
                         try {
-                            rewritten = await window.DZ.dual.rewrite(dNarr);
+                            if (f.strm && window.DZ.dual.rewriteStream) {
+                                const res2 = await window.DZ.dual.rewriteStream(dNarr, function (partial) {
+                                    try {
+                                        const allB2 = (window.pai || pai)(partial, true);
+                                        while (_dualBubbles.length < allB2.length) {
+                                            if (_dualBubbles.length === 0 && indicatorEl && indicatorEl._setStage) {
+                                                indicatorEl._setStage('✍️ 第二模型 · 重组表达中…');
+                                            }
+                                            _dualBubbles.push(apb(allB2[_dualBubbles.length], -1));
+                                        }
+                                        if (_dualBubbles.length > 0 && allB2.length > 0) {
+                                            const lastP = allB2[allB2.length - 1];
+                                            const lastD = _dualBubbles[_dualBubbles.length - 1];
+                                            const tgt = lastD.querySelector('.typing-target');
+                                            if (tgt && lastP.tx) {
+                                                tgt.innerHTML = abold(lastP.tx);
+                                                lastD._ft = lastP.tx;
+                                                lastD._bolded = true;
+                                            }
+                                        }
+                                        try { checkChatFold(); } catch(_) {}
+                                        try { scb(); } catch(_) {}
+                                    } catch(_) {}
+                                });
+                                rewritten = (res2 && res2.text) || '';
+                                _dualStreamed = !!(res2 && res2.streamed);
+                            } else {
+                                rewritten = await window.DZ.dual.rewrite(dNarr);
+                            }
                         } catch (e2) {
                             rewritten = '';
+                            _dualStreamed = false;
                             try { tst('第二模型润色失败，已回退第一模型正文'); } catch (_) {}
                         }
                         // —— 重组：润色后的叙事 + 原事实标签 + 原选项（选项绝不改动）——
                         full = (rewritten || dNarr).trim();
                         if (dTags) full += '\n' + dTags;
                         full += '\n[choice]' + (dChoices && dChoices.length ? dChoices.join('|') : generateNeutralChoices().join('|')) + '[/choice]';
-                        const bbD = pai(full, false);
-                        for (const b of bbD) apb(b, f.tspd);
+                        if (_dualStreamed && _dualBubbles.length) {
+                            // 叙事部分已流式渲染：正式解析应用状态/通知，并增量补齐剩余标签/选项块
+                            try { if (indicatorEl && indicatorEl._setStage) indicatorEl._setStage('🔍 核验设定与状态…'); } catch(_) {}
+                            const allFinalD = (window.pai || pai)(full, false);
+                            while (_dualBubbles.length < allFinalD.length) {
+                                _dualBubbles.push(apb(allFinalD[_dualBubbles.length], f.tspd));
+                            }
+                            if (_dualBubbles.length > 0 && allFinalD.length > 0) {
+                                const lastP = allFinalD[allFinalD.length - 1];
+                                const lastD = _dualBubbles[_dualBubbles.length - 1];
+                                const tgt = lastD.querySelector('.typing-target');
+                                if (tgt && lastP.tx) {
+                                    tgt.innerHTML = abold(lastP.tx);
+                                    lastD._ft = lastP.tx;
+                                    lastD._bolded = true;
+                                }
+                            }
+                            try { checkChatFold(); } catch(_) {}
+                            try { scb(); } catch(_) {}
+                        } else {
+                            if (_dualBubbles.length) { _dualBubbles.forEach(el => { try { el.remove(); } catch(_) {} }); }
+                            const bbD = pai(full, false);
+                            for (const b of bbD) apb(b, f.tspd);
+                        }
                     } else if (f.strm && f.key) {
                         const ct = new AbortController();
                         ctrl = ct;
@@ -4769,7 +4837,7 @@
             // are defined in the second script block and exposed there via window.GameSystems
             // Additional functions needed by second script block
             window.rbt = rbt; window.upui = upui; window.stg = stg;
-            window.ccb = ccb; window.svh = svh; window.apb = apb;
+            window.ccb = ccb; window.svh = svh; window.apb = apb; window.cbe = cbe;
             window.migrateSta = migrateSta; window.migrateChr = migrateChr; window.migrateCfg = migrateCfg;
             window.mergeSbx = mergeSbx; window.ssbx = ssbx; window.gsbx = gsbx;
             window.ldh = ldh; window.ssv = ssv; window.gsv = gsv; window.validateSaveData = validateSaveData;
@@ -6542,23 +6610,18 @@
                 try {
                     const c = cfg() || {};
                     if (!c.key) {
-                        if ($('welEndpointPreset')) {
-                            try {
-                                $('welEndpointPreset').value = c.preset || (typeof AP === 'object' && AP[c.preset]) ? c.preset : 'openai';
-                                try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
-                            } catch(e) { console.warn('[NewGame] 预设填充出错：', e); }
-                        }
-                        try { if ($('welEndpoint')) $('welEndpoint').value = c.ep || ''; } catch {}
+                        // ===== DZ 整合：API 配置并入向导第④步（welcomeModal 已移除，消除"教程→小窗→向导"割裂）=====
+                        try { if (typeof fillCharModal === 'function') fillCharModal(); } catch(e) { console.warn('[NewGame] fillCharModal 出错：', e); }
                         try {
-                            const sl = $('welModelSelect');
-                            if (c.model && sl) {
-                                const hasOpt = [...sl.options].some(o => o.value === c.model);
-                                if (hasOpt) sl.value = c.model;
-                                else if ($('welModel')) { $('welModel').value = c.model; sl.style.display='none'; $('welModel').style.display=''; }
-                            } else if (c.model && $('welModel')) { $('welModel').value = c.model; }
+                            const _cm = $('charModal');
+                            if (_cm) {
+                                if (hasCustomCharacter()) _cm.classList.remove('is-first');
+                                else _cm.classList.add('is-first');
+                                _cm.style.display = 'flex';
+                            }
                         } catch(e) {}
-                        try { if ($('welKey')) $('welKey').value = c.key || ''; } catch {}
-                        try { $('welcomeModal').style.display = 'flex'; } catch {}
+                        try { if (window.DZ && window.DZ.charStep4) window.DZ.charStep4.fill(); } catch(e) {}
+                        try { tst('请完成向导第④步「AI 与功能」的 API 配置'); } catch(e) {}
                         return;
                     }
                     const curSt = (typeof gst === 'function') ? gst() : null;
@@ -6816,8 +6879,7 @@
                         tst('❌ 拉取失败：' + msg);
                         // 拉取失败时切换为手动输入模式
                         selEl.style.display = 'none';
-                        const inpId = selId === 'apiModelSelect' ? 'apiModel' : 'welModel';
-                        const inp = document.getElementById(inpId);
+                        const inp = document.getElementById('apiModel');
                         if (inp) { inp.style.display = ''; inp.focus(); }
                     } finally {
                         btn.textContent = oldText;
@@ -6826,8 +6888,6 @@
                 }
                 const btn1 = document.getElementById('btnFetchModels');
                 if (btn1) btn1.addEventListener('click', () => doFetch('btnFetchModels', 'apiEndpoint', 'apiKey', 'apiModelSelect'));
-                const btn2 = document.getElementById('btnFetchModelsWel');
-                if (btn2) btn2.addEventListener('click', () => doFetch('btnFetchModelsWel', 'welEndpoint', 'welKey', 'welModelSelect'));
                 // 页面加载时自动恢复缓存的模型列表
                 try {
                     const cached = localStorage.getItem('vn_fetched_models');
@@ -7628,6 +7688,191 @@ ${sumContent}
                 // Re-send through hin() which will re-add player bubble + message + get new AI reply
                 hin(origTx, isIdle);
             });
+            // ===== DZ 回合多候选重生成：一次生成 3 个版本供玩家挑选 =====
+            $('btnRegenMulti') && $('btnRegenMulti').addEventListener('click', async () => {
+                if (busy) { tst('演算中，无法重新生成'); return; }
+                let lastUserIdx = -1;
+                for (let i = hist.length - 1; i >= 0; i--) { if (hist[i].role === 'user') { lastUserIdx = i; break; } }
+                if (lastUserIdx < 0 || lastUserIdx + 1 >= hist.length || hist[lastUserIdx + 1].role !== 'assistant') { tst('没有可重新生成的AI回复'); return; }
+                const lastUserTx = hist[lastUserIdx].content;
+                const wasIdle = lastUserTx.startsWith('[自主] ');
+                const c2 = cfg();
+                if (!c2.key || !c2.model || !c2.ep) { tst('请先配置 API（开局向导第④步或设置）'); return; }
+                if (c2.aiOff) { tst('AI 已停用，无法重新生成'); return; }
+                busy = true;
+                try { _setAILock(true); } catch(_) {}
+                try { snotifyStartBatch(); } catch(_) {}
+                playSfx('send');
+                tst('正在一次生成 3 个候选版本…');
+                const mcInd = document.createElement('div');
+                mcInd.className = 'typing-indicator';
+                mcInd.innerHTML = '<div class="ti-inner"><div class="ti-stage">🎲 正在一次生成 3 个候选版本…</div><div class="typing-dots"><span></span><span></span><span></span></div><div class="ti-timer">0.0s</div></div>';
+                const mcStart = Date.now();
+                const mcTimer = setInterval(function () {
+                    const el = mcInd.querySelector('.ti-timer');
+                    if (el) el.textContent = ((Date.now() - mcStart) / 1000).toFixed(1) + 's';
+                }, 100);
+                try { $('chatArea').appendChild(mcInd); try { scb(); } catch(_) {} } catch(_) {}
+                let candidates = [];
+                try {
+                    // 复用与 hin 完全一致的上下文组装（排除旧 AI 回复，保留玩家行动）
+                    const msgs = composeTurnMessages(wasIdle, null, lastUserIdx + 1);
+                    if (!msgs.length) throw new Error('上下文为空');
+                    const safeModel = c2.model.trim();
+                    const safeMaxTokens = Math.max(64, Math.min(32000, parseInt(c2.maxT, 10) || 2000));
+                    const baseTemp = isNaN(parseFloat(c2.temp)) ? 0.7 : Math.max(0, Math.min(2, parseFloat(c2.temp)));
+                    const results = await Promise.allSettled([0, 0.18, 0.36].map(function (dt, k) {
+                        const body = {
+                            model: safeModel,
+                            messages: msgs,
+                            max_tokens: safeMaxTokens,
+                            temperature: Math.max(0, Math.min(2, +(baseTemp + dt).toFixed(2))),
+                            stream: false
+                        };
+                        return window._sendProxyRequest(c2.ep, body, c2.key, null, false).then(function (rp) {
+                            if (!rp.ok) throw new Error('候选 ' + 'ABC'[k] + ' HTTP ' + rp.status);
+                            return rp.json().then(function (d) {
+                                const t = (d && d.choices && d.choices[0] && d.choices[0].message && d.choices[0].message.content) || '';
+                                if (!String(t).trim()) throw new Error('候选 ' + 'ABC'[k] + ' 返回为空');
+                                return String(t);
+                            });
+                        });
+                    }));
+                    candidates = results.filter(function (r) { return r.status === 'fulfilled'; }).map(function (r) { return r.value; });
+                } catch (e) {
+                    try { tst('多候选生成失败：' + ((e && e.message) || e)); } catch(_) {}
+                } finally {
+                    try { if (mcInd.parentNode) mcInd.remove(); } catch(_) {}
+                    clearInterval(mcTimer);
+                }
+                if (!candidates.length) {
+                    busy = false;
+                    try { _setAILock(false); } catch(_) {}
+                    try { snotifyEndBatch(); } catch(_) {}
+                    try { apb({ ty: 'system', tx: '多候选生成失败：3 个候选均未成功，请稍后重试。' }, 0); } catch(_) {}
+                    return;
+                }
+                if (candidates.length === 1) {
+                    tst('仅成功生成 1 个候选，已直接采用');
+                    await applyRegenCandidate(candidates[0], lastUserIdx, lastUserTx, wasIdle);
+                    return;
+                }
+                // 选择器 UI（busy 保持 true：玩家挑选期间锁定其他操作，取消即解锁）
+                const ca = $('chatArea');
+                const wrap = document.createElement('div');
+                wrap.className = 'dz-candidates';
+                const head = document.createElement('div');
+                head.className = 'dz-candidates-head';
+                head.textContent = '🎲 多候选重生成 · 生成了 ' + candidates.length + ' 个版本，请挑选一个继续（选定前原回合保持不变）';
+                wrap.appendChild(head);
+                const LBL = ['A', 'B', 'C'];
+                candidates.forEach(function (ct0, k) {
+                    const card = document.createElement('div');
+                    card.className = 'dz-candidate-card';
+                    const prev = document.createElement('div');
+                    prev.className = 'dz-candidate-preview';
+                    let pv = String(ct0).replace(/\[[^\]\n]{0,80}\]/g, '').replace(/\s+/g, ' ').trim();
+                    prev.textContent = '版本 ' + LBL[k] + '｜' + (pv.slice(0, 150) || '（空）') + (pv.length > 150 ? '…' : '');
+                    const btn = document.createElement('button');
+                    btn.className = 'dz-candidate-pick btn-modal primary';
+                    btn.textContent = '采用版本 ' + LBL[k];
+                    btn.addEventListener('click', async function () {
+                        try { wrap.remove(); } catch(_) {}
+                        await applyRegenCandidate(ct0, lastUserIdx, lastUserTx, wasIdle);
+                    });
+                    card.appendChild(prev);
+                    card.appendChild(btn);
+                    wrap.appendChild(card);
+                });
+                const cancel = document.createElement('button');
+                cancel.className = 'dz-candidate-cancel btn-modal';
+                cancel.textContent = '都不采用，保留原回合';
+                cancel.addEventListener('click', function () {
+                    try { wrap.remove(); } catch(_) {}
+                    busy = false;
+                    try { _setAILock(false); } catch(_) {}
+                    try { snotifyEndBatch(); } catch(_) {}
+                    try { tst('已取消，保留原回合'); } catch(_) {}
+                });
+                wrap.appendChild(cancel);
+                ca.appendChild(wrap);
+                try { scb(); } catch(_) {}
+            });
+
+            /* 多候选：应用被选中的候选（回滚状态 → 清除旧 AI 回复 → 渲染新版本并完成回合收尾） */
+            async function applyRegenCandidate(ct, lastUserIdx, lastUserTx, wasIdle) {
+                try {
+                    // 1. 回滚快照（与 btnRegenTurn 相同的深拷贝恢复，防止旧回复的物品/属性残留）
+                    if (undo && undo.st) {
+                        sst(JSON.parse(JSON.stringify(undo.st)));
+                        if (undo.ch) sch(JSON.parse(JSON.stringify(undo.ch)));
+                        if (undo.clk) sclk(JSON.parse(JSON.stringify(undo.clk)));
+                        if (undo.sbx) { sbx = mergeSbx(JSON.parse(JSON.stringify(undo.sbx))); ssbx(sbx); }
+                        if (undo.ach && typeof window._setUnlockedAchievements === 'function') {
+                            window._setUnlockedAchievements(undo.ach);
+                        }
+                    }
+                    // 2. 清除旧 AI 回复气泡（保留最后一条玩家气泡）
+                    const ca = $('chatArea');
+                    if (ca) {
+                        const bubbles = Array.from(ca.children);
+                        let lastPlayerIdx = -1;
+                        for (let i = bubbles.length - 1; i >= 0; i--) {
+                            const el = bubbles[i];
+                            if (el.classList && (el.classList.contains('vn-bubble--player') || (el._ft != null && el.querySelector && el.querySelector('.vn-tag') && el.querySelector('.vn-tag').textContent === '我'))) { lastPlayerIdx = i; break; }
+                        }
+                        if (lastPlayerIdx >= 0) {
+                            for (let i = bubbles.length - 1; i > lastPlayerIdx; i--) { try { bubbles[i].remove(); } catch(_) {} }
+                        } else {
+                            while (ca.children.length > (undo.bubbleCount || 0)) { const last = ca.lastChild; if (!last) break; last.remove(); }
+                        }
+                    }
+                    // 3. 弃旧 AI 回复（保留玩家消息在 hist 中，DOM 玩家气泡也保留）
+                    hist.splice(lastUserIdx + 1);
+                    const f2 = cfg();
+                    let finalFull = String(ct);
+                    if (finalFull.length > 60000) { finalFull = finalFull.slice(0, 60000); tst('AI回复过长，已截断'); }
+                    // 4. 默认标签补挂 + 选项兜底（与 hin 收尾一致的轻量版）
+                    const s0 = gst();
+                    const defTags = generateDefaultTags(s0, finalFull);
+                    if (defTags) {
+                        finalFull = defTags + '\n' + finalFull;
+                        try { (window.pai || pai)(defTags, false); } catch(_) {}
+                    }
+                    if (!/\[choice\]/i.test(finalFull)) {
+                        const nc = generateNeutralChoices();
+                        finalFull += '\n[choice]' + nc[0] + '|' + nc[1] + '|' + nc[2] + '[/choice]';
+                        try {
+                            const bbC = (window.pai || pai)('[choice]' + nc.join('|') + '[/choice]', false);
+                            for (const b of bbC) apb(b, f2.tspd);
+                        } catch(_) {}
+                    }
+                    // 5. 渲染选定候选（正式解析，应用状态）
+                    const bb = (window.pai || pai)(finalFull, false);
+                    for (const b of bb) apb(b, f2.tspd);
+                    try { checkChatFold(); } catch(_) {}
+                    try { scb(); } catch(_) {}
+                    // 6. 入史 + 记忆 + 变量官 + 时间推进
+                    hist.push({ role: 'assistant', content: finalFull });
+                    svh(hist);
+                    if (window.MEMORY_SYSTEM && typeof MEMORY_SYSTEM.recordTurn === 'function') {
+                        try { MEMORY_SYSTEM.recordTurn(lastUserTx, finalFull); } catch (memE) { console.warn('[Memory] 本轮记录失败：', memE); }
+                    }
+                    if (window.DZ && window.DZ.varJudge && cfg().vjOn) {
+                        try { await window.DZ.varJudge.run(finalFull); } catch (e) { console.warn('[VarJudge] 失败：', e); }
+                    }
+                    try { advTime(); } catch(_) {}
+                    try { upui(); } catch(_) {}
+                    try { tst('已采用候选版本，剧情继续'); } catch(_) {}
+                } catch (e) {
+                    console.warn('[RegenMulti] 应用候选失败：', e);
+                    try { apb({ ty: 'system', tx: '候选应用失败：' + ((e && e.message) || e) }, 0); } catch(_) {}
+                } finally {
+                    busy = false;
+                    try { _setAILock(false); } catch(_) {}
+                    try { snotifyEndBatch(); } catch(_) {}
+                }
+            }
             $('btnSidePanel').addEventListener('click', () => { sideMode = 'panel'; updateSideView(); upui(); $('sidePanel').classList.toggle('open'); $('sideOverlay').classList.toggle('show'); });
             $('btnProfile').addEventListener('click', () => { sideMode = 'profile'; updateSideView(); upui(); $('sidePanel').classList.toggle('open'); $('sideOverlay').classList.toggle('show'); });
             $('sideOverlay').addEventListener('click', () => { $('sidePanel').classList.remove('open'); $('sideOverlay').classList.remove('show'); });
@@ -8259,108 +8504,7 @@ ${sumContent}
                 };
                 inp.click();
             });
-            $('btnWelcomeNext').addEventListener('click', () => {
-                const k = $('welKey').value.trim();
-                if (!k) return tst('需要API密钥');
-                const ep = $('welEndpoint').value || DCFG.ep;
-                const model = $('welModelSelect').value || $('welModel').value || 'gpt-4o';
-                const preset = $('welEndpointPreset').value;
-                scf({ ...cfg(), ep: ep, key: k, model: model, preset: preset });
-                $('welcomeModal').style.display = 'none';
-                tst('API配置已保存，下次无需重复配置');
-                // Check if character has been customized (not default); if so, start game directly
-                if (hasCustomCharacter()) {
-                    // Character exists, skip creation and start game
-                    const existingChr = gch();
-                    $('chatEmpty').style.display = 'flex';
-                    tst('欢迎回来，' + (existingChr.cn || '幸存者') + '。继续你的旅程…');
-                } else {
-                    fillCharModal();
-                    $('charModal').style.display = 'flex';
-                    tst('请创建你的角色');
-                }
-            });
-            $('welEndpointPreset').addEventListener('change', function() {
-                const p = AP[this.value] || AP.custom;
-                $('welEndpoint').value = p.ep;
-                const sl = $('welModelSelect');
-                const mi = $('welModel');
-                sl.innerHTML = '';
-                if (p.md && p.md.length) {
-                    p.md.forEach(m => sl.add(new Option(m, m)));
-                    sl.style.display = '';
-                    if (mi) mi.style.display = 'none';
-                    sl.value = p.md[0];
-                    if (mi) mi.value = p.md[0];
-                } else {
-                    sl.style.display = 'none';
-                    if (mi) mi.style.display = '';
-                }
-                // 选择预设后立即 scf 保存（endpoint/preset/model，保持用户选完就不用重新选）
-                try {
-                    scf({
-                        ...cfg(),
-                        preset: this.value,
-                        ep: $('welEndpoint').value || DCFG.ep,
-                        model: (sl.value && sl.style.display !== 'none') ? sl.value : ((mi ? mi.value : '') || 'gpt-4o')
-                    });
-                } catch {}
-            });
-            // ========== 欢迎模态：所有 API 控件 "输入即保存"（localStorage 持久化），刷新不用重输 ==========
-            (function bindWelcomeInputs() {
-                // 简单防抖，避免逐字输入时频繁写 localStorage 导致卡顿
-                let _welTimer = null;
-                function debounce(fn, ms) {
-                    return function() {
-                        const ctx = this, args = arguments;
-                        if (_welTimer) clearTimeout(_welTimer);
-                        _welTimer = setTimeout(function() { _welTimer = null; fn.apply(ctx, args); }, ms);
-                    };
-                }
-                function saveFromWelcome() {
-                    try {
-                        const sl = $('welModelSelect');
-                        const pickModel = (sl && sl.style.display !== 'none') ? sl.value : ($('welModel') ? $('welModel').value : '');
-                        const cur = cfg();
-                        // NEVER 清空已有 key（如果用户不小心输入又删了，保护原 key）
-                        const newKey = $('welKey') ? $('welKey').value : '';
-                        const finalKey = (newKey && newKey.trim() !== '') ? newKey.trim() : (cur.key || '');
-                        scf({
-                            ...cur,
-                            preset: $('welEndpointPreset') ? $('welEndpointPreset').value : cur.preset,
-                            ep: ($('welEndpoint') ? $('welEndpoint').value : '') || DCFG.ep,
-                            model: pickModel || 'gpt-4o',
-                            key: finalKey
-                        });
-                    } catch {}
-                }
-                const debouncedWelSave = debounce(saveFromWelcome, 250);
-                const welIds = ['welKey','welEndpoint','welModel'];
-                welIds.forEach(id => { const el = document.getElementById(id); if (el) el.addEventListener('input', debouncedWelSave); });
-                const sel = document.getElementById('welModelSelect'); if (sel) sel.addEventListener('change', saveFromWelcome);
-                // ===== DZ：静默保存 —— 不再显示"已自动保存到本地"提示 =====
-            })();
-            $('btnTestWel').addEventListener('click', async () => {
-                const k = $('welKey').value;
-                if (!k) return tst('缺少密钥');
-                tst('测试中...');
-                try {
-                    const ep = $('welEndpoint').value;
-                    const testBody = { model: $('welModelSelect').value || $('welModel').value, messages: [{ role: 'user', content: 'hi' }], max_tokens: 5 };
-                    const r = await window._sendProxyRequest(ep, testBody, k, null, false);
-                    if (r.ok) {
-                        tst('连接成功');
-                    } else {
-                        let msg = '失败 (HTTP ' + r.status + ')';
-                        if (r.status === 401) msg = '失败：认证失败，请检查API密钥';
-                        else if (r.status === 403) msg = '失败：访问被拒绝';
-                        else if (r.status === 404) msg = '失败：接口不存在，请检查端点地址';
-                        else if (r.status === 429) msg = '失败：请求过于频繁';
-                        else if (r.status >= 500) msg = '失败：服务器暂时不可用';
-                        tst(msg);
-                    }
-                } catch { tst('网络错误：无法连接到服务器，请检查网络或端点地址'); }
-            });
+            // ===== DZ welcomeModal 已移除：API 配置统一走创建向导第④步（charStep4）与设置面板 =====
 
             // 共享：从表单读取角色卡（供"开始游戏"和"应用设定不重开"复用）
             function _collectCharFromForm() {
@@ -8644,15 +8788,11 @@ ${sumContent}
                     overlay.style.display = 'none';
                     return;
                 }
-                if (overlay && overlay.id === 'welcomeModal') {
-                    tst('请完成配置后再关闭');
-                    return;
-                }
                 overlay && (overlay.style.display = 'none');
             }));
             document.querySelectorAll('.modal-overlay').forEach(m => {
                 const id = m.id;
-                const noDismiss = (id === 'welcomeModal' || id === 'charModal' || id === 'apiConfigModal');
+                const noDismiss = (id === 'charModal' || id === 'apiConfigModal');
                 m.addEventListener('click', function(e) {
                     if (e.target === this && !noDismiss) this.style.display = 'none';
                 });
@@ -9193,27 +9333,26 @@ ${sumContent}
                 const tutDone = localStorage.getItem('vn_tutorial');
                 const needsTutFirst = !tutDone && !finalCfg.key && !hasCustomCharacter();
 
+                // ===== DZ 整合：无 key 时直接进入创建向导（API 配置在第④步完成；welcomeModal 已移除）=====
+                const _openWizardForApiKey = () => {
+                    try { if (typeof fillCharModal === 'function') fillCharModal(); } catch(e) {}
+                    try {
+                        const _cm = $('charModal');
+                        if (_cm) {
+                            if (hasCustomCharacter()) _cm.classList.remove('is-first');
+                            else _cm.classList.add('is-first');
+                            _cm.style.display = 'flex';
+                        }
+                    } catch(e) {}
+                    try { if (window.DZ && window.DZ.charStep4) window.DZ.charStep4.fill(); } catch(e) {}
+                };
                 if (!finalCfg.key) {
                     if (!needsTutFirst) {
-                        // Step 1: No API key (教程已完成) - show welcome modal for configuration, UNCONDITIONALLY 回填所有字段
-                        if ($('welEndpointPreset')) {
-                            $('welEndpointPreset').value = finalCfg.preset || 'openai';
-                            // 触发 change 事件以刷新 welModelSelect 选项
-                            try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
-                        }
-                        $('welEndpoint').value = finalCfg.ep || '';
-                        const sl = $('welModelSelect');
-                        if (finalCfg.model && sl) {
-                            const hasOpt = [...sl.options].some(o => o.value === finalCfg.model);
-                            if (hasOpt) sl.value = finalCfg.model;
-                            else { $('welModel').value = finalCfg.model; sl.style.display='none'; $('welModel').style.display=''; }
-                        } else if (finalCfg.model) {
-                            $('welModel').value = finalCfg.model;
-                        }
-                        $('welKey').value = finalCfg.key || '';
-                        $('welcomeModal').style.display = 'flex';
+                        // Step 1: No API key (教程已完成) - 直接进入创建向导，第④步配置 API
+                        _openWizardForApiKey();
+                        tst('请创建角色，并在向导第④步完成 AI API 配置');
                     }
-                    // 若需要先播教程，则不显示欢迎模态，由下方教程回调中显示
+                    // 若需要先播教程，则由下方教程回调中打开向导
                 } else if (loadedFromSave) {
                     // Step 2: Has API key + loaded from save - restore silently
                     rbt();
@@ -9232,35 +9371,19 @@ ${sumContent}
                     tst('请创建你的角色');
                 }
                 // Only auto-focus input if no modal is covering the screen
-                const wm = $('welcomeModal'), cm = $('charModal');
-                const wmHidden = !wm || wm.style.display === 'none' || !wm.style.display;
+                const cm = $('charModal');
                 const cmHidden = !cm || cm.style.display === 'none' || !cm.style.display;
-                if (wmHidden && cmHidden && !isMobile()) {
+                if (cmHidden && !isMobile()) {
                     setTimeout(() => $('inputText').focus(), 100);
                 }
                 // ===== 新手教程触发（needsTutFirst 已在上方预判）=====
                 if (needsTutFirst) {
-                    // 教程独占顶层（欢迎模态未显示，无需隐藏）
+                    // 教程独占顶层（向导未显示，无需隐藏）
                     setTimeout(() => {
                         launchTutorial(() => {
-                            // 教程结束后再回填并显示 API 配置模态
-                            try {
-                                if ($('welEndpointPreset')) {
-                                    $('welEndpointPreset').value = finalCfg.preset || 'openai';
-                                    try { $('welEndpointPreset').dispatchEvent(new Event('change', {bubbles:false})); } catch {}
-                                }
-                                $('welEndpoint').value = finalCfg.ep || '';
-                                const sl = $('welModelSelect');
-                                if (finalCfg.model && sl) {
-                                    const hasOpt = [...sl.options].some(o => o.value === finalCfg.model);
-                                    if (hasOpt) sl.value = finalCfg.model;
-                                    else { $('welModel').value = finalCfg.model; sl.style.display='none'; $('welModel').style.display=''; }
-                                } else if (finalCfg.model) {
-                                    $('welModel').value = finalCfg.model;
-                                }
-                                $('welKey').value = finalCfg.key || '';
-                                if (wm) wm.style.display = 'flex';
-                            } catch {}
+                            // 教程结束后直接进入创建向导（第④步配置 API）
+                            _openWizardForApiKey();
+                            try { tst('请创建角色，并在向导第④步完成 AI API 配置'); } catch(e) {}
                         });
                     }, 300);
                 }

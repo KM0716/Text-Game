@@ -298,7 +298,8 @@
                 '3. 可选文字标签：[伤势:文字] [心态:文字]',
                 '4. 幅度参考：常规行动 1-5 点，剧烈/极端行动 5-15 点，休息恢复 5-15 点；一切以剧情合理性为准，禁止无理由大幅跳变。',
                 '5. 正文中已发生的事实优先（吃了东西→饱腹上升；奔跑→疲劳上升；受伤→伤势恶化），不要否定正文。',
-                '6. 只结算“本轮正文”造成的变化，基于给出的当前状态做增量或绝对值裁定。'
+                '6. 只结算“本轮正文”造成的变化，基于给出的当前状态做增量或绝对值裁定。',
+                '7. 【判定依据】标签行之后，对每个发生变化的标签另起一行输出：依据:名称——简短理由（≤20字，引用本轮正文事实，让玩家看懂数值为何变化）；无变化的标签不必给依据。'
             ].join('\n');
         },
         run: async function (fullTx) {
@@ -315,7 +316,7 @@
                 '【当前状态】' + cur.join(' ') + ' 伤势:' + (s.wd || '无') + ' 心态:' + (s.mood || '平静'),
                 '【玩家行动】' + (lastUser || '（无明显行动）').slice(0, 500),
                 '【本轮正文】\n' + String(fullTx || '').slice(0, 2500),
-                '请输出本轮结算标签行（可多行）。'
+                '请输出本轮结算标签行（可多行），并附判定依据行。'
             ].join('\n');
             const body = {
                 model: c.model,
@@ -323,7 +324,7 @@
                     { role: 'system', content: varJudge._systemPrompt() },
                     { role: 'user', content: user }
                 ],
-                max_tokens: 160,
+                max_tokens: 300,
                 temperature: 0.15,
                 stream: false
             };
@@ -341,6 +342,12 @@
                 window.apb({ ty: 'system', tx: '⚖ 变量官结算失败，本轮跳过（网络或配置问题，不影响剧情）。' }, 0);
                 return;
             }
+            // DZ 判定依据：解析「依据:名称——理由」行（不计入结算标签，仅供展示与写回）
+            const reasons = {};
+            String(out).split(/\n+/).forEach(function (ln) {
+                const m = ln.match(/^\s*依据\s*[:：]\s*([^\s——、，,]{1,6})\s*[——\-]\s*(.+)$/);
+                if (m) reasons[m[1].trim()] = m[2].trim().slice(0, 30);
+            });
             if (out.indexOf('[无]') !== -1 || !/\[[^\]]+\]/.test(out)) {
                 window.apb({ ty: 'varblock', tx: '本轮无数值变化。' }, 0);
                 return;
@@ -356,12 +363,15 @@
                     const inner = t.slice(1, -1).replace(/：/g, ':').replace(/:\s+/g, ':');
                     const eq = inner.indexOf(':');
                     if (eq <= 0) return '';
-                    return '[变量官:' + inner.slice(0, eq).trim() + '=' + inner.slice(eq + 1).trim() + ']';
+                    const _nm = inner.slice(0, eq).trim();
+                    const _val = inner.slice(eq + 1).trim();
+                    const _rs = reasons[_nm] ? ('|依据:' + reasons[_nm]) : '';
+                    return '[变量官:' + _nm + '=' + _val + _rs + ']';
                 }).join('');
                 for (let i = hist.length - 1; i >= 0; i--) {
                     if (hist[i] && hist[i].role === 'assistant') {
                         if (vjText) {
-                            hist[i].content = String(hist[i].content || '') + '\n' + vjText.slice(0, 300);
+                            hist[i].content = String(hist[i].content || '') + '\n' + vjText.slice(0, 600);
                             if (typeof window.svh === 'function') window.svh(hist);
                         }
                         break;
@@ -376,10 +386,11 @@
                 if (typeof a === 'number' && typeof b === 'number' && a !== b) {
                     const d = b - a;
                     lines.push(p[0] + ' ' + a + ' → ' + b + '（' + (d > 0 ? '+' : '') + d + '）');
+                    if (reasons[p[0]]) lines.push('　└ 依据：' + reasons[p[0]]);
                 }
             });
-            if (before['伤势'] !== after['伤势']) lines.push('伤势 → ' + after['伤势']);
-            if (before['心态'] !== after['心态']) lines.push('心态 → ' + after['心态']);
+            if (before['伤势'] !== after['伤势']) { lines.push('伤势 → ' + after['伤势']); if (reasons['伤势']) lines.push('　└ 依据：' + reasons['伤势']); }
+            if (before['心态'] !== after['心态']) { lines.push('心态 → ' + after['心态']); if (reasons['心态']) lines.push('　└ 依据：' + reasons['心态']); }
             window.apb({
                 ty: 'varblock',
                 tx: (lines.length ? lines.join('\n') : '本轮数值无变化。') + '\n· 已通过状态闸门验证'
@@ -432,6 +443,78 @@
                 } catch (e) { lastErr = e; }
             }
             throw lastErr || new Error('双模型润色失败');
+        },
+        /* DZ 双模型流式：SSE 边生成边回调 onDelta(partialClean)；任何失败自动回退非流式 rewrite。
+         * 返回 { text, streamed } —— text 为最终重组文本，streamed 表示是否真走了流式。 */
+        rewriteStream: async function (narrative, onDelta) {
+            const c = cfg();
+            const minLength = Math.max(30, String(narrative || '').length * 0.3);
+            const mkBody = function (stream) {
+                return {
+                    model: c.model2.trim(),
+                    messages: [
+                        { role: 'system', content: dual._systemPrompt() },
+                        { role: 'user', content: '【待重组正文】\n' + String(narrative || '').slice(0, 8000) + '\n\n输出重组后的正文（仅正文）：' }
+                    ],
+                    max_tokens: Math.max(1200, parseInt(c.maxT, 10) || 2000),
+                    temperature: 0.7,
+                    stream: !!stream
+                };
+            };
+            let acc = '';
+            try {
+                const resp = await window._sendProxyRequest(c.ep, mkBody(true), c.key, null, true);
+                if (!resp.ok || !resp.body) throw new Error('rewriteStream HTTP ' + resp.status);
+                const rd = resp.body.getReader();
+                const dc = new TextDecoder();
+                let buf = '', isSSE = true, firstChunk = true;
+                const feed = function (text) {
+                    if (!text) return;
+                    acc += text;
+                    const clean = String(acc).replace(/^\s*```[a-z]*\s*/i, '').replace(/```\s*$/, '');
+                    if (onDelta) { try { onDelta(clean); } catch (e0) {} }
+                };
+                const eatLine = function (l) {
+                    l = String(l || '');
+                    if (l.indexOf('data:') !== 0) return;
+                    const d0 = l.replace(/^data:\s?/, '').trim();
+                    if (!d0 || d0 === '[DONE]') return;
+                    try {
+                        const j = JSON.parse(d0);
+                        if (j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content) feed(j.choices[0].delta.content);
+                    } catch (e1) {}
+                };
+                while (true) {
+                    const r2 = await rd.read();
+                    if (r2.done) {
+                        if (isSSE && buf) String(buf).split('\n').forEach(eatLine);
+                        break;
+                    }
+                    buf += dc.decode(r2.value, { stream: true });
+                    if (firstChunk) {
+                        if (buf.length >= 8) {
+                            firstChunk = false;
+                            if (buf.indexOf('data:') === -1) { isSSE = false; break; }
+                        } else continue;
+                    }
+                    if (!isSSE) break;
+                    const ls = String(buf).split('\n');
+                    buf = ls.pop() || '';
+                    ls.forEach(eatLine);
+                }
+                if (!isSSE && buf) {
+                    // 服务端忽略 stream:true：按普通 JSON 响应处理
+                    try {
+                        const j = JSON.parse(buf);
+                        acc = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+                        if (onDelta) { try { onDelta(acc); } catch (e0) {} }
+                    } catch (e1) { acc = ''; }
+                }
+                const clean = String(acc).replace(/^\s*```[a-z]*\s*/i, '').replace(/```\s*$/, '').trim();
+                if (clean.length >= minLength) return { text: clean, streamed: true };
+            } catch (e) { /* 落入下方非流式回退 */ }
+            const text = await dual.rewrite(narrative);
+            return { text: text, streamed: false };
         }
     };
 
@@ -1089,7 +1172,360 @@
     };
 
     /* ================================================================
-     * 13. 对外暴露 + 初始化
+     * 13. 剧情档案（书签 / 时间轴回放 / 剧本导出）
+     * ================================================================ */
+    const BM_KEY = 'zday_dz_bookmarks_v1';
+    let _bmCache = null;
+
+    function bmLoad() {
+        if (_bmCache) return _bmCache;
+        try {
+            const raw = localStorage.getItem(BM_KEY);
+            _bmCache = raw ? JSON.parse(raw) : { v: 1, items: [] };
+            if (!Array.isArray(_bmCache.items)) _bmCache.items = [];
+        } catch (e) { _bmCache = { v: 1, items: [] }; }
+        return _bmCache;
+    }
+    function bmSave() {
+        try { localStorage.setItem(BM_KEY, JSON.stringify(bmLoad())); } catch (e) {}
+    }
+
+    const story = {
+        _tab: 'timeline', // 当前档案页：timeline | bookmarks | export
+
+        /* ---- 回合序列：hist 中每条 user 消息配对其后的 assistant ---- */
+        turns: function () {
+            const hist = window._getHist ? window._getHist() : [];
+            const arr = [];
+            for (let i = 0; i < hist.length; i++) {
+                const m = hist[i];
+                if (!m || m.role !== 'user' || !m.content) continue;
+                let aIdx = -1;
+                for (let j = i + 1; j < hist.length; j++) {
+                    if (!hist[j]) continue;
+                    if (hist[j].role === 'user') break;
+                    if (hist[j].role === 'assistant') { aIdx = j; break; }
+                }
+                arr.push({ uIdx: i, aIdx: aIdx, user: m, ai: aIdx >= 0 ? hist[aIdx] : null });
+            }
+            return arr;
+        },
+        _preview: function (raw, n) {
+            let t = String(raw || '');
+            t = t.replace(/\[[^\]]*\]/g, '').replace(/\s+/g, ' ').trim();
+            return t.length > (n || 60) ? t.slice(0, n || 60) + '…' : t;
+        },
+
+        /* ---- 书签 ---- */
+        addBookmark: function (label) {
+            const hist = window._getHist ? window._getHist() : [];
+            if (!hist.length) { if (window.tst) window.tst('还没有剧情，先玩一回合再打书签'); return null; }
+            const bm = {
+                id: 'bm' + Date.now().toString(36) + Math.floor(Math.random() * 1e4).toString(36),
+                label: String(label || '').trim().slice(0, 40) || ('第 ' + story.turns().length + ' 回合'),
+                histLen: hist.length,
+                ts: Date.now()
+            };
+            bmLoad().items.push(bm);
+            bmSave();
+            return bm;
+        },
+        removeBookmark: function (id) {
+            bmLoad().items = bmLoad().items.filter(function (b) { return b.id !== id; });
+            bmSave();
+        },
+
+        /* ---- 回放：把 hist[0..endIdx] 静默解析后渲染进容器 ---- */
+        replayInto: function (box, endIdx) {
+            const hist = (window._getHist ? window._getHist() : []).slice(0, endIdx + 1);
+            box.innerHTML = '';
+            hist.forEach(function (m) {
+                if (!m || !m.content) return;
+                if (m.role === 'user') {
+                    box.appendChild(window.cbe({ ty: 'player', tx: m.content }));
+                } else {
+                    window.pai(m.content, true).forEach(function (b) {
+                        if (b.ty === 'choice') return; // 回放不渲染可交互选项
+                        box.appendChild(window.cbe(b));
+                    });
+                }
+            });
+        },
+        _replayView: function (endIdx, title, fromTab) {
+            const wrap = document.createElement('div');
+            wrap.className = 'dz-replay-view';
+            const back = document.createElement('button');
+            back.className = 'btn-modal dz-replay-back';
+            back.textContent = '‹ 返回列表';
+            back.addEventListener('click', function () { story._tab = fromTab || 'timeline'; story.render(); });
+            const head = document.createElement('div');
+            head.className = 'dz-replay-head';
+            head.textContent = title || '剧情回放';
+            const box = document.createElement('div');
+            box.className = 'dz-replay-box';
+            story.replayInto(box, endIdx);
+            wrap.appendChild(back);
+            wrap.appendChild(head);
+            wrap.appendChild(box);
+            return wrap;
+        },
+
+        /* ---- 剧本导出（Markdown Blob 下载） ---- */
+        _scriptBlock: function (raw) {
+            let t = String(raw || '');
+            // 选项块 → 可读列表（容错未闭合）
+            t = t.replace(/\[choice\]([\s\S]*?)(?:\[\/choice\]|$)/gi, function (_, body) {
+                const opts = body.split(/\n+/).map(function (s) {
+                    return s.replace(/^[-·•*]\s*/, '').replace(/^\d+[.、)．]\s*/, '').trim();
+                }).filter(Boolean);
+                return '\n▸ 选项：\n' + opts.map(function (o) { return '  · ' + o; }).join('\n') + '\n';
+            });
+            t = t.replace(/\[\/(?:npc|panel|player|system|chapter|whisper|monologue|clue)[^\]]*\]/gi, '');
+            t = t.replace(/\[npc[：:]([^\]]+)\]/g, '\n【$1】');
+            t = t.replace(/\[panel[：:]([^\]]+)\]/g, '\n◆ $1 ◆');
+            t = t.replace(/\[player\]/g, '\n◆ 我 ◆');
+            t = t.replace(/\[system\]/g, '\n◆ 系统 ◆');
+            t = t.replace(/\[chapter\]/g, '\n—— 章节 ——\n');
+            t = t.replace(/\[whisper\]/g, '\n（低语）');
+            t = t.replace(/\[monologue\]/g, '\n（内心）');
+            t = t.replace(/\[clue\]/g, '\n📌 线索：');
+            t = t.replace(/\[变量官[：:]([^\]]+)\]/g, '\n⚖ 变量官：$1');
+            t = t.replace(/\n{3,}/g, '\n\n');
+            return t.trim();
+        },
+        exportMarkdown: function () {
+            const hist = window._getHist ? window._getHist() : [];
+            if (!hist.length) { if (window.tst) window.tst('还没有剧情可以导出'); return; }
+            const c = window.gch ? window.gch() : {};
+            const pad = function (n) { return (n < 10 ? '0' : '') + n; };
+            const d = new Date();
+            const lines = [];
+            lines.push('# 代号：ZDay · 剧本存档');
+            lines.push('');
+            lines.push('> 导出时间：' + d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes()));
+            let dayTxt = '';
+            try { const k = window.gclk ? window.gclk() : null; if (k && k.day) dayTxt = ' ｜ 游戏内：第 ' + k.day + ' 天'; } catch (e) {}
+            lines.push('> 回合数：' + story.turns().length + dayTxt);
+            lines.push('');
+            // 一、角色卡
+            lines.push('## 一、角色与世界');
+            const kv = [['主角', c.cn], ['职业', c.job], ['背景', c.bg], ['性格', c.pers], ['技能', c.skl], ['恐惧', c.fear], ['精神锚点', c.mental], ['灾变', c.dn], ['环境', c.env], ['世界规则', c.wr], ['危险等级', c.danger], ['地理', c.geo], ['地点', c.loc], ['势力', c.fac], ['历史', c.hist], ['资源', c.res]];
+            kv.forEach(function (p) { if (p[1]) lines.push('- **' + p[0] + '**：' + p[1]); });
+            lines.push('');
+            // 二、世界书
+            const wbList = worldbook.list();
+            if (wbList.length) {
+                lines.push('## 二、世界书词条');
+                lines.push('');
+                wbList.forEach(function (e) {
+                    lines.push('### ' + e.title);
+                    lines.push('');
+                    lines.push(e.content);
+                    lines.push('');
+                });
+            }
+            // 三、剧情全文
+            lines.push('## ' + (wbList.length ? '三' : '二') + '、剧情全文');
+            lines.push('');
+            let turn = 0;
+            hist.forEach(function (m) {
+                if (!m || !m.content) return;
+                if (m.role === 'user') {
+                    turn++;
+                    lines.push('### 第 ' + turn + ' 回合');
+                    lines.push('');
+                    lines.push('> 【我】' + story._preview(m.content, 200));
+                    lines.push('');
+                } else {
+                    lines.push(story._scriptBlock(m.content));
+                    lines.push('');
+                }
+            });
+            const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'zday-剧本-' + d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.md';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 400);
+            if (window.tst) window.tst('剧本已导出（.md）');
+        },
+
+        /* ---- 渲染 ---- */
+        render: function () {
+            const root = $('dzArchiveContent');
+            if (!root) return;
+            if (story._tab === 'bookmarks') return story._renderBookmarks(root);
+            if (story._tab === 'export') return story._renderExport(root);
+            story._renderTimeline(root);
+        },
+        _renderTimeline: function (root) {
+            root.innerHTML = '';
+            const turns = story.turns();
+            const tip = document.createElement('div');
+            tip.className = 'dz-archive-tip';
+            tip.textContent = turns.length ? ('共 ' + turns.length + ' 个回合 · 点击「回放」重看当时的剧情（只读，不影响当前进度）') : '还没有对话记录，开始游戏后再来翻档案';
+            root.appendChild(tip);
+            turns.forEach(function (t, i) {
+                const row = document.createElement('div');
+                row.className = 'dz-tl-row';
+                const main = document.createElement('div');
+                main.className = 'dz-tl-main';
+                const tag = document.createElement('span');
+                tag.className = 'dz-tl-turn';
+                tag.textContent = '第 ' + (i + 1) + ' 回';
+                main.appendChild(tag);
+                const tx = document.createElement('div');
+                tx.className = 'dz-tl-tx';
+                tx.textContent = story._preview(t.user.content, 60) || '（无输入）';
+                main.appendChild(tx);
+                row.appendChild(main);
+                const acts = document.createElement('div');
+                acts.className = 'dz-tl-acts';
+                const btn = document.createElement('button');
+                btn.className = 'btn-modal';
+                btn.textContent = '回放';
+                btn.addEventListener('click', function () {
+                    root.innerHTML = '';
+                    root.appendChild(story._replayView(t.aIdx >= 0 ? t.aIdx : t.uIdx, '第 ' + (i + 1) + ' 回合 · ' + story._preview(t.user.content, 24), 'timeline'));
+                    root.scrollTop = 0;
+                });
+                acts.appendChild(btn);
+                row.appendChild(acts);
+                root.appendChild(row);
+            });
+        },
+        _renderBookmarks: function (root) {
+            root.innerHTML = '';
+            const bar = document.createElement('div');
+            bar.className = 'dz-bm-bar';
+            const add = document.createElement('button');
+            add.className = 'btn-modal';
+            add.textContent = '＋ 在当前位置打书签';
+            add.addEventListener('click', function () {
+                if (story.addBookmark()) story.render();
+            });
+            bar.appendChild(add);
+            root.appendChild(bar);
+            const items = bmLoad().items.slice().sort(function (a, b) { return b.ts - a.ts; });
+            const tip = document.createElement('div');
+            tip.className = 'dz-archive-tip';
+            tip.textContent = items.length ? ('共 ' + items.length + ' 个书签 · 回放会从开局重现到打书签那一刻的剧情（只读）') : '还没有书签 · 在关键剧情处打个标记，随时回来翻看';
+            root.appendChild(tip);
+            items.forEach(function (bm) {
+                const row = document.createElement('div');
+                row.className = 'dz-tl-row';
+                const main = document.createElement('div');
+                main.className = 'dz-tl-main';
+                const tag = document.createElement('span');
+                tag.className = 'dz-tl-turn';
+                tag.textContent = new Date(bm.ts).toLocaleDateString('zh-CN', { month: 'numeric', day: 'numeric' });
+                main.appendChild(tag);
+                const tx = document.createElement('div');
+                tx.className = 'dz-tl-tx';
+                tx.textContent = bm.label;
+                main.appendChild(tx);
+                row.appendChild(main);
+                const acts = document.createElement('div');
+                acts.className = 'dz-tl-acts';
+                const rp = document.createElement('button');
+                rp.className = 'btn-modal';
+                rp.textContent = '回放';
+                rp.addEventListener('click', function () {
+                    root.innerHTML = '';
+                    root.appendChild(story._replayView(Math.max(0, bm.histLen - 1), '书签 · ' + bm.label, 'bookmarks'));
+                    root.scrollTop = 0;
+                });
+                acts.appendChild(rp);
+                const del = document.createElement('button');
+                del.className = 'btn-modal dz-bm-del';
+                del.textContent = '✕';
+                del.title = '删除书签';
+                del.addEventListener('click', function () {
+                    story.removeBookmark(bm.id);
+                    story.render();
+                });
+                acts.appendChild(del);
+                row.appendChild(acts);
+                root.appendChild(row);
+            });
+        },
+        _renderExport: function (root) {
+            root.innerHTML = '';
+            const box = document.createElement('div');
+            box.className = 'dz-export-box';
+            const turns = story.turns();
+            box.innerHTML = '<div class="dz-archive-tip">把这一局的故事导出为 Markdown 剧本：包含角色与世界设定、全部世界书词条、从头到尾的完整剧情（含旁白/NPC 台词/实物面板/变量官结算）。可以发给别人阅读你的冒险。</div>'
+                + '<div class="dz-archive-tip">当前：' + (turns.length ? (turns.length + ' 个回合' + (worldbook.count() ? ' · ' + worldbook.count() + ' 条世界书' : '')) : '暂无剧情') + '</div>';
+            const btn = document.createElement('button');
+            btn.className = 'btn-modal';
+            btn.textContent = '📄 导出剧本（.md）';
+            btn.addEventListener('click', story.exportMarkdown);
+            box.appendChild(btn);
+            root.appendChild(box);
+        }
+    };
+
+    /* ================================================================
+     * 14. 移动端手势：屏幕左边缘右滑开侧栏；侧栏/面板内左滑关闭
+     * ================================================================ */
+    function initGestures() {
+        let sx = 0, sy = 0, st = 0, tracking = false;
+        let fromEdge = false, inSidebar = false, inPanel = false;
+        document.addEventListener('touchstart', function (ev) {
+            if (ev.touches.length !== 1) { tracking = false; return; }
+            const t = ev.touches[0];
+            sx = t.clientX; sy = t.clientY; st = Date.now();
+            fromEdge = sx < 36;
+            inSidebar = false; inPanel = false;
+            const sb = $('dzSidebar');
+            if (sb) {
+                const r = sb.getBoundingClientRect();
+                if (sx >= r.left && sx <= r.right && sy >= r.top && sy <= r.bottom) inSidebar = true;
+            }
+            const sp = $('sidePanel');
+            if (sp && sp.classList.contains('open')) {
+                const r = sp.getBoundingClientRect();
+                if (sx >= r.left && sx <= r.right && sy >= r.top && sy <= r.bottom) inPanel = true;
+            }
+            tracking = true;
+        }, { passive: true });
+        document.addEventListener('touchend', function (ev) {
+            if (!tracking) return;
+            tracking = false;
+            if (isDesktop()) return; // 手势仅移动端生效
+            // 有模态框打开时不响应（避免在弹层上误触）
+            const mods = document.querySelectorAll('.modal-overlay');
+            for (let i = 0; i < mods.length; i++) {
+                if (mods[i].style.display !== 'none') return;
+            }
+            const t = ev.changedTouches[0];
+            const dx = t.clientX - sx;
+            const dy = t.clientY - sy;
+            if (Date.now() - st > 700 || Math.abs(dy) > 60 || Math.abs(dx) < 50) return; // 排除垂直滚动与轻点
+            // ① 屏幕左边缘右滑 → 展开侧栏
+            if (fromEdge && dx > 50 && !layout.isSidebarOpen()) {
+                layout.setSidebar(true, false);
+                return;
+            }
+            // ② 侧栏内左滑 → 收起侧栏
+            if (inSidebar && dx < -50) {
+                layout.setSidebar(false, false);
+                return;
+            }
+            // ③ 面板内左滑 → 关闭主从面板
+            if (inPanel && dx < -50) {
+                const sp = $('sidePanel'), so = $('sideOverlay');
+                if (sp) sp.classList.remove('open');
+                if (so) so.classList.remove('show');
+                return;
+            }
+        }, { passive: true });
+    }
+
+    /* ================================================================
+     * 15. 对外暴露 + 初始化
      * ================================================================ */
     window.DZ = {
         worldbook: worldbook,
@@ -1102,6 +1538,7 @@
         charStep4: charStep4,
         narrative: narrative,
         settingsHooks: settingsHooks,
+        story: story,
         buildSystemNote: buildSystemNote,
         systemNoteHash: systemNoteHash,
         openModal: openModal
@@ -1119,6 +1556,20 @@
         bindModal('worldbookModal', 'modalCloseWorldbook', worldbook.renderUI);
         bindModal('narrativeModal', 'modalCloseNarrative');
         bindModal('memoryModal', 'modalCloseMemory');
+        bindModal('archiveModal', 'modalCloseArchive', story.render);
+        // 剧情档案：侧栏入口 + 页签切换
+        const ar = $('dzBtnArchive');
+        if (ar) ar.addEventListener('click', function () { story.render(); openModal('archiveModal'); });
+        document.querySelectorAll('.dz-archive-tab').forEach(function (btn) {
+            btn.addEventListener('click', function () {
+                document.querySelectorAll('.dz-archive-tab').forEach(function (b) { b.classList.remove('active'); });
+                btn.classList.add('active');
+                story._tab = btn.getAttribute('data-atab') || 'timeline';
+                story.render();
+            });
+        });
+        // 移动端手势
+        initGestures();
         // 侧栏按钮
         const wb = $('dzBtnWorldbook');
         if (wb) wb.addEventListener('click', function () { worldbook.renderUI(); openModal('worldbookModal'); });
