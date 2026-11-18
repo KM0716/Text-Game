@@ -2022,7 +2022,7 @@
             border-bottom: 1px dotted var(--border-light);
         }
         .sandbox-subgroup h5::before {
-            content: '鈻?;
+            content: '▸';
             display: inline-block;
             margin-right: 4px;
             transition: transform 0.2s;
@@ -2239,7 +2239,9 @@
             padding-bottom: 7px;
             font-weight: bold;
         }
-        .modal-panel h4 {
+        /* DZ：向导面板（dz-wizard-panel）与 modal-panel 共用同一套表单样式，保持创建向导与游戏内弹窗视觉统一 */
+        .modal-panel h4,
+        .dz-wizard-panel h4 {
             font-size: 0.78rem;
             color: var(--ink-light);
             margin-top: 10px;
@@ -2247,7 +2249,8 @@
             border-left: 3px solid var(--accent);
             padding-left: 6px;
         }
-        .modal-panel label {
+        .modal-panel label:not(.dz-switch-row),
+        .dz-wizard-panel label:not(.dz-switch-row) {
             display: block;
             font-size: 0.7rem;
             color: var(--text-secondary);
@@ -2255,7 +2258,8 @@
             margin-top: 8px;
             font-weight: bold;
         }
-        .modal-panel .field-hint {
+        .modal-panel .field-hint,
+        .dz-wizard-panel .field-hint {
             font-size: 0.6rem;
             color: var(--text-muted);
             font-style: italic;
@@ -2266,7 +2270,10 @@
         }
         .modal-panel input,
         .modal-panel select,
-        .modal-panel textarea {
+        .modal-panel textarea,
+        .dz-wizard-panel input,
+        .dz-wizard-panel select,
+        .dz-wizard-panel textarea {
             width: 100%;
             padding: 7px 10px;
             font-size: 0.72rem;
@@ -2281,12 +2288,16 @@
         }
         .modal-panel input:focus,
         .modal-panel select:focus,
-        .modal-panel textarea:focus {
+        .modal-panel textarea:focus,
+        .dz-wizard-panel input:focus,
+        .dz-wizard-panel select:focus,
+        .dz-wizard-panel textarea:focus {
             border-color: var(--accent);
             box-shadow: 0 0 0 2px rgba(139, 69, 19, 0.12);
         }
         /* 手绘风格下拉菜单 */
-        .modal-panel select {
+        .modal-panel select,
+        .dz-wizard-panel select {
             appearance: none;
             -webkit-appearance: none;
             -moz-appearance: none;
@@ -2297,16 +2308,19 @@
             background-size: 12px;
             cursor: pointer;
         }
-        .modal-panel select:hover {
+        .modal-panel select:hover,
+        .dz-wizard-panel select:hover {
             border-color: var(--accent);
             background-color: var(--button-hover);
         }
-        .modal-panel select option {
+        .modal-panel select option,
+        .dz-wizard-panel select option {
             background: var(--bg-paper);
             color: var(--text);
             padding: 4px 8px;
         }
-        .modal-panel textarea {
+        .modal-panel textarea,
+        .dz-wizard-panel textarea {
             min-height: 48px;
             resize: vertical;
             line-height: 1.6;
@@ -3506,10 +3520,10 @@
             .quick-actions { gap: 4px; }
             .btn-quick { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
             .modal-panel h3 { font-size: 1rem; }
-            .modal-panel h4 { font-size: 0.82rem; }
-            .modal-panel label { font-size: 0.72rem; }
-            .modal-panel .field-hint { font-size: 0.65rem; }
-            .modal-panel input, .modal-panel select, .modal-panel textarea { font-size: 0.8rem; padding: 8px 9px; min-height: 40px; }
+            .modal-panel h4, .dz-wizard-panel h4 { font-size: 0.82rem; }
+            .modal-panel label:not(.dz-switch-row), .dz-wizard-panel label:not(.dz-switch-row) { font-size: 0.72rem; }
+            .modal-panel .field-hint, .dz-wizard-panel .field-hint { font-size: 0.65rem; }
+            .modal-panel input, .modal-panel select, .modal-panel textarea, .dz-wizard-panel input, .dz-wizard-panel select, .dz-wizard-panel textarea { font-size: 0.8rem; padding: 8px 9px; min-height: 40px; }
             .tab-btn { padding: 7px 9px; font-size: 0.7rem; min-height: 38px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
             .btn-modal { font-size: 0.78rem; padding: 8px 13px; min-height: 42px; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
             .sandbox-field-row .sandbox-field { flex: 1 1 100%; min-width: 0; }
@@ -5035,6 +5049,7 @@ body.dz-dragging { user-select: none; -webkit-user-select: none; }
 .dz-switch-row input[type="checkbox"] {
     margin-top: 3px;
     width: 15px; height: 15px;
+    padding: 0; border: none; background: none;
     accent-color: var(--accent);
     cursor: pointer;
     flex-shrink: 0;
@@ -5092,7 +5107,7 @@ body[data-theme="dark"].dz-hl-dialogue .dlg { color: #7db8e8; }
     display: flex; align-items: center; gap: 6px;
     flex-wrap: wrap;
 }
-.wb-entry-head input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; cursor: pointer; }
+.wb-entry-head input[type="checkbox"] { accent-color: var(--accent); width: 14px; height: 14px; padding: 0; border: none; background: none; cursor: pointer; }
 .wb-entry-title { font-weight: 700; font-size: 0.76rem; color: var(--text); flex: 1; min-width: 90px; }
 .wb-entry-keys { font-size: 0.62rem; color: var(--accent); }
 .wb-entry-btns { display: flex; gap: 4px; }

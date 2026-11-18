@@ -7936,7 +7936,6 @@ ${sumContent}
             $('bpViewAll') && $('bpViewAll').addEventListener('click', () => { bpView = 'all'; bpPage = 0; renderBackpack(); });
             $('bpViewStar') && $('bpViewStar').addEventListener('click', () => { bpView = 'star'; bpPage = 0; renderBackpack(); });
             $('btnOpenSandbox') && $('btnOpenSandbox').addEventListener('click', () => { renderSandbox(); openSandboxExtras(); $('sandboxModal').style.display = 'flex'; });
-            $('btnOpenSandbox2') && $('btnOpenSandbox2').addEventListener('click', () => { renderSandbox(); openSandboxExtras(); $('sandboxModal').style.display = 'flex'; });
             $('btnSideSandbox') && $('btnSideSandbox').addEventListener('click', () => { renderSandbox(); openSandboxExtras(); $('sandboxModal').style.display = 'flex'; });
             $('btnApplySandbox') && $('btnApplySandbox').addEventListener('click', () => { ssbx(gsbx()); applySandboxExtras(); $('sandboxModal').style.display = 'none'; tst('沙盒设置已应用'); });
             $('btnCancelSandbox') && $('btnCancelSandbox').addEventListener('click', () => { $('sandboxModal').style.display = 'none'; });
@@ -7966,6 +7965,38 @@ ${sumContent}
                     }
                 } catch(e) {}
             }
+
+            // ===== DZ：创建向导第③步内嵌沙盒配置（不再弹窗） =====
+            // #sandboxFormBody 是唯一表单主体：向导打开时移入 #sandboxInlineHost，关闭后移回 sandboxModal，
+            // 两处（向导 / 游戏内弹窗）共用同一 DOM 与数据源，避免双份状态不同步。
+            (function initSandboxInline() {
+                const wiz = $('charModal'), modal = $('sandboxModal');
+                const host = $('sandboxInlineHost'), body = $('sandboxFormBody');
+                if (!wiz || !modal || !host || !body) return;
+                const modalPanel = modal.querySelector('.modal-panel');
+                const modalFooter = modal.querySelector('.btn-row');
+                // 向导内改动即时落盘（向导哲学：所有配置自动保存）
+                const persistSandbox = () => { try { ssbx(gsbx()); applySandboxExtras(); } catch(e) {} };
+                host.addEventListener('change', persistSandbox);
+                const mountToWizard = () => {
+                    if (host.contains(body)) return;
+                    host.appendChild(body);
+                    renderSandbox(); openSandboxExtras();
+                };
+                const mountBackToModal = () => {
+                    if (!host.contains(body)) return;
+                    persistSandbox();
+                    if (modalFooter) modalPanel.insertBefore(body, modalFooter);
+                    else modalPanel.appendChild(body);
+                };
+                // 监听向导显隐（open/close/Esc/确认等所有路径统一走 style 变化）
+                const syncSandboxMount = () => {
+                    if (wiz.style.display === 'flex') mountToWizard();
+                    else mountBackToModal();
+                };
+                new MutationObserver(syncSandboxMount).observe(wiz, { attributes: true, attributeFilter: ['style', 'class'] });
+                syncSandboxMount();
+            })();
 
             // ===== Floating clue sidebar toggle & drag =====
             const clueSb = $('clueSidebar');

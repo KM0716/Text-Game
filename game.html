@@ -465,7 +465,7 @@
             <p class="field-hint">列出你世界中所有可探索的区域，用顿号、逗号或换行分隔。留空则使用上方特殊地点</p>
             <textarea id="charMapAreas" rows="2" placeholder="公寓区域、商业区、市中心医院、地下商场、城北军事基地、东部乡镇集市"></textarea>
             <div class="btn-row" style="justify-content:flex-start;margin-top:4px;">
-                <button class="btn-modal" id="btnRandomMap" style="font-size:0.66rem;">随机生成地图</button>
+                <button class="btn-modal" id="btnRandomMap" style="font-size:0.66rem;padding:4px 8px;">随机生成地图</button>
             </div>
             <p class="field-hint" id="charMapHint" style="color:var(--ink-soft);font-size:0.65rem;margin-top:4px;">点击"随机生成地图"将根据当前世界设定生成10-14个合理的探索区域，包括周边乡镇</p>
         </div>
@@ -482,7 +482,7 @@
             <div style="display:flex;gap:4px;"><select id="charGender"><option>男</option><option>女</option></select><select id="charBodyType"><option>正常</option><option>瘦削</option><option>健壮</option></select></div>
             <label>身高体重</label>
             <p class="field-hint">身高cm / 体重kg，影响负重、潜行、体能消耗。可点"自动计算"估算</p>
-            <div style="display:flex;gap:4px;"><input id="charHeight" type="number" placeholder="身高 cm"><input id="charWeight" type="number" placeholder="体重 kg"><button class="btn-modal" id="btnAutoWeight" style="font-size:0.6rem;white-space:nowrap;">自动计算</button></div>
+            <div style="display:flex;gap:4px;"><input id="charHeight" type="number" placeholder="身高 cm"><input id="charWeight" type="number" placeholder="体重 kg"><button class="btn-modal" id="btnAutoWeight" style="font-size:0.66rem;padding:4px 8px;white-space:nowrap;">自动计算</button></div>
             <label>惯用手</label>
             <p class="field-hint">影响战斗和操作动作的描述</p>
             <select id="charHand"><option value="右">右手</option><option value="左">左手</option><option value="双">双手惯用</option></select>
@@ -555,23 +555,9 @@
             </div>
         </div>
         <div class="tab-content" id="tab-sandbox">
-            <p class="field-hint" style="margin-bottom:8px;">沙盒细节用于精细调整游戏世界规则、生存机制、丧尸行为、载具系统等核心参数。所有设置均会作为AI生成剧情时的硬性约束。</p>
-            <p class="field-hint" style="margin-bottom:12px;">点击下方按钮打开详细配置面板，按10大分类进行设定。每项参数都有详细提示说明用途。</p>
-            <div class="btn-row" style="margin-bottom:8px;"><button class="btn-modal primary" id="btnOpenSandbox2" type="button">打开沙盒细节配置</button></div>
-            <h4 style="margin-top:14px;">十大分类概览</h4>
-            <ul style="font-size:0.78rem;line-height:1.7;color:var(--ink-soft);padding-left:1.2em;">
-                <li><strong>时间与世界设施</strong> — 昼夜流速、停水停电、物资刷新</li>
-                <li><strong>天气与自然环境</strong> — 气温、降雨、降雪、雾气、采集</li>
-                <li><strong>随机事件</strong> — 事件频率、幸存者遭遇、睡眠事件</li>
-                <li><strong>尸体与感染机制</strong> — 尸体感染风险、尸体吸引丧尸</li>
-                <li><strong>战利品（物资刷新）</strong> — 食物、医疗、武器、弹药等刷新率</li>
-                <li><strong>丧尸基础设定</strong> — 移速、力量、感染途径、感官、活跃时段</li>
-                <li><strong>丧尸种群与密度</strong> — 丧尸密度</li>
-                <li><strong>角色生存与属性</strong> — 饥渴衰减、疲劳积累、伤口感染</li>
-                <li><strong>载具系统</strong> — 载具可用性</li>
-                <li><strong>伦理与人性底线</strong> — 伦理底线、暴力程度、粗口、人性衰减、信任度</li>
-            </ul>
-            <p class="field-hint" style="margin-top:10px;">预设职业：在"角色设定"标签页的"职业与技能"部分可选择以下预设职业：行商、特别行动部队、流浪医生、工程师、黑客、狙击手、心理学家、炼金术士、退伍军人、前警官、街头混混、野外生存专家、科学家、神父/祭司、贵族/继承人。选择后将自动填充对应技能和初始物品。</p>
+            <p class="field-hint" style="margin-bottom:10px;">沙盒细节用于精细调整游戏世界规则、生存机制、丧尸行为、载具系统等核心参数。所有设置均会作为 AI 生成剧情时的硬性约束，改动自动保存在本地。点击分组标题可折叠/展开，每项参数都有详细提示说明用途。</p>
+            <!-- DZ：沙盒配置直接内嵌在向导第③步（不再弹窗），表单主体与游戏内「沙盒参数配置」弹窗共用同一 DOM（由 main.js 挂载搬运） -->
+            <div id="sandboxInlineHost"></div>
         </div>
         <!-- ===== 第四步：AI 与功能 ===== -->
         <div class="tab-content" id="tab-ai">
@@ -898,9 +884,10 @@
         <div class="btn-row"><button class="btn-modal primary" id="btnClosePromptHelp">知道了</button></div>
     </div></div>
 
-    <!-- Sandbox Modal -->
+    <!-- Sandbox Modal（表单主体 #sandboxFormBody 与创建向导第③步共用：向导打开时被移入 #sandboxInlineHost，关闭后移回此处） -->
     <div class="modal-overlay" id="sandboxModal" style="display:none;"><div class="modal-panel" style="max-width:640px;">
         <button class="modal-close" id="modalCloseSandbox">x</button><h3>沙盒参数配置</h3>
+        <div id="sandboxFormBody">
         <p class="field-hint" style="text-align:center;margin-bottom:6px;">修改以下参数可自定义游戏世界的核心规则。点击分组标题可折叠/展开。</p>
         <div id="sandboxContainer"></div>
         <hr style="border:none;border-top:1px dashed var(--divider);margin:8px 0;">
@@ -916,6 +903,7 @@
                 <option value="800">约 800 字（丰富）</option>
                 <option value="1200">约 1200 字（长篇）</option>
             </select>
+        </div>
         </div>
         <div class="btn-row">
             <button class="btn-modal" id="btnCancelSandbox">取消</button>
