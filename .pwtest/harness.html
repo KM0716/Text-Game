@@ -1,0 +1,103 @@
+<!DOCTYPE html><html><head><meta charset="utf-8"><title>HARNESS</title></head>
+<body>
+  <!-- Replicates game.html wizard + sandbox modal structure -->
+  <div id="charModal" style="display:none;">
+    <div class="dz-wizard-panel"><div class="dz-wizard-body">
+      <div class="tab-content" id="tab-sandbox"><div id="sandboxInlineHost"></div></div>
+    </div></div>
+  </div>
+
+  <div id="sandboxModal" style="display:none;">
+    <div class="modal-panel" style="max-width:640px;">
+      <button class="modal-close">x</button><h3>沙盒参数配置</h3>
+      <div id="sandboxFormBody">
+        <div id="sandboxContainer"></div>
+        <div id="writingGuidelinesContainer"></div>
+        <select id="targetWordCountSelect"><option value="0">a</option><option value="500">b</option></select>
+      </div>
+      <div class="btn-row"><button id="btnCancelSandbox">取消</button><button id="btnApplySandbox">应用</button></div>
+    </div>
+  </div>
+
+<pre id="out"></pre>
+<script>
+  const log = [];
+  const out = document.getElementById('out');
+  const $ = id => document.getElementById(id);
+  // stubs
+  let persistCount = 0, renderCount = 0, extrasCount = 0;
+  function gsbx(){ return { a:1 }; }
+  function ssbx(x){ persistCount++; return x; }
+  function applySandboxExtras(){ persistCount++; }  // mimic: applySandboxExtras is also called in persist path
+  function renderSandbox(){ renderCount++; const c=$('sandboxContainer'); if(c) c.innerHTML='<div class="sandbox-subgroup">rendered-'+renderCount+'</div>'; }
+  function openSandboxExtras(){ extrasCount++; const w=$('writingGuidelinesContainer'); if(w) w.innerHTML='guidelines-'+extrasCount; }
+  function scf(x){ return x; } function cfg(){ return {}; }
+
+  // ---- exact copy of initSandboxInline from main.js ----
+  (function initSandboxInline() {
+    const wiz = $('charModal'), modal = $('sandboxModal');
+    const host = $('sandboxInlineHost'), body = $('sandboxFormBody');
+    if (!wiz || !modal || !host || !body) return;
+    const modalPanel = modal.querySelector('.modal-panel');
+    const modalFooter = modal.querySelector('.btn-row');
+    const persistSandbox = () => { try { ssbx(gsbx()); applySandboxExtras(); } catch(e) {} };
+    host.addEventListener('change', persistSandbox);
+    const mountToWizard = () => {
+      if (host.contains(body)) return;
+      host.appendChild(body);
+      renderSandbox(); openSandboxExtras();
+    };
+    const mountBackToModal = () => {
+      if (!host.contains(body)) return;
+      persistSandbox();
+      if (modalFooter) modalPanel.insertBefore(body, modalFooter);
+      else modalPanel.appendChild(body);
+    };
+    const syncSandboxMount = () => {
+      if (wiz.style.display === 'flex') mountToWizard();
+      else mountBackToModal();
+    };
+    new MutationObserver(syncSandboxMount).observe(wiz, { attributes: true, attributeFilter: ['style', 'class'] });
+    syncSandboxMount();
+  })();
+
+  // ---- test driver (async: MutationObserver fires asynchronously) ----
+  const tick = () => new Promise(r => setTimeout(r, 0));
+  (async () => {
+  function check(name, cond){ log.push((cond?'PASS':'FAIL')+' '+name); }
+  const host = $('sandboxInlineHost'), body = $('sandboxFormBody'), modal = $('sandboxModal');
+
+  check('initial body in modal', modal.contains(body) && !host.contains(body));
+
+  $('charModal').style.display = 'flex'; await tick();
+  check('after open: body in wizard host', host.contains(body) && !modal.contains(body));
+  check('after open: renderSandbox called', renderCount >= 1);
+  check('after open: openSandboxExtras called', extrasCount >= 1);
+
+  const r0 = renderCount;
+  $('charModal').style.display = 'flex'; await tick();
+  check('reopen idempotent (no extra render)', renderCount === r0);
+
+  const p0 = persistCount;
+  const sel = $('targetWordCountSelect');
+  sel.value = '500'; sel.dispatchEvent(new Event('change', {bubbles:true})); await tick();
+  check('change in wizard persists', persistCount > p0);
+
+  const p1 = persistCount;
+  $('charModal').style.display = 'none'; await tick();
+  check('after close: body back in modal', modal.contains(body) && !host.contains(body));
+  check('after close: body is before .btn-row footer', body.nextElementSibling && body.nextElementSibling.classList.contains('btn-row'));
+  check('after close: persist fired', persistCount > p1);
+
+  check('ingame modal body present', modal.querySelector('#sandboxContainer') === $('sandboxContainer'));
+
+  $('charModal').style.display = 'flex'; await tick();
+  check('reopen wizard moves body back to host', host.contains(body));
+
+  out.textContent = log.join('\n');
+  window.__HARNESS_DONE = true;
+  window.__HARNESS_LOG = log;
+  })();
+
+</script>
+</body></html>

@@ -1600,7 +1600,7 @@
               0 4px 8px rgba(181,139,90,0.08);
         }
         .vn-choice.selected::before {
-            content: '鈻?';
+            content: '▸';
             position: absolute;
             left: 10px;
             top: 50%;
@@ -1711,7 +1711,7 @@
             white-space: nowrap;
         }
         .item-ref::before {
-            content: '鈻?;
+            content: '▸';
             color: var(--accent);
             font-weight: bold;
             margin-right: 2px;
@@ -1722,7 +1722,7 @@
             box-shadow: 0 0 6px rgba(212, 168, 74, 0.35);
         }
         .bp-cell.stared::after {
-            content: '鈽?;
+            content: '★';
             position: absolute;
             top: 2px; right: 2px;
             color: #d4a84a;
